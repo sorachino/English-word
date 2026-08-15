@@ -3,6 +3,8 @@ const LS = {
   MY_WORDS: 'pv_my_words',
   WEAK: 'pv_weak',          // { "verb": {level:'hint'|'choice'|'wrong', streak:0} }
   LOG: 'pv_daily_log',      // { "2026-08-15": {solved:10, correct:8} }
+  AUTO_ENABLED: 'pv_auto_backup_enabled',
+  AUTO_COUNT: 'pv_auto_backup_count',
 };
 
 function loadJSON(key, fallback) {
@@ -359,6 +361,7 @@ function finishQuestion(ok, method, delay) {
   q.resolved = true; q.method = method;
   recordResult(q.answer, ok ? method : 'wrong');
   logToday(ok);
+  bumpAutoBackupCounter();
   if (ok) quizState.correctCount++;
   quizState.results.push({ verb: q.answer, ok });
 
@@ -557,6 +560,80 @@ function updateStreakPill() {
   document.getElementById('streak-num').textContent = calcStreak(log);
 }
 updateStreakPill();
+
+// ===================== バックアップ =====================
+function exportBackup(auto) {
+  const data = {
+    app: 'phrasal-verb-notebook',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    myWords: myWords(),
+    weak: loadJSON(LS.WEAK, {}),
+    log: loadJSON(LS.LOG, {}),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `phrasal-verb-backup-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast(auto ? '10問たまったので自動でバックアップしました' : 'バックアップを書き出しました');
+}
+
+function importBackup(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(reader.result);
+    } catch (e) {
+      toast('読み込みに失敗しました（ファイルが壊れています）');
+      return;
+    }
+    if (!data || typeof data !== 'object') {
+      toast('読み込みに失敗しました（形式が違います）');
+      return;
+    }
+    if (Array.isArray(data.myWords)) saveJSON(LS.MY_WORDS, data.myWords);
+    if (data.weak && typeof data.weak === 'object') saveJSON(LS.WEAK, data.weak);
+    if (data.log && typeof data.log === 'object') saveJSON(LS.LOG, data.log);
+    toast('バックアップを読み込みました');
+    refreshWeakRow();
+    updateStreakPill();
+    renderMyWordList();
+    renderStats();
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('export-btn').addEventListener('click', () => exportBackup(false));
+document.getElementById('import-btn').addEventListener('click', () => {
+  document.getElementById('import-file').click();
+});
+document.getElementById('import-file').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) importBackup(file);
+  e.target.value = '';
+});
+
+const autoToggle = document.getElementById('auto-backup-toggle');
+autoToggle.checked = loadJSON(LS.AUTO_ENABLED, true);
+autoToggle.addEventListener('change', () => saveJSON(LS.AUTO_ENABLED, autoToggle.checked));
+
+function bumpAutoBackupCounter() {
+  if (!loadJSON(LS.AUTO_ENABLED, true)) return;
+  const n = loadJSON(LS.AUTO_COUNT, 0) + 1;
+  if (n >= 10) {
+    exportBackup(true);
+    saveJSON(LS.AUTO_COUNT, 0);
+  } else {
+    saveJSON(LS.AUTO_COUNT, n);
+  }
+}
 
 // ===================== トースト =====================
 let toastTimer;

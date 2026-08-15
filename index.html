@@ -176,6 +176,18 @@
       <div class="weak-list" id="weak-list"></div>
       <div class="empty-note" id="weak-empty" hidden>まだ記録がありません。クイズを解くと、間違えた語やヒントを使った語がここに表示されます。</div>
     </div>
+
+    <div class="card">
+      <div class="section-label">バックアップ</div>
+      <label class="switch" style="margin-bottom:10px;">
+        <input type="checkbox" id="auto-backup-toggle" checked>
+        <span>10問解くごとに自動で書き出す</span>
+      </label>
+      <button class="btn-primary" id="export-btn">今すぐ書き出す（ダウンロード）</button>
+      <button class="btn-ghost btn-block" id="import-btn">ファイルから読み込む</button>
+      <input type="file" id="import-file" accept="application/json" hidden>
+      <div class="empty-note">キャッシュ削除や機種変更の前に書き出しておくと、成績・苦手語・マイ単語を復元できます。読み込むと今のデータは上書きされます。iPhoneの「ファイル」アプリのダウンロード先をiCloud Driveにしておくと、自動書き出し分もiCloudに残ります。</div>
+    </div>
   </section>
 
 </main>

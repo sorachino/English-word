@@ -154,10 +154,12 @@ select{
   width:70px; height:20px; background:rgba(199,154,61,.35);
   border:1px solid rgba(199,154,61,.5);
 }
+.card-stage-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
 .card-stage{
   font-family:"JetBrains Mono",monospace; font-size:11px; font-weight:700;
-  color:var(--hanko); letter-spacing:.1em; margin-bottom:10px;
+  color:var(--hanko); letter-spacing:.1em;
 }
+.card-stage-row .wi-mark{font-size:22px;}
 .question-text{
   font-size:18px; line-height:1.65; font-weight:500; color:var(--ink);
   min-height:64px;
@@ -230,16 +232,25 @@ select{
 .done-item.ng .r-mark{color:var(--hanko);}
 
 /* ---------- Word list ---------- */
-.list-controls{display:flex; gap:8px; margin-bottom:12px;}
+.list-controls{display:flex; gap:8px; margin-bottom:10px;}
 .list-controls input[type=search]{
   flex:1; min-width:0; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
   font-family:inherit; font-size:14px; background:#fff;
 }
 .list-controls select{flex:none; max-width:38%; padding:10px 8px; font-size:13px;}
+.list-controls-row2{display:flex; gap:8px; margin-bottom:8px;}
+.list-controls-row2 select{
+  flex:1; min-width:0; padding:9px 8px; font-size:12.5px; border:1px solid var(--line);
+  border-radius:8px; background:#fff; color:var(--ink); font-family:inherit;
+}
+.list-marked-toggle{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; cursor:pointer;}
 .word-item{
   background:var(--paper-raised); border:1px solid var(--line); border-radius:8px;
   padding:12px 14px; margin-bottom:8px; cursor:pointer;
+  border-left:4px solid var(--line);
 }
+.word-item.status-ok{border-left-color:var(--ok);}
+.word-item.status-ng{border-left-color:var(--hanko);}
 .word-item .wi-head{display:flex; justify-content:space-between; align-items:baseline;}
 .wi-verb{font-weight:800; font-size:15.5px; color:var(--navy);}
 .wi-stage{font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--gold); font-weight:700;}
@@ -250,6 +261,12 @@ select{
 .wi-detail .ja{color:var(--ink-soft); margin-bottom:8px;}
 .wi-detail .def{color:var(--ink-soft); font-size:12px; margin-top:4px;}
 .wi-badge-mine{display:inline-block; font-size:10px; background:var(--ok-soft); color:var(--ok); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:700;}
+.wi-right{display:flex; align-items:center; gap:8px; flex:none;}
+.wi-mark{
+  background:none; border:none; font-size:19px; line-height:1; cursor:pointer;
+  color:var(--line); padding:0 2px;
+}
+.wi-mark.on{color:var(--gold);}
 
 /* ---------- Dictionary form ---------- */
 .form-title{font-weight:900; font-size:16px; margin-bottom:12px; color:var(--navy);}
@@ -274,6 +291,7 @@ select{
 .weak-chip{
   font-size:12.5px; padding:5px 10px; border-radius:14px; font-weight:700;
   border:1px solid var(--hanko); color:var(--hanko); background:var(--hanko-soft);
+  cursor:pointer;
 }
 .weak-chip.hint{border-color:var(--gold); color:#8A6A1E; background:var(--gold-soft);}
 .empty-note{font-size:12.5px; color:var(--ink-soft); line-height:1.6;}

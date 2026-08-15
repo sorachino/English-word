@@ -181,6 +181,21 @@ function recordResult(verb, method) {
   saveJSON(LS.WEAK, weak);
 }
 
+// ===================== 単語ごとの回答履歴（単語帳の色分け用） =====================
+const LS_ANSWERED = 'pv_answered';
+function recordAnswered(verb, ok) {
+  const data = loadJSON(LS_ANSWERED, {});
+  if (!data[verb]) data[verb] = { ok: 0, ng: 0 };
+  if (ok) data[verb].ok++; else data[verb].ng++;
+  saveJSON(LS_ANSWERED, data);
+}
+function wordStatusClass(verb) {
+  const data = loadJSON(LS_ANSWERED, {});
+  const rec = data[verb];
+  if (!rec) return '';
+  return rec.ng > 0 ? ' status-ng' : ' status-ok';
+}
+
 function logToday(correct) {
   const log = loadJSON(LS.LOG, {});
   const key = todayKey();
@@ -270,6 +285,7 @@ function showQuestion() {
   document.getElementById('q-total').textContent = quizState.questions.length;
   document.getElementById('progress-fill').style.width = (100 * (quizState.idx) / quizState.questions.length) + '%';
   document.getElementById('card-stage').textContent = q.word.mine ? 'マイ単語' : ('Stage ' + q.word.stage + ' · No.' + q.word.no);
+  refreshQuizMarkBtn();
   document.getElementById('question-text').innerHTML = q.questionHtml;
   document.getElementById('ja-preview').textContent = q.ja;
   document.getElementById('hint-box').hidden = true;
@@ -403,6 +419,7 @@ function finishQuestion(ok, method, delay) {
   const q = quizState.questions[quizState.idx];
   q.resolved = true; q.method = method;
   recordResult(q.answer, ok ? method : 'wrong');
+  recordAnswered(q.answer, ok);
   logToday(ok);
   bumpAutoBackupCounter();
   playResultSound(ok);
@@ -464,13 +481,22 @@ function doneItemEl(r, idx) {
       <span class="wi-verb">${escHtml(r.verb)}</span>
       <span class="r-mark">${r.ok ? '○' : '×'}</span>
     </div>`;
-  div.addEventListener('click', () => openDoneDetail(idx));
+  div.addEventListener('click', () => {
+    const items = quizState.results.map(rr => ({ verb: rr.verb, ok: rr.ok, word: rr.q.word }));
+    openDetailModal(items, idx);
+  });
   return div;
 }
 
-// ===================== 結果詳細モーダル =====================
+function findWordByVerb(verb) {
+  return allWords().find(w => baseForm(w.verb) === verb);
+}
+
+// ===================== 結果詳細モーダル（クイズ結果・苦手語 共通） =====================
+let ddItems = [];
 let ddIndex = 0;
-function openDoneDetail(idx) {
+function openDetailModal(items, idx) {
+  ddItems = items;
   ddIndex = idx;
   renderDoneDetail();
   document.getElementById('dd-modal').hidden = false;
@@ -479,16 +505,19 @@ function closeDoneDetail() {
   document.getElementById('dd-modal').hidden = true;
 }
 function renderDoneDetail() {
-  const results = quizState.results;
-  const r = results[ddIndex];
-  const w = r.q.word;
+  const it = ddItems[ddIndex];
+  const w = it.word;
   document.getElementById('dd-idx').textContent = ddIndex + 1;
-  document.getElementById('dd-total').textContent = results.length;
+  document.getElementById('dd-total').textContent = ddItems.length;
   document.getElementById('dd-prev').disabled = ddIndex === 0;
-  document.getElementById('dd-next').disabled = ddIndex === results.length - 1;
+  document.getElementById('dd-next').disabled = ddIndex === ddItems.length - 1;
+  let markHtml;
+  if (it.ok === true) markHtml = '<div class="dd-mark ok">○ 正解</div>';
+  else if (it.ok === false) markHtml = '<div class="dd-mark ng">× 不正解</div>';
+  else markHtml = `<div class="dd-mark ng">★ 苦手な語${it.sub ? '（' + escHtml(it.sub) + '）' : ''}</div>`;
   document.getElementById('dd-body').innerHTML = `
-    <div class="dd-mark ${r.ok ? 'ok' : 'ng'}">${r.ok ? '○ 正解' : '× 不正解'}</div>
-    <div class="dd-verb">${escHtml(r.verb)}</div>
+    ${markHtml}
+    <div class="dd-verb">${escHtml(it.verb)}</div>
     ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)}</div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
     ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)}</div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
     <div class="def">${escHtml(w.meaning || '')}${w.def ? '／' + escHtml(w.def) : ''}</div>
@@ -496,9 +525,8 @@ function renderDoneDetail() {
   `;
 }
 function ddGo(delta) {
-  const results = quizState.results;
   const next = ddIndex + delta;
-  if (next < 0 || next >= results.length) return;
+  if (next < 0 || next >= ddItems.length) return;
   ddIndex = next;
   renderDoneDetail();
 }
@@ -532,12 +560,56 @@ document.getElementById('restart-btn').addEventListener('click', () => {
 });
 
 // ===================== UI: 単語帳 =====================
+// ===================== 単語帳：マーク =====================
+function loadMarked() { return new Set(loadJSON('pv_marked', [])); }
+function saveMarked(set) { saveJSON('pv_marked', [...set]); }
+function toggleMarked(verb) {
+  const set = loadMarked();
+  if (set.has(verb)) set.delete(verb); else set.add(verb);
+  saveMarked(set);
+  return set.has(verb);
+}
+
+function refreshQuizMarkBtn() {
+  if (!quizState) return;
+  const q = quizState.questions[quizState.idx];
+  const on = loadMarked().has(q.answer);
+  const btn = document.getElementById('quiz-mark-btn');
+  btn.textContent = on ? '★' : '☆';
+  btn.classList.toggle('on', on);
+}
+document.getElementById('quiz-mark-btn').addEventListener('click', () => {
+  if (!quizState) return;
+  const q = quizState.questions[quizState.idx];
+  toggleMarked(q.answer);
+  refreshQuizMarkBtn();
+});
+
 function renderWordList() {
   const q = document.getElementById('list-search').value.trim().toLowerCase();
   const stage = parseInt(document.getElementById('list-stage-filter').value, 10);
+  const sortMode = document.getElementById('list-sort').value;
+  const markedOnly = document.getElementById('marked-only-toggle').checked;
+  const marked = loadMarked();
+
   let words = allWords();
   if (stage) words = words.filter(w => w.stage === stage);
   if (q) words = words.filter(w => w.verb.toLowerCase().includes(q) || (w.meaning || '').includes(q));
+  if (markedOnly) words = words.filter(w => marked.has(baseForm(w.verb)));
+
+  words = words.slice();
+  if (sortMode === 'az') {
+    words.sort((a, b) => baseForm(a.verb).toLowerCase().localeCompare(baseForm(b.verb).toLowerCase()));
+  } else if (sortMode === 'za') {
+    words.sort((a, b) => baseForm(b.verb).toLowerCase().localeCompare(baseForm(a.verb).toLowerCase()));
+  } else if (sortMode === 'marked') {
+    words.sort((a, b) => {
+      const am = marked.has(baseForm(a.verb)) ? 1 : 0;
+      const bm = marked.has(baseForm(b.verb)) ? 1 : 0;
+      return bm - am;
+    });
+  }
+
   const el = document.getElementById('word-list');
   el.innerHTML = '';
   if (!words.length) { el.innerHTML = '<div class="empty-note">該当する語がありません</div>'; return; }
@@ -545,11 +617,16 @@ function renderWordList() {
 }
 function wordItemEl(w) {
   const div = document.createElement('div');
-  div.className = 'word-item';
+  const verbKey = baseForm(w.verb);
+  div.className = 'word-item' + wordStatusClass(verbKey);
+  const marked = loadMarked().has(verbKey);
   div.innerHTML = `
     <div class="wi-head">
       <div><span class="wi-verb">${escHtml(w.verb)}</span>${w.mine ? '<span class="wi-badge-mine">マイ単語</span>' : ''}</div>
-      <div class="wi-stage">${w.mine ? 'MY' : 'ST.' + w.stage}</div>
+      <div class="wi-right">
+        <button class="wi-mark${marked ? ' on' : ''}" type="button" aria-label="マーク">${marked ? '★' : '☆'}</button>
+        <span class="wi-stage">${w.mine ? 'MY' : 'ST.' + w.stage}</span>
+      </div>
     </div>
     <div class="wi-meaning">${escHtml(w.meaning || '')}</div>
     <div class="wi-detail">
@@ -558,6 +635,12 @@ function wordItemEl(w) {
       ${w.def ? `<div class="def">${escHtml(w.def)}</div>` : ''}
       ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
     </div>`;
+  div.querySelector('.wi-mark').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const nowOn = toggleMarked(verbKey);
+    e.currentTarget.textContent = nowOn ? '★' : '☆';
+    e.currentTarget.classList.toggle('on', nowOn);
+  });
   div.addEventListener('click', () => div.classList.toggle('open'));
   return div;
 }
@@ -565,6 +648,8 @@ function escHtml(s) { const d = document.createElement('div'); d.textContent = s
 
 document.getElementById('list-search').addEventListener('input', renderWordList);
 document.getElementById('list-stage-filter').addEventListener('change', renderWordList);
+document.getElementById('list-sort').addEventListener('change', renderWordList);
+document.getElementById('marked-only-toggle').addEventListener('change', renderWordList);
 
 // ===================== UI: 辞書に追加 =====================
 document.getElementById('dict-form').addEventListener('submit', e => {
@@ -652,7 +737,22 @@ function renderStats() {
     if (w.wrong) parts.push('誤答' + w.wrong);
     if (w.choice) parts.push('4択' + w.choice);
     if (w.hint) parts.push('ヒント' + w.hint);
-    chip.textContent = k + ' ×' + parts.join(' ');
+    const sub = parts.join(' ');
+    chip.textContent = k + ' ×' + sub;
+    chip.addEventListener('click', () => {
+      const sortedKeys = keys.slice();
+      const items = sortedKeys.map(kk => {
+        const ww = weak[kk];
+        const p = [];
+        if (ww.wrong) p.push('誤答' + ww.wrong);
+        if (ww.choice) p.push('4択' + ww.choice);
+        if (ww.hint) p.push('ヒント' + ww.hint);
+        return { verb: kk, ok: null, sub: p.join(' '), word: findWordByVerb(kk) };
+      }).filter(it => it.word);
+      const idx = items.findIndex(it => it.verb === k);
+      if (idx === -1) { toast('この語の例文データが見つかりませんでした'); return; }
+      openDetailModal(items, idx);
+    });
     wl.appendChild(chip);
   });
 }

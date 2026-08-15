@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 
@@ -72,7 +72,10 @@
 
       <div class="index-card" id="question-card">
         <div class="card-tape"></div>
-        <div class="card-stage" id="card-stage">Stage —</div>
+        <div class="card-stage-row">
+          <div class="card-stage" id="card-stage">Stage —</div>
+          <button class="wi-mark" id="quiz-mark-btn" type="button" aria-label="マーク">☆</button>
+        </div>
         <div class="question-text" id="question-text">Loading…</div>
         <div class="ja-preview" id="ja-preview"></div>
         <div class="hint-box" id="hint-box" hidden></div>
@@ -115,10 +118,19 @@
   <section class="view" id="view-list">
     <div class="list-controls">
       <input type="search" id="list-search" placeholder="句動詞・意味で検索">
+    </div>
+    <div class="list-controls-row2">
       <select id="list-stage-filter">
         <option value="0">全ステージ</option>
       </select>
+      <select id="list-sort">
+        <option value="no">No.順</option>
+        <option value="az">A→Z</option>
+        <option value="za">Z→A</option>
+        <option value="marked">マーク優先</option>
+      </select>
     </div>
+    <label class="switch list-marked-toggle"><input type="checkbox" id="marked-only-toggle"><span>マークした語だけ表示</span></label>
     <div class="word-list" id="word-list"></div>
   </section>
 
@@ -232,6 +244,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js?v=1"></script>
 <script src="data.js?v=3"></script>
-<script src="app.js?v=7"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

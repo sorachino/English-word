@@ -36,44 +36,47 @@ body{
 /* ---------- Header ---------- */
 .app-head{
   display:flex; align-items:center; justify-content:space-between;
-  padding:16px 18px 10px;
+  gap:8px;
+  padding:14px 12px 10px;
   background:var(--navy);
   color:#fff;
   border-bottom:3px solid var(--gold);
   position:sticky; top:0; z-index:20;
 }
-.brand{display:flex; align-items:center; gap:10px;}
+.brand{display:flex; align-items:center; gap:8px; min-width:0;}
 .brand-mark{
-  width:38px; height:38px; border-radius:50%;
+  width:34px; height:34px; border-radius:50%;
   background:var(--gold); color:var(--navy-deep);
   display:flex; align-items:center; justify-content:center;
-  font-weight:900; font-size:18px; flex:none;
+  font-weight:900; font-size:16px; flex:none;
 }
-.brand-title{font-weight:900; font-size:16px; letter-spacing:.02em;}
+.brand-title{font-weight:900; font-size:15px; letter-spacing:.02em;}
 .brand-sub{
-  font-family:"JetBrains Mono",monospace; font-size:9.5px;
-  letter-spacing:.14em; color:var(--gold-soft); opacity:.8; margin-top:1px;
+  font-family:"JetBrains Mono",monospace; font-size:8.5px;
+  letter-spacing:.1em; color:var(--gold-soft); opacity:.8; margin-top:1px;
+  white-space:nowrap;
 }
 .streak{
   font-family:"JetBrains Mono",monospace; font-weight:700; font-size:13px;
   background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18);
-  padding:5px 10px; border-radius:20px;
+  padding:5px 10px; border-radius:20px; flex:none;
 }
 
 /* ---------- Folder-tab nav ---------- */
 .tabs{
-  display:flex; gap:4px; padding:10px 12px 0;
-  background:var(--navy); position:sticky; top:65px; z-index:19;
+  display:flex; gap:2px; padding:8px 8px 0;
+  background:var(--navy); position:sticky; top:60px; z-index:19;
 }
 .tab{
-  flex:1; border:none; cursor:pointer;
+  flex:1; min-width:0; border:none; cursor:pointer;
   background:#2A3C58; color:#B9C4D6;
-  font-family:"Noto Sans JP",sans-serif; font-weight:700; font-size:12.5px;
-  padding:10px 4px 9px; border-radius:8px 8px 0 0;
-  display:flex; flex-direction:column; align-items:center; gap:2px;
+  font-family:"Noto Sans JP",sans-serif; font-weight:700; font-size:11px;
+  padding:9px 2px 8px; border-radius:7px 7px 0 0;
+  display:flex; flex-direction:column; align-items:center; gap:1px;
   transition:background .15s, color .15s;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.tab-idx{font-family:"JetBrains Mono",monospace; font-size:9px; opacity:.65; letter-spacing:.08em;}
+.tab-idx{font-family:"JetBrains Mono",monospace; font-size:8px; opacity:.65; letter-spacing:.04em;}
 .tab.active{background:var(--paper); color:var(--navy);}
 .tab.active .tab-idx{color:var(--hanko); opacity:1;}
 

@@ -356,12 +356,58 @@ function resolveChoice(chosen, btnEl) {
   finishQuestion(ok, ok ? 'choice' : 'wrong', true);
 }
 
+// ===================== 効果音 =====================
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function beep(ctx, start, freq, dur, type, vol) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(vol, start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + dur + 0.02);
+}
+function playResultSound(correct) {
+  if (loadJSON('pv_sound_off', false)) return;
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    if (correct) {
+      beep(ctx, now, 659.25, 0.09, 'sine', 0.18);
+      beep(ctx, now + 0.09, 987.77, 0.16, 'sine', 0.18);
+    } else {
+      beep(ctx, now, 220, 0.16, 'square', 0.10);
+      beep(ctx, now + 0.1, 174.61, 0.2, 'square', 0.10);
+    }
+  } catch (e) { /* AudioContextが使えない環境は無音のまま無視 */ }
+}
+function refreshSoundToggle() {
+  const off = loadJSON('pv_sound_off', false);
+  document.getElementById('sound-toggle').textContent = off ? '🔇' : '🔊';
+}
+document.getElementById('sound-toggle').addEventListener('click', () => {
+  const off = loadJSON('pv_sound_off', false);
+  saveJSON('pv_sound_off', !off);
+  refreshSoundToggle();
+});
+refreshSoundToggle();
+
 function finishQuestion(ok, method, delay) {
   const q = quizState.questions[quizState.idx];
   q.resolved = true; q.method = method;
   recordResult(q.answer, ok ? method : 'wrong');
   logToday(ok);
   bumpAutoBackupCounter();
+  playResultSound(ok);
   if (ok) quizState.correctCount++;
   quizState.results.push({ verb: q.answer, ok });
 

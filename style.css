@@ -19,6 +19,7 @@
 }
 
 *{box-sizing:border-box;}
+[hidden]{display:none !important;}
 html,body{margin:0;padding:0;}
 body{
   background:var(--paper);
@@ -60,6 +61,11 @@ body{
   font-family:"JetBrains Mono",monospace; font-weight:700; font-size:13px;
   background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18);
   padding:5px 10px; border-radius:20px; flex:none;
+}
+.head-right{display:flex; align-items:center; gap:8px; flex:none;}
+.sound-toggle{
+  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18);
+  border-radius:20px; padding:5px 9px; font-size:14px; cursor:pointer; flex:none;
 }
 
 /* ---------- Folder-tab nav ---------- */
@@ -270,6 +276,8 @@ select{
 }
 .weak-chip.hint{border-color:var(--gold); color:#8A6A1E; background:var(--gold-soft);}
 .empty-note{font-size:12.5px; color:var(--ink-soft); line-height:1.6;}
+.btn-block{width:100%; margin-top:8px;}
+.card .empty-note{margin-top:10px;}
 
 /* ---------- Toast ---------- */
 .toast{

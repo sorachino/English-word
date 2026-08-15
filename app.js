@@ -883,9 +883,67 @@ function ensureNickname() {
   let n = getNickname();
   if (!n) {
     n = window.prompt('ランキングに表示する名前を入力してください（後で「変更」から直せます）', '');
-    if (n) { n = n.trim().slice(0, 20); if (n) localStorage.setItem('pv_nickname', n); }
+    if (n) {
+      n = n.trim().slice(0, 20);
+      if (n) { localStorage.setItem('pv_nickname', n); pullAndMergeCloud(n); }
+    }
   }
   return getNickname();
+}
+
+function sanitizeKey(k) { return String(k).replace(/[.#$/\[\]]/g, '_'); }
+
+function pullAndMergeCloud(nickname) {
+  const db = initFirebase();
+  if (!db || !nickname) return;
+  db.ref(`users/${nickname}`).get().then(snap => {
+    const cloud = snap.val() || {};
+    let changed = false;
+
+    if (cloud.weak && typeof cloud.weak === 'object') {
+      const localWeak = loadJSON(LS.WEAK, {});
+      Object.entries(cloud.weak).forEach(([verb, cw]) => {
+        if (!cw) return;
+        if (localWeak[verb]) {
+          localWeak[verb] = {
+            hint: (localWeak[verb].hint || 0) + (cw.hint || 0),
+            choice: (localWeak[verb].choice || 0) + (cw.choice || 0),
+            wrong: (localWeak[verb].wrong || 0) + (cw.wrong || 0),
+            okStreak: localWeak[verb].okStreak || 0,
+          };
+        } else {
+          localWeak[verb] = { hint: cw.hint || 0, choice: cw.choice || 0, wrong: cw.wrong || 0, okStreak: cw.okStreak || 0 };
+        }
+      });
+      saveJSON(LS.WEAK, localWeak);
+      changed = true;
+    }
+
+    if (cloud.log && typeof cloud.log === 'object') {
+      const localLog = loadJSON(LS.LOG, {});
+      Object.entries(cloud.log).forEach(([date, cl]) => {
+        if (!cl) return;
+        if (localLog[date]) {
+          localLog[date] = {
+            solved: (localLog[date].solved || 0) + (cl.solved || 0),
+            correct: (localLog[date].correct || 0) + (cl.correct || 0),
+          };
+        } else {
+          localLog[date] = { solved: cl.solved || 0, correct: cl.correct || 0 };
+        }
+      });
+      saveJSON(LS.LOG, localLog);
+      changed = true;
+    }
+
+    if (changed) {
+      refreshWeakRow();
+      updateStreakPill();
+      const statsView = document.getElementById('view-stats');
+      if (statsView && statsView.classList.contains('active')) renderStats();
+      toast('前回までの記録を引き継ぎました');
+    }
+  }).catch(() => {});
 }
 
 function weekKey(d = new Date()) {
@@ -909,10 +967,14 @@ function syncLeaderboard(verb, ok) {
   updates[`leaderboard/week/${weekKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
   updates[`leaderboard/month/${monthKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
   if (verb) {
-    const safeVerb = verb.replace(/[.#$/\[\]]/g, '_');
+    const safeVerb = sanitizeKey(verb);
     const field = ok ? 'ok' : 'ng';
     updates[`answers/${nickname}/${safeVerb}/${field}`] = firebase.database.ServerValue.increment(1);
   }
+  const weakForCloud = {};
+  Object.entries(loadJSON(LS.WEAK, {})).forEach(([k, v]) => { weakForCloud[sanitizeKey(k)] = v; });
+  updates[`users/${nickname}/weak`] = weakForCloud;
+  updates[`users/${nickname}/log`] = loadJSON(LS.LOG, {});
   db.ref().update(updates).catch(() => {});
 }
 

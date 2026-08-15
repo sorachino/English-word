@@ -56,13 +56,27 @@ function blankSentence(sentence, verb) {
   if (!sentence) return null;
   const parts = baseForm(verb).split(' ');
   const head = parts[0], tail = parts.slice(1);
-  let pat = '\\b' + headPattern(head.toLowerCase());
-  for (const t of tail) pat += '(?:\\s+\\w+){0,3}\\s+' + esc(t);
+  const headPat = headPattern(head.toLowerCase());
+  let pat;
+  if (tail.length) {
+    const tailPat = tail.map(esc).join('\\s+');
+    pat = '\\b(' + headPat + ')((?:\\s+\\w+){0,3})?\\s+(' + tailPat + ')\\b';
+  } else {
+    pat = '\\b(' + headPat + ')\\b';
+  }
   const re = new RegExp(pat, 'i');
   const m = sentence.match(re);
   if (!m) return null;
   const start = m.index, end = start + m[0].length;
-  return sentence.slice(0, start) + '<b>( ? )</b>' + sentence.slice(end);
+  let inner;
+  const middle = (tail.length && m[2]) ? m[2].trim() : '';
+  if (middle) {
+    // 動詞と前置詞の間に目的語が挟まる場合：目的語はそのまま見せ、動詞部分だけ空欄にする
+    inner = '<b>( ? )</b> ' + middle + ' <b>( ? )</b>';
+  } else {
+    inner = '<b>( ? )</b>';
+  }
+  return sentence.slice(0, start) + inner + sentence.slice(end);
 }
 
 // ===================== クイズエンジン =====================

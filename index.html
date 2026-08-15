@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -74,6 +74,7 @@
         <div class="card-tape"></div>
         <div class="card-stage" id="card-stage">Stage —</div>
         <div class="question-text" id="question-text">Loading…</div>
+        <div class="ja-preview" id="ja-preview"></div>
         <div class="hint-box" id="hint-box" hidden></div>
       </div>
 
@@ -181,6 +182,21 @@
     </div>
 
     <div class="card">
+      <div class="section-label">ランキング（回答数）</div>
+      <div class="chip-group" id="lb-period-group">
+        <button class="chip active" data-period="week">今週</button>
+        <button class="chip" data-period="month">今月</button>
+      </div>
+      <div class="lb-nickname-row">
+        <span>あなたの表示名：<b id="lb-my-name">未設定</b></span>
+        <button class="btn-ghost" id="lb-rename-btn">変更</button>
+      </div>
+      <div class="lb-list" id="leaderboard-list"></div>
+      <div class="empty-note" id="leaderboard-empty" hidden>まだ記録がありません。</div>
+      <div class="empty-note" id="leaderboard-setup-note">ランキング機能は設定が完了すると使えるようになります。</div>
+    </div>
+
+    <div class="card">
       <div class="section-label">バックアップ</div>
       <label class="switch" style="margin-bottom:10px;">
         <input type="checkbox" id="auto-backup-toggle" checked>
@@ -197,7 +213,10 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js?v=1"></script>
 <script src="data.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

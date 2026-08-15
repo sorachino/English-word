@@ -204,7 +204,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'list') renderWordList();
     if (btn.dataset.tab === 'dict') renderMyWordList();
-    if (btn.dataset.tab === 'stats') renderStats();
+    if (btn.dataset.tab === 'stats') { renderStats(); renderLeaderboard(); updateLbNameDisplay(); }
   });
 });
 
@@ -271,6 +271,7 @@ function showQuestion() {
   document.getElementById('progress-fill').style.width = (100 * (quizState.idx) / quizState.questions.length) + '%';
   document.getElementById('card-stage').textContent = q.word.mine ? 'マイ単語' : ('Stage ' + q.word.stage + ' · No.' + q.word.no);
   document.getElementById('question-text').innerHTML = q.questionHtml;
+  document.getElementById('ja-preview').textContent = q.ja;
   document.getElementById('hint-box').hidden = true;
   document.getElementById('hint-box').textContent = '';
   document.getElementById('answer-form').hidden = false;
@@ -295,11 +296,8 @@ document.getElementById('hint-btn').addEventListener('click', () => {
   const q = quizState.questions[quizState.idx];
   const box = document.getElementById('hint-box');
   if (!q.hintShown) {
-    box.textContent = '和訳: ' + q.ja;
-    q.hintShown = 1;
-  } else if (q.hintShown === 1) {
     box.textContent = '意味: ' + q.meaning + (q.def ? '（' + q.def + '）' : '');
-    q.hintShown = 2;
+    q.hintShown = 1;
   } else {
     box.textContent = '単語数: ' + q.answer.split(' ').length + '語';
   }
@@ -408,6 +406,7 @@ function finishQuestion(ok, method, delay) {
   logToday(ok);
   bumpAutoBackupCounter();
   playResultSound(ok);
+  syncLeaderboard();
   if (ok) quizState.correctCount++;
   quizState.results.push({ verb: q.answer, ok });
 
@@ -680,6 +679,101 @@ function bumpAutoBackupCounter() {
     saveJSON(LS.AUTO_COUNT, n);
   }
 }
+
+// ===================== ランキング =====================
+let fbDB = null;
+function initFirebase() {
+  if (fbDB) return fbDB;
+  if (typeof FIREBASE_CONFIG === 'undefined' || !FIREBASE_CONFIG.apiKey || !FIREBASE_CONFIG.databaseURL) return null;
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    fbDB = firebase.database();
+  } catch (e) { fbDB = null; }
+  return fbDB;
+}
+
+function getNickname() { return localStorage.getItem('pv_nickname') || ''; }
+function ensureNickname() {
+  let n = getNickname();
+  if (!n) {
+    n = window.prompt('ランキングに表示する名前を入力してください（後で「変更」から直せます）', '');
+    if (n) { n = n.trim().slice(0, 20); if (n) localStorage.setItem('pv_nickname', n); }
+  }
+  return getNickname();
+}
+
+function weekKey(d = new Date()) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - dayNum + 3);
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return `${date.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+function monthKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function syncLeaderboard() {
+  const db = initFirebase();
+  if (!db) return;
+  const nickname = ensureNickname();
+  if (!nickname) return;
+  const updates = {};
+  updates[`leaderboard/week/${weekKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
+  updates[`leaderboard/month/${monthKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
+  db.ref().update(updates).catch(() => {});
+}
+
+let lbPeriod = 'week';
+function renderLeaderboard() {
+  const db = initFirebase();
+  const listEl = document.getElementById('leaderboard-list');
+  const emptyEl = document.getElementById('leaderboard-empty');
+  const setupEl = document.getElementById('leaderboard-setup-note');
+  if (!db) {
+    listEl.innerHTML = '';
+    emptyEl.hidden = true;
+    setupEl.hidden = false;
+    return;
+  }
+  setupEl.hidden = true;
+  const key = lbPeriod === 'week' ? weekKey() : monthKey();
+  db.ref(`leaderboard/${lbPeriod}/${key}`).get().then(snap => {
+    const val = snap.val() || {};
+    const rows = Object.entries(val).sort((a, b) => b[1] - a[1]);
+    listEl.innerHTML = '';
+    emptyEl.hidden = rows.length > 0;
+    const me = getNickname();
+    rows.forEach(([name, count], i) => {
+      const row = document.createElement('div');
+      row.className = 'lb-row' + (name === me ? ' me' : '');
+      row.innerHTML = `<span class="lb-rank">${i + 1}</span><span class="lb-name">${escHtml(name)}</span><span class="lb-count">${count}</span>`;
+      listEl.appendChild(row);
+    });
+  }).catch(() => { listEl.innerHTML = ''; emptyEl.hidden = false; });
+}
+
+function updateLbNameDisplay() {
+  document.getElementById('lb-my-name').textContent = getNickname() || '未設定';
+}
+updateLbNameDisplay();
+
+document.querySelectorAll('#lb-period-group .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#lb-period-group .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    lbPeriod = chip.dataset.period;
+    renderLeaderboard();
+  });
+});
+
+document.getElementById('lb-rename-btn').addEventListener('click', () => {
+  localStorage.removeItem('pv_nickname');
+  ensureNickname();
+  updateLbNameDisplay();
+  renderLeaderboard();
+});
 
 // ===================== トースト =====================
 let toastTimer;

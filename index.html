@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16233B">
+<title>句動詞ノート — Phrasal Verbs</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="句動詞ノート">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-head">
+  <div class="brand">
+    <span class="brand-mark">句</span>
+    <div class="brand-text">
+      <div class="brand-title">句動詞ノート</div>
+      <div class="brand-sub">PHRASAL VERB LEDGER · 402</div>
+    </div>
+  </div>
+  <div class="streak" id="streak-pill">🔥 <span id="streak-num">0</span></div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="tab active" data-tab="quiz"><span class="tab-idx">01</span>クイズ</button>
+  <button class="tab" data-tab="list"><span class="tab-idx">02</span>単語帳</button>
+  <button class="tab" data-tab="dict"><span class="tab-idx">03</span>辞書に追加</button>
+  <button class="tab" data-tab="stats"><span class="tab-idx">04</span>記録</button>
+</nav>
+
+<main id="views">
+
+  <!-- ============ クイズ ============ -->
+  <section class="view active" id="view-quiz">
+    <div class="quiz-setup card" id="quiz-setup">
+      <div class="setup-row">
+        <label>範囲</label>
+        <select id="quiz-stage">
+          <option value="0">全ステージ</option>
+        </select>
+      </div>
+      <div class="setup-row">
+        <label>問題数</label>
+        <div class="chip-group" id="quiz-count-group">
+          <button class="chip" data-count="5">5</button>
+          <button class="chip active" data-count="10">10</button>
+          <button class="chip" data-count="20">20</button>
+        </div>
+      </div>
+      <div class="setup-row" id="weak-row" style="display:none">
+        <label>苦手語</label>
+        <label class="switch"><input type="checkbox" id="weak-toggle" checked><span>優先的に混ぜる（<span id="weak-count">0</span>語）</span></label>
+      </div>
+      <button class="btn-primary" id="start-quiz">はじめる</button>
+    </div>
+
+    <div class="quiz-play" id="quiz-play" hidden>
+      <div class="progress-row">
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-label"><span id="q-idx">1</span> / <span id="q-total">10</span></div>
+      </div>
+
+      <div class="index-card" id="question-card">
+        <div class="card-tape"></div>
+        <div class="card-stage" id="card-stage">Stage —</div>
+        <div class="question-text" id="question-text">Loading…</div>
+        <div class="hint-box" id="hint-box" hidden></div>
+      </div>
+
+      <form id="answer-form" class="answer-form">
+        <input type="text" id="answer-input" placeholder="句動詞を入力" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button type="submit" class="btn-primary">答える</button>
+      </form>
+
+      <div class="choice-grid" id="choice-grid" hidden></div>
+
+      <div class="quiz-actions">
+        <button class="btn-ghost" id="hint-btn">ヒント</button>
+        <button class="btn-ghost" id="choice-btn">4択にする</button>
+      </div>
+
+      <div class="stamp-result" id="stamp-result" hidden></div>
+
+      <div class="reveal-box" id="reveal-box" hidden>
+        <div class="reveal-verb" id="reveal-verb"></div>
+        <div class="reveal-sentence" id="reveal-sentence"></div>
+        <div class="reveal-ja" id="reveal-ja"></div>
+        <div class="reveal-def" id="reveal-def"></div>
+        <div class="reveal-note" id="reveal-note" hidden></div>
+        <button class="btn-primary" id="next-btn">次の問題 →</button>
+      </div>
+    </div>
+
+    <div class="quiz-done card" id="quiz-done" hidden>
+      <div class="done-stamp">済</div>
+      <div class="done-score"><span id="done-score-num">0</span> / <span id="done-score-total">10</span> 正解</div>
+      <div class="done-list" id="done-list"></div>
+      <button class="btn-primary" id="restart-btn">もう一度</button>
+    </div>
+  </section>
+
+  <!-- ============ 単語帳 ============ -->
+  <section class="view" id="view-list">
+    <div class="list-controls">
+      <input type="search" id="list-search" placeholder="句動詞・意味で検索">
+      <select id="list-stage-filter">
+        <option value="0">全ステージ</option>
+      </select>
+    </div>
+    <div class="word-list" id="word-list"></div>
+  </section>
+
+  <!-- ============ 辞書に追加 ============ -->
+  <section class="view" id="view-dict">
+    <form class="card dict-form" id="dict-form">
+      <div class="form-title">マイ単語を追加</div>
+      <label>句動詞 <span class="req">必須</span></label>
+      <input type="text" id="d-verb" required placeholder="例: iron out">
+      <label>意味（日本語） <span class="req">必須</span></label>
+      <input type="text" id="d-meaning" required placeholder="例: （問題を）解決する、詰める">
+      <label>English definition</label>
+      <input type="text" id="d-def" placeholder="to resolve a problem through discussion">
+      <label>例文1</label>
+      <input type="text" id="d-ex1" placeholder="We ironed out the details.">
+      <label>例文1 和訳</label>
+      <input type="text" id="d-ja1" placeholder="細部を詰めた。">
+      <label>例文2（ビジネス寄り推奨）</label>
+      <input type="text" id="d-ex2" placeholder="Let's iron out the contract terms.">
+      <label>例文2 和訳</label>
+      <input type="text" id="d-ja2" placeholder="契約条件を詰めましょう。">
+      <label>備考</label>
+      <input type="text" id="d-note" placeholder="任意">
+      <button type="submit" class="btn-primary">辞書に追加</button>
+    </form>
+
+    <div class="my-words-head">追加した単語（<span id="my-count">0</span>）</div>
+    <div class="word-list" id="my-word-list"></div>
+  </section>
+
+  <!-- ============ 記録 ============ -->
+  <section class="view" id="view-stats">
+    <div class="card stats-summary">
+      <div class="stat-block">
+        <div class="stat-num" id="stat-total">0</div>
+        <div class="stat-label">総回答数</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-num" id="stat-today">0</div>
+        <div class="stat-label">今日</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-num" id="stat-streak">0</div>
+        <div class="stat-label">連続日数</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-num" id="stat-accuracy">–</div>
+        <div class="stat-label">正答率</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">過去14日</div>
+      <div class="bar-chart" id="bar-chart"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">苦手な語（<span id="weak-total">0</span>）</div>
+      <div class="weak-list" id="weak-list"></div>
+      <div class="empty-note" id="weak-empty" hidden>まだ記録がありません。クイズを解くと、間違えた語やヒントを使った語がここに表示されます。</div>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

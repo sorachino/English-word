@@ -520,9 +520,15 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
 }
 
-// ===================== Service Worker 登録 =====================
+// ===================== Service Worker（一時停止） =====================
+// キャッシュの不整合が続いたため、開発中はオフライン対応を一時停止し、
+// 既存のService Workerとキャッシュを自動で解除する。
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => r.unregister());
   });
 }
+if ('caches' in window) {
+  caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+}
+

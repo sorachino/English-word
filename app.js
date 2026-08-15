@@ -936,6 +936,23 @@ function pullAndMergeCloud(nickname) {
       changed = true;
     }
 
+    if (cloud.answered && typeof cloud.answered === 'object') {
+      const localAnswered = loadJSON(LS_ANSWERED, {});
+      Object.entries(cloud.answered).forEach(([verb, ca]) => {
+        if (!ca) return;
+        if (localAnswered[verb]) {
+          localAnswered[verb] = {
+            ok: (localAnswered[verb].ok || 0) + (ca.ok || 0),
+            ng: (localAnswered[verb].ng || 0) + (ca.ng || 0),
+          };
+        } else {
+          localAnswered[verb] = { ok: ca.ok || 0, ng: ca.ng || 0 };
+        }
+      });
+      saveJSON(LS_ANSWERED, localAnswered);
+      changed = true;
+    }
+
     if (changed) {
       refreshWeakRow();
       updateStreakPill();
@@ -975,6 +992,9 @@ function syncLeaderboard(verb, ok) {
   Object.entries(loadJSON(LS.WEAK, {})).forEach(([k, v]) => { weakForCloud[sanitizeKey(k)] = v; });
   updates[`users/${nickname}/weak`] = weakForCloud;
   updates[`users/${nickname}/log`] = loadJSON(LS.LOG, {});
+  const answeredForCloud = {};
+  Object.entries(loadJSON(LS_ANSWERED, {})).forEach(([k, v]) => { answeredForCloud[sanitizeKey(k)] = v; });
+  updates[`users/${nickname}/answered`] = answeredForCloud;
   db.ref().update(updates).catch(() => {});
 }
 

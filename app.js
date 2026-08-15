@@ -85,13 +85,18 @@ let quizState = null;
 
 function buildQuiz(stageFilter, count, useWeak) {
   const words = allWords();
-  let pool = stageFilter ? words.filter(w => w.stage === stageFilter) : words.slice();
-
   const weak = loadJSON(LS.WEAK, {});
   const weakVerbs = Object.keys(weak);
-  let picks = [];
 
-  if (useWeak && weakVerbs.length) {
+  let pool;
+  if (stageFilter === 'weak') {
+    pool = words.filter(w => weakVerbs.includes(baseForm(w.verb)));
+  } else {
+    pool = stageFilter ? words.filter(w => w.stage === stageFilter) : words.slice();
+  }
+
+  let picks = [];
+  if (stageFilter !== 'weak' && useWeak && weakVerbs.length) {
     const weakPool = pool.filter(w => weakVerbs.includes(baseForm(w.verb)));
     shuffle(weakPool);
     const n = Math.min(Math.ceil(count * 0.3), weakPool.length, count);
@@ -206,8 +211,10 @@ function populateStageSelects() {
   const stages = [...new Set(PV_DATA.map(w => w.stage))].sort((a, b) => a - b);
   const sel1 = document.getElementById('quiz-stage');
   const sel2 = document.getElementById('list-stage-filter');
+  const weakOption = document.getElementById('weak-option');
   for (const s of stages) {
-    const o1 = document.createElement('option'); o1.value = s; o1.textContent = 'Stage ' + s; sel1.appendChild(o1);
+    const o1 = document.createElement('option'); o1.value = s; o1.textContent = 'Stage ' + s;
+    sel1.insertBefore(o1, weakOption);
     const o2 = document.createElement('option'); o2.value = s; o2.textContent = 'Stage ' + s; sel2.appendChild(o2);
   }
 }
@@ -227,13 +234,25 @@ function refreshWeakRow() {
   const n = Object.keys(weak).length;
   document.getElementById('weak-count').textContent = n;
   document.getElementById('weak-row').style.display = n > 0 ? 'flex' : 'none';
+  const opt = document.getElementById('weak-option');
+  opt.textContent = '苦手語のみ（' + n + '語）';
+  opt.disabled = n === 0;
+  if (n === 0 && document.getElementById('quiz-stage').value === 'weak') {
+    document.getElementById('quiz-stage').value = '0';
+  }
 }
 refreshWeakRow();
 
+document.getElementById('quiz-stage').addEventListener('change', (e) => {
+  document.getElementById('weak-row').style.display =
+    (e.target.value === 'weak' || Object.keys(loadJSON(LS.WEAK, {})).length === 0) ? 'none' : 'flex';
+});
+
 document.getElementById('start-quiz').addEventListener('click', () => {
-  const stage = parseInt(document.getElementById('quiz-stage').value, 10);
+  const raw = document.getElementById('quiz-stage').value;
+  const stage = raw === 'weak' ? 'weak' : (parseInt(raw, 10) || 0);
   const useWeak = document.getElementById('weak-toggle').checked;
-  const qs = buildQuiz(stage || 0, quizCount, useWeak);
+  const qs = buildQuiz(stage, quizCount, useWeak);
   if (!qs.length) { toast('この範囲では問題が作れませんでした'); return; }
   quizState = { questions: qs, idx: 0, correctCount: 0, results: [] };
   document.getElementById('quiz-setup').hidden = true;

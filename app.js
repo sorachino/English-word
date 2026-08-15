@@ -247,6 +247,8 @@ function showQuestion() {
   document.getElementById('choice-btn').disabled = false;
   document.getElementById('hint-btn').disabled = false;
   document.getElementById('giveup-btn').disabled = false;
+  document.getElementById('submit-btn').hidden = false;
+  document.getElementById('submit-btn').disabled = false;
   setTimeout(() => document.getElementById('answer-input').focus(), 50);
 }
 
@@ -270,6 +272,7 @@ document.getElementById('choice-btn').addEventListener('click', () => switchToCh
 
 document.getElementById('giveup-btn').addEventListener('click', () => {
   document.getElementById('answer-form').hidden = true;
+  document.getElementById('submit-btn').hidden = true;
   document.getElementById('choice-grid').hidden = true;
   document.getElementById('hint-btn').disabled = true;
   document.getElementById('choice-btn').disabled = true;
@@ -280,6 +283,7 @@ document.getElementById('giveup-btn').addEventListener('click', () => {
 function switchToChoices() {
   const q = quizState.questions[quizState.idx];
   document.getElementById('answer-form').hidden = true;
+  document.getElementById('submit-btn').hidden = true;
   const grid = document.getElementById('choice-grid');
   grid.innerHTML = '';
   q.choices.forEach(c => {
@@ -334,7 +338,7 @@ function finishQuestion(ok, method, delay) {
   const noteEl = document.getElementById('reveal-note');
   if (q.note) { noteEl.hidden = false; noteEl.textContent = '※ ' + q.note; } else { noteEl.hidden = true; }
 
-  const run = () => { reveal.hidden = false; document.getElementById('answer-form').hidden = true; document.getElementById('choice-grid').hidden = true; document.getElementById('hint-btn').disabled = true; document.getElementById('choice-btn').disabled = true; };
+  const run = () => { reveal.hidden = false; document.getElementById('answer-form').hidden = true; document.getElementById('submit-btn').hidden = true; document.getElementById('choice-grid').hidden = true; document.getElementById('hint-btn').disabled = true; document.getElementById('choice-btn').disabled = true; };
   delay ? setTimeout(run, 350) : run();
 }
 

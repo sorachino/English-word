@@ -168,7 +168,6 @@ select{
   border-radius:8px; font-family:"Noto Sans JP",sans-serif; background:#fff;
 }
 .answer-form input:focus{outline:none; border-color:var(--navy);}
-.answer-form .btn-primary{width:auto; margin-top:0; padding:12px 20px; flex:none; white-space:nowrap;}
 
 .choice-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;}
 .choice-btn{
@@ -180,9 +179,12 @@ select{
 .choice-btn.correct{background:var(--ok-soft); border-color:var(--ok); color:var(--ok);}
 .choice-btn.wrong{background:var(--hanko-soft); border-color:var(--hanko); color:var(--hanko);}
 
-.quiz-actions{display:flex; gap:8px; margin-bottom:6px; flex-wrap:wrap;}
-.quiz-actions .btn-ghost{flex:1 1 28%;}
+.quiz-actions{display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap;}
+.quiz-actions .btn-ghost{flex:1 1 21%; padding:9px 2px; font-size:11.5px; white-space:nowrap;}
 .btn-giveup{color:var(--hanko); border-color:var(--hanko-soft); background:var(--hanko-soft);}
+.quiz-actions .btn-submit{
+  flex:1 1 21%; margin-top:0; padding:9px 2px; font-size:12.5px; white-space:nowrap;
+}
 
 .stamp-result{
   display:flex; justify-content:center; margin:10px 0;
@@ -223,9 +225,10 @@ select{
 /* ---------- Word list ---------- */
 .list-controls{display:flex; gap:8px; margin-bottom:12px;}
 .list-controls input[type=search]{
-  flex:1; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+  flex:1; min-width:0; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
   font-family:inherit; font-size:14px; background:#fff;
 }
+.list-controls select{flex:none; max-width:38%; padding:10px 8px; font-size:13px;}
 .word-item{
   background:var(--paper-raised); border:1px solid var(--line); border-radius:8px;
   padding:12px 14px; margin-bottom:8px; cursor:pointer;

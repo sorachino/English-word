@@ -243,7 +243,8 @@ select{
   flex:1; min-width:0; padding:9px 8px; font-size:12.5px; border:1px solid var(--line);
   border-radius:8px; background:#fff; color:var(--ink); font-family:inherit;
 }
-.list-marked-toggle{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); margin-bottom:12px; cursor:pointer;}
+.list-marked-toggle{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); margin-bottom:10px; cursor:pointer;}
+#status-filter-group{margin-bottom:12px;}
 .word-item{
   background:var(--paper-raised); border:1px solid var(--line); border-radius:8px;
   padding:12px 14px; margin-bottom:8px; cursor:pointer;

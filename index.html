@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 
@@ -131,6 +131,11 @@
       </select>
     </div>
     <label class="switch list-marked-toggle"><input type="checkbox" id="marked-only-toggle"><span>マークした語だけ表示</span></label>
+    <div class="chip-group" id="status-filter-group">
+      <button class="chip active" data-status="all">すべて</button>
+      <button class="chip" data-status="ng">間違えた語</button>
+      <button class="chip" data-status="ok">得意な語</button>
+    </div>
     <div class="word-list" id="word-list"></div>
   </section>
 
@@ -244,6 +249,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js?v=1"></script>
 <script src="data.js?v=3"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

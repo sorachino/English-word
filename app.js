@@ -585,17 +585,35 @@ document.getElementById('quiz-mark-btn').addEventListener('click', () => {
   refreshQuizMarkBtn();
 });
 
+let statusFilter = 'all';
+document.querySelectorAll('#status-filter-group .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#status-filter-group .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    statusFilter = chip.dataset.status;
+    renderWordList();
+  });
+});
+
 function renderWordList() {
   const q = document.getElementById('list-search').value.trim().toLowerCase();
   const stage = parseInt(document.getElementById('list-stage-filter').value, 10);
   const sortMode = document.getElementById('list-sort').value;
   const markedOnly = document.getElementById('marked-only-toggle').checked;
   const marked = loadMarked();
+  const answered = loadJSON(LS_ANSWERED, {});
 
   let words = allWords();
   if (stage) words = words.filter(w => w.stage === stage);
   if (q) words = words.filter(w => w.verb.toLowerCase().includes(q) || (w.meaning || '').includes(q));
   if (markedOnly) words = words.filter(w => marked.has(baseForm(w.verb)));
+  if (statusFilter !== 'all') {
+    words = words.filter(w => {
+      const rec = answered[baseForm(w.verb)];
+      if (!rec) return false;
+      return statusFilter === 'ng' ? rec.ng > 0 : (rec.ng === 0 && rec.ok > 0);
+    });
+  }
 
   words = words.slice();
   if (sortMode === 'az') {

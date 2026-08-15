@@ -912,67 +912,47 @@ function pullAndMergeCloud(nickname) {
 
     if (cloud.weak && typeof cloud.weak === 'object') {
       const localWeak = loadJSON(LS.WEAK, {});
+      let sub = false;
       Object.entries(cloud.weak).forEach(([verb, cw]) => {
-        if (!cw) return;
-        if (localWeak[verb]) {
-          localWeak[verb] = {
-            hint: (localWeak[verb].hint || 0) + (cw.hint || 0),
-            choice: (localWeak[verb].choice || 0) + (cw.choice || 0),
-            wrong: (localWeak[verb].wrong || 0) + (cw.wrong || 0),
-            okStreak: localWeak[verb].okStreak || 0,
-          };
-        } else {
-          localWeak[verb] = { hint: cw.hint || 0, choice: cw.choice || 0, wrong: cw.wrong || 0, okStreak: cw.okStreak || 0 };
-        }
+        if (!cw || localWeak[verb]) return;
+        localWeak[verb] = { hint: cw.hint || 0, choice: cw.choice || 0, wrong: cw.wrong || 0, okStreak: cw.okStreak || 0 };
+        sub = true;
       });
-      saveJSON(LS.WEAK, localWeak);
-      changed = true;
+      if (sub) { saveJSON(LS.WEAK, localWeak); changed = true; }
     }
 
     if (cloud.log && typeof cloud.log === 'object') {
       const localLog = loadJSON(LS.LOG, {});
+      let sub = false;
       Object.entries(cloud.log).forEach(([date, cl]) => {
-        if (!cl) return;
-        if (localLog[date]) {
-          localLog[date] = {
-            solved: (localLog[date].solved || 0) + (cl.solved || 0),
-            correct: (localLog[date].correct || 0) + (cl.correct || 0),
-          };
-        } else {
-          localLog[date] = { solved: cl.solved || 0, correct: cl.correct || 0 };
-        }
+        if (!cl || localLog[date]) return;
+        localLog[date] = { solved: cl.solved || 0, correct: cl.correct || 0 };
+        sub = true;
       });
-      saveJSON(LS.LOG, localLog);
-      changed = true;
+      if (sub) { saveJSON(LS.LOG, localLog); changed = true; }
     }
 
     if (cloud.answered && typeof cloud.answered === 'object') {
       const localAnswered = loadJSON(LS_ANSWERED, {});
+      let sub = false;
       Object.entries(cloud.answered).forEach(([verb, ca]) => {
-        if (!ca) return;
-        if (localAnswered[verb]) {
-          localAnswered[verb] = {
-            ok: (localAnswered[verb].ok || 0) + (ca.ok || 0),
-            ng: (localAnswered[verb].ng || 0) + (ca.ng || 0),
-          };
-        } else {
-          localAnswered[verb] = { ok: ca.ok || 0, ng: ca.ng || 0 };
-        }
+        if (!ca || localAnswered[verb]) return;
+        localAnswered[verb] = { ok: ca.ok || 0, ng: ca.ng || 0 };
+        sub = true;
       });
-      saveJSON(LS_ANSWERED, localAnswered);
-      changed = true;
+      if (sub) { saveJSON(LS_ANSWERED, localAnswered); changed = true; }
     }
 
     if (Array.isArray(cloud.myWords) && cloud.myWords.length) {
       const map = new Map();
       myWords().forEach(w => { if (w && w.verb) map.set(w.verb.trim().toLowerCase(), w); });
+      let sub = false;
       cloud.myWords.forEach(w => {
         if (!w || !w.verb) return;
         const key = w.verb.trim().toLowerCase();
-        if (!map.has(key)) map.set(key, w);
+        if (!map.has(key)) { map.set(key, w); sub = true; }
       });
-      saveJSON(LS.MY_WORDS, [...map.values()]);
-      changed = true;
+      if (sub) { saveJSON(LS.MY_WORDS, [...map.values()]); changed = true; }
     }
 
     if (changed) {
@@ -982,6 +962,8 @@ function pullAndMergeCloud(nickname) {
       if (statsView && statsView.classList.contains('active')) renderStats();
       const dictView = document.getElementById('view-dict');
       if (dictView && dictView.classList.contains('active')) renderMyWordList();
+      const listView = document.getElementById('view-list');
+      if (listView && listView.classList.contains('active')) renderWordList();
       toast('前回までの記録を引き継ぎました');
     }
   }).catch(() => {});
@@ -1057,13 +1039,10 @@ function updateLbNameDisplay() {
 }
 updateLbNameDisplay();
 
-// 名前は端末に残っているのに苦手語・記録が空の場合は、クラウドから自動で復元を試みる
+// 名前が設定されていれば、起動のたびにクラウド側の記録で足りない分を補う（既存データは上書きしない）
 (() => {
   const nick = getNickname();
-  if (!nick) return;
-  const hasWeak = Object.keys(loadJSON(LS.WEAK, {})).length > 0;
-  const hasLog = Object.keys(loadJSON(LS.LOG, {})).length > 0;
-  if (!hasWeak && !hasLog) pullAndMergeCloud(nick);
+  if (nick) pullAndMergeCloud(nick);
 })();
 
 document.querySelectorAll('#lb-period-group .chip').forEach(chip => {

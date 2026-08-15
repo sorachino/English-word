@@ -118,10 +118,13 @@ function buildQuiz(stageFilter, count, useWeak) {
     if (!blanked) continue;
 
     const head = verb.split(' ')[0].toLowerCase();
-    const same = allVerbs.filter(v => v.toLowerCase().startsWith(head + ' ') && v !== verb);
-    const others = allVerbs.filter(v => v !== verb && !same.includes(v));
-    shuffle(same); shuffle(others);
-    const distractors = same.concat(others).slice(0, 3);
+    const wordCount = verb.split(' ').length;
+    const sameCount = v => v.split(' ').length === wordCount;
+    const sameHeadSameCount = allVerbs.filter(v => v !== verb && sameCount(v) && v.toLowerCase().startsWith(head + ' '));
+    const otherSameCount = allVerbs.filter(v => v !== verb && sameCount(v) && !sameHeadSameCount.includes(v));
+    const fallbackAny = allVerbs.filter(v => v !== verb && !sameCount(v));
+    shuffle(sameHeadSameCount); shuffle(otherSameCount); shuffle(fallbackAny);
+    const distractors = sameHeadSameCount.concat(otherSameCount).concat(fallbackAny).slice(0, 3);
     const choices = shuffle(distractors.concat([verb]));
 
     questions.push({

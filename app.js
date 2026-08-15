@@ -382,8 +382,8 @@ function playResultSound(correct) {
     if (ctx.state === 'suspended') ctx.resume();
     const now = ctx.currentTime;
     if (correct) {
-      beep(ctx, now, 659.25, 0.09, 'sine', 0.18);
-      beep(ctx, now + 0.09, 987.77, 0.16, 'sine', 0.18);
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // ド・ミ・ソ・ド（上昇アルペジオ）
+      notes.forEach((f, i) => beep(ctx, now + i * 0.085, f, 0.22, 'sine', 0.18));
     } else {
       beep(ctx, now, 220, 0.16, 'square', 0.10);
       beep(ctx, now + 0.1, 174.61, 0.2, 'square', 0.10);

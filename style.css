@@ -165,7 +165,7 @@ select{
   border-radius:8px; font-family:"Noto Sans JP",sans-serif; background:#fff;
 }
 .answer-form input:focus{outline:none; border-color:var(--navy);}
-.answer-form .btn-primary{width:auto; margin-top:0; padding:12px 18px;}
+.answer-form .btn-primary{width:auto; margin-top:0; padding:12px 20px; flex:none; white-space:nowrap;}
 
 .choice-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;}
 .choice-btn{
@@ -177,7 +177,9 @@ select{
 .choice-btn.correct{background:var(--ok-soft); border-color:var(--ok); color:var(--ok);}
 .choice-btn.wrong{background:var(--hanko-soft); border-color:var(--hanko); color:var(--hanko);}
 
-.quiz-actions{display:flex; gap:8px; margin-bottom:6px;}
+.quiz-actions{display:flex; gap:8px; margin-bottom:6px; flex-wrap:wrap;}
+.quiz-actions .btn-ghost{flex:1 1 28%;}
+.btn-giveup{color:var(--hanko); border-color:var(--hanko-soft); background:var(--hanko-soft);}
 
 .stamp-result{
   display:flex; justify-content:center; margin:10px 0;

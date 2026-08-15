@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 
@@ -201,7 +201,8 @@
     <div class="card">
       <div class="section-label">ランキング（回答数）</div>
       <div class="chip-group" id="lb-period-group">
-        <button class="chip active" data-period="week">今週</button>
+        <button class="chip active" data-period="day">今日</button>
+        <button class="chip" data-period="week">今週</button>
         <button class="chip" data-period="month">今月</button>
       </div>
       <div class="lb-nickname-row">
@@ -212,21 +213,21 @@
       <div class="empty-note" id="leaderboard-empty" hidden>まだ記録がありません。</div>
       <div class="empty-note" id="leaderboard-setup-note">ランキング機能は設定が完了すると使えるようになります。</div>
     </div>
-
-    <div class="card">
-      <div class="section-label">バックアップ</div>
-      <label class="switch" style="margin-bottom:10px;">
-        <input type="checkbox" id="auto-backup-toggle" checked>
-        <span>10問解くごとに自動で書き出す</span>
-      </label>
-      <button class="btn-primary" id="export-btn">今すぐ書き出す（ダウンロード）</button>
-      <button class="btn-ghost btn-block" id="import-btn">ファイルから読み込む</button>
-      <input type="file" id="import-file" accept="application/json" hidden>
-      <div class="empty-note">キャッシュ削除や機種変更の前に書き出しておくと、成績・苦手語・マイ単語を復元できます。読み込むと今のデータは上書きされます。iPhoneの「ファイル」アプリのダウンロード先をiCloud Driveにしておくと、自動書き出し分もiCloudに残ります。</div>
-    </div>
   </section>
 
 </main>
+
+<div class="dd-modal" id="lb-detail-modal" hidden>
+  <div class="dd-backdrop" id="lb-detail-backdrop"></div>
+  <div class="dd-card">
+    <div class="dd-head">
+      <div class="dd-pos" id="lb-detail-name">名前</div>
+      <button class="dd-close" id="lb-detail-close" aria-label="閉じる">×</button>
+    </div>
+    <div class="dd-body" id="lb-detail-body">読み込み中…</div>
+  </div>
+</div>
+
 
 <div class="dd-modal" id="dd-modal" hidden>
   <div class="dd-backdrop" id="dd-backdrop"></div>
@@ -249,6 +250,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js?v=1"></script>
 <script src="data.js?v=3"></script>
-<script src="app.js?v=18"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>

@@ -296,7 +296,6 @@ select{
 }
 .weak-chip.hint{border-color:var(--gold); color:#8A6A1E; background:var(--gold-soft);}
 .empty-note{font-size:12.5px; color:var(--ink-soft); line-height:1.6;}
-.btn-block{width:100%; margin-top:8px;}
 .card .empty-note{margin-top:10px;}
 
 .lb-nickname-row{
@@ -308,6 +307,7 @@ select{
 .lb-row{
   display:flex; align-items:center; gap:10px; padding:8px 10px;
   border:1px solid var(--line); border-radius:8px; background:var(--paper-raised); font-size:13.5px;
+  cursor:pointer;
 }
 .lb-row.me{border-color:var(--gold); background:var(--gold-soft);}
 .lb-rank{font-family:"JetBrains Mono",monospace; font-weight:800; color:var(--hanko); width:20px; text-align:center; flex:none;}
@@ -341,6 +341,12 @@ select{
 }
 .dd-nav:disabled{opacity:.3;}
 .dd-pos{flex:1; text-align:center; font-family:"JetBrains Mono",monospace; font-weight:700; color:var(--ink-soft); font-size:13px;}
+#lb-detail-name{font-size:17px; font-weight:900; color:var(--navy); font-family:"Noto Sans JP",sans-serif;}
+.lb-detail-stats{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;}
+.lb-detail-stat{text-align:center; background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:10px 6px;}
+.lb-detail-stat .n{font-family:"JetBrains Mono",monospace; font-weight:800; font-size:19px; color:var(--navy);}
+.lb-detail-stat .l{font-size:11px; color:var(--ink-soft); margin-top:2px;}
+.lb-detail-weak-title{font-weight:700; font-size:13px; color:var(--ink-soft); margin-bottom:8px;}
 .dd-close{
   flex:none; width:30px; height:30px; border-radius:50%; border:none;
   background:var(--line); color:var(--ink); font-size:16px; cursor:pointer;

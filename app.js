@@ -3,8 +3,6 @@ const LS = {
   MY_WORDS: 'pv_my_words',
   WEAK: 'pv_weak',          // { "verb": {level:'hint'|'choice'|'wrong', streak:0} }
   LOG: 'pv_daily_log',      // { "2026-08-15": {solved:10, correct:8} }
-  AUTO_ENABLED: 'pv_auto_backup_enabled',
-  AUTO_COUNT: 'pv_auto_backup_count',
 };
 
 function loadJSON(key, fallback) {
@@ -210,7 +208,10 @@ function logToday(correct) {
 function todayKey(offset = 0) {
   const d = new Date();
   d.setDate(d.getDate() - offset);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 // ===================== UI: タブ =====================
@@ -424,7 +425,6 @@ function finishQuestion(ok, method, delay) {
   recordResult(q.answer, ok ? method : 'wrong');
   recordAnswered(q.answer, ok);
   logToday(ok);
-  bumpAutoBackupCounter();
   playResultSound(ok);
   syncLeaderboard(q.answer, ok);
   if (ok) quizState.correctCount++;
@@ -794,80 +794,6 @@ function updateStreakPill() {
 }
 updateStreakPill();
 
-// ===================== バックアップ =====================
-function exportBackup(auto) {
-  const data = {
-    app: 'phrasal-verb-notebook',
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    myWords: myWords(),
-    weak: loadJSON(LS.WEAK, {}),
-    log: loadJSON(LS.LOG, {}),
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const stamp = new Date().toISOString().slice(0, 10);
-  a.href = url;
-  a.download = `phrasal-verb-backup-${stamp}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-  toast(auto ? '10問たまったので自動でバックアップしました' : 'バックアップを書き出しました');
-}
-
-function importBackup(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    let data;
-    try {
-      data = JSON.parse(reader.result);
-    } catch (e) {
-      toast('読み込みに失敗しました（ファイルが壊れています）');
-      return;
-    }
-    if (!data || typeof data !== 'object') {
-      toast('読み込みに失敗しました（形式が違います）');
-      return;
-    }
-    if (Array.isArray(data.myWords)) saveJSON(LS.MY_WORDS, data.myWords);
-    if (data.weak && typeof data.weak === 'object') saveJSON(LS.WEAK, data.weak);
-    if (data.log && typeof data.log === 'object') saveJSON(LS.LOG, data.log);
-    toast('バックアップを読み込みました');
-    refreshWeakRow();
-    updateStreakPill();
-    renderMyWordList();
-    renderStats();
-  };
-  reader.readAsText(file);
-}
-
-document.getElementById('export-btn').addEventListener('click', () => exportBackup(false));
-document.getElementById('import-btn').addEventListener('click', () => {
-  document.getElementById('import-file').click();
-});
-document.getElementById('import-file').addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (file) importBackup(file);
-  e.target.value = '';
-});
-
-const autoToggle = document.getElementById('auto-backup-toggle');
-autoToggle.checked = loadJSON(LS.AUTO_ENABLED, true);
-autoToggle.addEventListener('change', () => saveJSON(LS.AUTO_ENABLED, autoToggle.checked));
-
-function bumpAutoBackupCounter() {
-  if (!loadJSON(LS.AUTO_ENABLED, true)) return;
-  const n = loadJSON(LS.AUTO_COUNT, 0) + 1;
-  if (n >= 10) {
-    exportBackup(true);
-    saveJSON(LS.AUTO_COUNT, 0);
-  } else {
-    saveJSON(LS.AUTO_COUNT, n);
-  }
-}
-
 // ===================== ランキング =====================
 let fbDB = null;
 function initFirebase() {
@@ -987,6 +913,7 @@ function syncLeaderboard(verb, ok) {
   const nickname = ensureNickname();
   if (!nickname) return;
   const updates = {};
+  updates[`leaderboard/day/${todayKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
   updates[`leaderboard/week/${weekKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
   updates[`leaderboard/month/${monthKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
   if (verb) {
@@ -1005,7 +932,7 @@ function syncLeaderboard(verb, ok) {
   db.ref().update(updates).catch(() => {});
 }
 
-let lbPeriod = 'week';
+let lbPeriod = 'day';
 function renderLeaderboard() {
   const db = initFirebase();
   const listEl = document.getElementById('leaderboard-list');
@@ -1018,7 +945,7 @@ function renderLeaderboard() {
     return;
   }
   setupEl.hidden = true;
-  const key = lbPeriod === 'week' ? weekKey() : monthKey();
+  const key = lbPeriod === 'day' ? todayKey() : (lbPeriod === 'week' ? weekKey() : monthKey());
   db.ref(`leaderboard/${lbPeriod}/${key}`).get().then(snap => {
     const val = snap.val() || {};
     const rows = Object.entries(val).sort((a, b) => b[1] - a[1]);
@@ -1029,10 +956,55 @@ function renderLeaderboard() {
       const row = document.createElement('div');
       row.className = 'lb-row' + (name === me ? ' me' : '');
       row.innerHTML = `<span class="lb-rank">${i + 1}</span><span class="lb-name">${escHtml(name)}</span><span class="lb-count">${count}</span>`;
+      row.addEventListener('click', () => openLbDetail(name));
       listEl.appendChild(row);
     });
   }).catch(() => { listEl.innerHTML = ''; emptyEl.hidden = false; });
 }
+
+function openLbDetail(name) {
+  document.getElementById('lb-detail-name').textContent = name;
+  document.getElementById('lb-detail-body').innerHTML = '読み込み中…';
+  document.getElementById('lb-detail-modal').hidden = false;
+  const db = initFirebase();
+  if (!db) return;
+  db.ref(`answers/${name}`).get().then(snap => {
+    const data = snap.val() || {};
+    const entries = Object.entries(data);
+    let ok = 0, ng = 0;
+    const weakList = [];
+    entries.forEach(([verb, rec]) => {
+      const o = (rec && rec.ok) || 0;
+      const n = (rec && rec.ng) || 0;
+      ok += o; ng += n;
+      if (n > 0) weakList.push({ verb, ng: n, ok: o });
+    });
+    const total = ok + ng;
+    const rate = total ? Math.round(100 * ok / total) : 0;
+    weakList.sort((a, b) => b.ng - a.ng);
+
+    const statsHtml = `
+      <div class="lb-detail-stats">
+        <div class="lb-detail-stat"><div class="n">${total}</div><div class="l">総回答数</div></div>
+        <div class="lb-detail-stat"><div class="n">${total ? rate + '%' : '–'}</div><div class="l">正答率</div></div>
+      </div>`;
+
+    const weakHtml = weakList.length
+      ? `<div class="lb-detail-weak-title">間違えた語（${weakList.length}）</div>
+         <div class="weak-list">${weakList.map(w => `<span class="weak-chip">${escHtml(w.verb)} ×${w.ng}</span>`).join('')}</div>`
+      : `<div class="empty-note">まだ間違えた語の記録がありません。</div>`;
+
+    document.getElementById('lb-detail-body').innerHTML = statsHtml + weakHtml;
+  }).catch(() => {
+    document.getElementById('lb-detail-body').innerHTML = '<div class="empty-note">取得に失敗しました。</div>';
+  });
+}
+document.getElementById('lb-detail-close').addEventListener('click', () => {
+  document.getElementById('lb-detail-modal').hidden = true;
+});
+document.getElementById('lb-detail-backdrop').addEventListener('click', () => {
+  document.getElementById('lb-detail-modal').hidden = true;
+});
 
 function updateLbNameDisplay() {
   document.getElementById('lb-my-name').textContent = getNickname() || '未設定';

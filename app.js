@@ -684,6 +684,7 @@ document.getElementById('dict-form').addEventListener('submit', e => {
   const list = myWords();
   list.push(w);
   saveJSON(LS.MY_WORDS, list);
+  pushMyWordsToCloud();
   e.target.reset();
   toast('辞書に追加しました');
   renderMyWordList();
@@ -706,6 +707,7 @@ function renderMyWordList() {
       const idx = list.length - 1 - i;
       list.splice(idx, 1);
       saveJSON(LS.MY_WORDS, list);
+      pushMyWordsToCloud();
       renderMyWordList();
       toast('削除しました');
     });
@@ -893,6 +895,14 @@ function ensureNickname() {
 
 function sanitizeKey(k) { return String(k).replace(/[.#$/\[\]]/g, '_'); }
 
+function pushMyWordsToCloud() {
+  const db = initFirebase();
+  if (!db) return;
+  const nickname = getNickname();
+  if (!nickname) return;
+  db.ref(`users/${nickname}/myWords`).set(myWords()).catch(() => {});
+}
+
 function pullAndMergeCloud(nickname) {
   const db = initFirebase();
   if (!db || !nickname) return;
@@ -953,11 +963,25 @@ function pullAndMergeCloud(nickname) {
       changed = true;
     }
 
+    if (Array.isArray(cloud.myWords) && cloud.myWords.length) {
+      const map = new Map();
+      myWords().forEach(w => { if (w && w.verb) map.set(w.verb.trim().toLowerCase(), w); });
+      cloud.myWords.forEach(w => {
+        if (!w || !w.verb) return;
+        const key = w.verb.trim().toLowerCase();
+        if (!map.has(key)) map.set(key, w);
+      });
+      saveJSON(LS.MY_WORDS, [...map.values()]);
+      changed = true;
+    }
+
     if (changed) {
       refreshWeakRow();
       updateStreakPill();
       const statsView = document.getElementById('view-stats');
       if (statsView && statsView.classList.contains('active')) renderStats();
+      const dictView = document.getElementById('view-dict');
+      if (dictView && dictView.classList.contains('active')) renderMyWordList();
       toast('前回までの記録を引き継ぎました');
     }
   }).catch(() => {});
@@ -995,6 +1019,7 @@ function syncLeaderboard(verb, ok) {
   const answeredForCloud = {};
   Object.entries(loadJSON(LS_ANSWERED, {})).forEach(([k, v]) => { answeredForCloud[sanitizeKey(k)] = v; });
   updates[`users/${nickname}/answered`] = answeredForCloud;
+  updates[`users/${nickname}/myWords`] = myWords();
   db.ref().update(updates).catch(() => {});
 }
 

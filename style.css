@@ -223,11 +223,11 @@ select{
   font-weight:900; font-size:22px; transform:rotate(-6deg);
 }
 .done-score{font-family:"JetBrains Mono",monospace; font-weight:700; font-size:20px; margin-bottom:14px;}
-.done-list{text-align:left; margin-bottom:6px;}
-.done-row{display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px dashed var(--line); font-size:13.5px;}
-.done-row .r-verb{font-weight:700;}
-.done-row.ok .r-mark{color:var(--ok);}
-.done-row.ng .r-mark{color:var(--hanko);}
+.done-list{text-align:left; margin-bottom:6px; display:flex; flex-direction:column; gap:8px;}
+.done-item .wi-head{align-items:center;}
+.done-item .r-mark{font-weight:800; font-size:16px; flex:none;}
+.done-item.ok .r-mark{color:var(--ok);}
+.done-item.ng .r-mark{color:var(--hanko);}
 
 /* ---------- Word list ---------- */
 .list-controls{display:flex; gap:8px; margin-bottom:12px;}
@@ -303,6 +303,37 @@ select{
   transition:all .25s; box-shadow:var(--shadow-2); z-index:50;
 }
 .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+/* ---------- 結果詳細モーダル ---------- */
+.dd-modal{position:fixed; inset:0; z-index:60; display:flex; align-items:flex-end;}
+.dd-backdrop{position:absolute; inset:0; background:rgba(14,24,38,.55);}
+.dd-card{
+  position:relative; width:100%; max-width:520px; margin:0 auto;
+  background:var(--paper-raised); border-radius:16px 16px 0 0;
+  padding:16px 18px 26px; box-shadow:0 -8px 30px rgba(0,0,0,.25);
+  max-height:82vh; overflow-y:auto; touch-action:pan-y;
+  animation:ddUp .22s ease;
+}
+@keyframes ddUp{from{transform:translateY(24px); opacity:0;} to{transform:none; opacity:1;}}
+.dd-head{display:flex; align-items:center; gap:10px; margin-bottom:12px;}
+.dd-nav{
+  flex:none; width:34px; height:34px; border-radius:50%; border:1px solid var(--line);
+  background:#fff; font-size:18px; color:var(--navy); cursor:pointer;
+}
+.dd-nav:disabled{opacity:.3;}
+.dd-pos{flex:1; text-align:center; font-family:"JetBrains Mono",monospace; font-weight:700; color:var(--ink-soft); font-size:13px;}
+.dd-close{
+  flex:none; width:30px; height:30px; border-radius:50%; border:none;
+  background:var(--line); color:var(--ink); font-size:16px; cursor:pointer;
+}
+.dd-body .dd-mark{font-weight:900; font-size:14px; margin-bottom:6px;}
+.dd-body .dd-mark.ok{color:var(--ok);}
+.dd-body .dd-mark.ng{color:var(--hanko);}
+.dd-body .dd-verb{font-weight:900; font-size:20px; color:var(--navy); margin-bottom:8px;}
+.dd-body .ex{color:var(--ink); font-size:14.5px; margin-bottom:2px;}
+.dd-body .ja{color:var(--ink-soft); font-size:13px; margin-bottom:10px;}
+.dd-body .def{color:var(--ink-soft); font-size:12.5px; margin-top:4px;}
+.dd-swipe-hint{text-align:center; font-size:11px; color:var(--ink-soft); margin-top:14px; opacity:.7;}
 
 @media (min-width:600px){
   body{font-size:17px;}

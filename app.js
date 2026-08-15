@@ -408,7 +408,7 @@ function finishQuestion(ok, method, delay) {
   playResultSound(ok);
   syncLeaderboard();
   if (ok) quizState.correctCount++;
-  quizState.results.push({ verb: q.answer, ok });
+  quizState.results.push({ verb: q.answer, ok, q });
 
   const stamp = document.getElementById('stamp-result');
   stamp.hidden = false;
@@ -451,15 +451,80 @@ function finishQuiz() {
   document.getElementById('done-score-total').textContent = quizState.questions.length;
   const list = document.getElementById('done-list');
   list.innerHTML = '';
-  quizState.results.forEach(r => {
-    const row = document.createElement('div');
-    row.className = 'done-row ' + (r.ok ? 'ok' : 'ng');
-    row.innerHTML = `<span class="r-verb">${r.verb}</span><span class="r-mark">${r.ok ? '○' : '×'}</span>`;
-    list.appendChild(row);
-  });
+  quizState.results.forEach((r, i) => list.appendChild(doneItemEl(r, i)));
   refreshWeakRow();
   updateStreakPill();
 }
+function doneItemEl(r, idx) {
+  const w = r.q.word;
+  const div = document.createElement('div');
+  div.className = 'word-item done-item' + (r.ok ? ' ok' : ' ng');
+  div.innerHTML = `
+    <div class="wi-head">
+      <span class="wi-verb">${escHtml(r.verb)}</span>
+      <span class="r-mark">${r.ok ? '○' : '×'}</span>
+    </div>`;
+  div.addEventListener('click', () => openDoneDetail(idx));
+  return div;
+}
+
+// ===================== 結果詳細モーダル =====================
+let ddIndex = 0;
+function openDoneDetail(idx) {
+  ddIndex = idx;
+  renderDoneDetail();
+  document.getElementById('dd-modal').hidden = false;
+}
+function closeDoneDetail() {
+  document.getElementById('dd-modal').hidden = true;
+}
+function renderDoneDetail() {
+  const results = quizState.results;
+  const r = results[ddIndex];
+  const w = r.q.word;
+  document.getElementById('dd-idx').textContent = ddIndex + 1;
+  document.getElementById('dd-total').textContent = results.length;
+  document.getElementById('dd-prev').disabled = ddIndex === 0;
+  document.getElementById('dd-next').disabled = ddIndex === results.length - 1;
+  document.getElementById('dd-body').innerHTML = `
+    <div class="dd-mark ${r.ok ? 'ok' : 'ng'}">${r.ok ? '○ 正解' : '× 不正解'}</div>
+    <div class="dd-verb">${escHtml(r.verb)}</div>
+    ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)}</div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
+    ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)}</div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
+    <div class="def">${escHtml(w.meaning || '')}${w.def ? '／' + escHtml(w.def) : ''}</div>
+    ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
+  `;
+}
+function ddGo(delta) {
+  const results = quizState.results;
+  const next = ddIndex + delta;
+  if (next < 0 || next >= results.length) return;
+  ddIndex = next;
+  renderDoneDetail();
+}
+document.getElementById('dd-prev').addEventListener('click', () => ddGo(-1));
+document.getElementById('dd-next').addEventListener('click', () => ddGo(1));
+document.getElementById('dd-close').addEventListener('click', closeDoneDetail);
+document.getElementById('dd-backdrop').addEventListener('click', closeDoneDetail);
+
+(() => {
+  const card = document.getElementById('dd-card');
+  let startX = 0, startY = 0, tracking = false;
+  card.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+  card.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+    ddGo(dx < 0 ? 1 : -1);
+  }, { passive: true });
+})();
 document.getElementById('restart-btn').addEventListener('click', () => {
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-setup').hidden = false;

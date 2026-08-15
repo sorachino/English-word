@@ -423,7 +423,7 @@ function finishQuestion(ok, method, delay) {
   logToday(ok);
   bumpAutoBackupCounter();
   playResultSound(ok);
-  syncLeaderboard();
+  syncLeaderboard(q.answer, ok);
   if (ok) quizState.correctCount++;
   quizState.results.push({ verb: q.answer, ok, q });
 
@@ -897,7 +897,7 @@ function monthKey(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function syncLeaderboard() {
+function syncLeaderboard(verb, ok) {
   const db = initFirebase();
   if (!db) return;
   const nickname = ensureNickname();
@@ -905,6 +905,11 @@ function syncLeaderboard() {
   const updates = {};
   updates[`leaderboard/week/${weekKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
   updates[`leaderboard/month/${monthKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
+  if (verb) {
+    const safeVerb = verb.replace(/[.#$/\[\]]/g, '_');
+    const field = ok ? 'ok' : 'ng';
+    updates[`answers/${nickname}/${safeVerb}/${field}`] = firebase.database.ServerValue.increment(1);
+  }
   db.ref().update(updates).catch(() => {});
 }
 

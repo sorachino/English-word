@@ -1012,6 +1012,15 @@ function updateLbNameDisplay() {
 }
 updateLbNameDisplay();
 
+// 名前は端末に残っているのに苦手語・記録が空の場合は、クラウドから自動で復元を試みる
+(() => {
+  const nick = getNickname();
+  if (!nick) return;
+  const hasWeak = Object.keys(loadJSON(LS.WEAK, {})).length > 0;
+  const hasLog = Object.keys(loadJSON(LS.LOG, {})).length > 0;
+  if (!hasWeak && !hasLog) pullAndMergeCloud(nick);
+})();
+
 document.querySelectorAll('#lb-period-group .chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('#lb-period-group .chip').forEach(c => c.classList.remove('active'));

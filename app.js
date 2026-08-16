@@ -377,6 +377,7 @@ function resolveChoice(chosen, btnEl) {
 // ===================== 効果音 =====================
 let audioCtx = null;
 function getAudioCtx() {
+  if (audioCtx && audioCtx.state === 'closed') audioCtx = null;
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return audioCtx;
 }
@@ -397,14 +398,21 @@ function playResultSound(correct) {
   if (loadJSON('pv_sound_off', false)) return;
   try {
     const ctx = getAudioCtx();
-    if (ctx.state === 'suspended') ctx.resume();
-    const now = ctx.currentTime;
-    if (correct) {
-      const notes = [523.25, 659.25, 783.99, 1046.50]; // ド・ミ・ソ・ド（上昇アルペジオ）
-      notes.forEach((f, i) => beep(ctx, now + i * 0.085, f, 0.22, 'sine', 0.18));
+    const schedule = () => {
+      const now = ctx.currentTime;
+      if (correct) {
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // ド・ミ・ソ・ド（上昇アルペジオ）
+        notes.forEach((f, i) => beep(ctx, now + i * 0.085, f, 0.22, 'sine', 0.18));
+      } else {
+        beep(ctx, now, 220, 0.16, 'square', 0.10);
+        beep(ctx, now + 0.1, 174.61, 0.2, 'square', 0.10);
+      }
+    };
+    if (ctx.state === 'running') {
+      schedule();
     } else {
-      beep(ctx, now, 220, 0.16, 'square', 0.10);
-      beep(ctx, now + 0.1, 174.61, 0.2, 'square', 0.10);
+      // suspended（休止中）や電話の割り込み後などは、復帰を待ってから鳴らす
+      ctx.resume().then(schedule).catch(() => {});
     }
   } catch (e) { /* AudioContextが使えない環境は無音のまま無視 */ }
 }

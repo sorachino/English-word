@@ -158,16 +158,12 @@ function answerMatches(input, answer) {
 function recordResult(verb, method) {
   // method: 'first'（記録なし対象）| 'hint' | 'choice' | 'wrong'
   const weak = loadJSON(LS.WEAK, {});
-  if (method === 'first') {
-    if (weak[verb]) {
-      weak[verb].okStreak = (weak[verb].okStreak || 0) + 1;
-      if (weak[verb].okStreak >= 2) delete weak[verb];
-    }
+  if (method !== 'wrong') {
+    // 正解した（ヒント・4択を使っていても）ので、直近の状態として苦手リストから外す
+    if (weak[verb]) delete weak[verb];
   } else {
-    const lvl = method === 'hint' ? 'hint' : (method === 'choice' ? 'choice' : 'wrong');
     if (!weak[verb]) weak[verb] = { hint: 0, choice: 0, wrong: 0, okStreak: 0 };
-    weak[verb][lvl] = (weak[verb][lvl] || 0) + 1;
-    weak[verb].okStreak = 0;
+    weak[verb].wrong = (weak[verb].wrong || 0) + 1;
   }
   // 上限30語：ヒントのみの語から間引く
   let keys = Object.keys(weak);
@@ -187,7 +183,7 @@ const LS_ANSWERED = 'pv_answered';
 function recordAnswered(verb, ok) {
   const data = loadJSON(LS_ANSWERED, {});
   if (!data[verb]) data[verb] = { ok: 0, ng: 0 };
-  if (ok) data[verb].ok++; else data[verb].ng++;
+  if (ok) { data[verb].ok++; data[verb].ng = 0; } else { data[verb].ng++; }
   saveJSON(LS_ANSWERED, data);
 }
 function wordStatusClass(verb) {
@@ -301,6 +297,7 @@ function showQuestion() {
   document.getElementById('stamp-result').hidden = true;
   document.getElementById('stamp-result').innerHTML = '';
   document.getElementById('reveal-box').hidden = true;
+  document.getElementById('mark-wrong-btn').hidden = true;
   document.getElementById('choice-btn').disabled = false;
   document.getElementById('choice-btn').hidden = false;
   document.getElementById('hint-btn').disabled = false;
@@ -449,6 +446,15 @@ function finishQuestion(ok, method, delay) {
   document.getElementById('reveal-def').textContent = q.def || '';
   const noteEl = document.getElementById('reveal-note');
   if (q.note) { noteEl.hidden = false; noteEl.textContent = '※ ' + q.note; } else { noteEl.hidden = true; }
+
+  const markWrongBtn = document.getElementById('mark-wrong-btn');
+  if (ok && (method === 'hint' || method === 'choice')) {
+    markWrongBtn.hidden = false;
+    markWrongBtn.disabled = false;
+    markWrongBtn.onclick = markCurrentAsWrong;
+  } else {
+    markWrongBtn.hidden = true;
+  }
 
   const run = () => {
     reveal.hidden = false;
@@ -968,6 +974,48 @@ function syncLeaderboard(verb, ok) {
 }
 
 let lbPeriod = 'day';
+
+function pushStateSnapshotToCloud() {
+  const db = initFirebase();
+  if (!db) return;
+  const nickname = getNickname();
+  if (!nickname) return;
+  const weakForCloud = {};
+  Object.entries(loadJSON(LS.WEAK, {})).forEach(([k, v]) => { weakForCloud[sanitizeKey(k)] = v; });
+  const answeredForCloud = {};
+  Object.entries(loadJSON(LS_ANSWERED, {})).forEach(([k, v]) => { answeredForCloud[sanitizeKey(k)] = v; });
+  db.ref(`users/${nickname}`).update({ weak: weakForCloud, answered: answeredForCloud }).catch(() => {});
+}
+
+function markCurrentAsWrong() {
+  if (!quizState) return;
+  const q = quizState.questions[quizState.idx];
+  if (!q || !q.resolved) return;
+  const verb = q.answer;
+
+  const weak = loadJSON(LS.WEAK, {});
+  if (!weak[verb]) weak[verb] = { hint: 0, choice: 0, wrong: 0, okStreak: 0 };
+  weak[verb].wrong = (weak[verb].wrong || 0) + 1;
+  saveJSON(LS.WEAK, weak);
+
+  const answered = loadJSON(LS_ANSWERED, {});
+  if (!answered[verb]) answered[verb] = { ok: 0, ng: 0 };
+  answered[verb].ng = (answered[verb].ng || 0) + 1;
+  saveJSON(LS_ANSWERED, answered);
+
+  const last = quizState.results[quizState.results.length - 1];
+  if (last && last.verb === verb && last.ok) {
+    last.ok = false;
+    quizState.correctCount = Math.max(0, quizState.correctCount - 1);
+  }
+
+  refreshWeakRow();
+  pushStateSnapshotToCloud();
+  const btn = document.getElementById('mark-wrong-btn');
+  btn.hidden = true;
+  toast('苦手な語として記録しました');
+}
+
 function renderLeaderboard() {
   const db = initFirebase();
   const listEl = document.getElementById('leaderboard-list');

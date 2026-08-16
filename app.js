@@ -52,6 +52,29 @@ function headPattern(head) {
   const alts = [...forms].sort((a, b) => b.length - a.length).map(esc);
   return '(?:' + alts.join('|') + '|' + esc(stem) + "\\w*)";
 }
+function findObjectInSentence(sentence, verb) {
+  if (!sentence) return null;
+  const parts = baseForm(verb).split(' ');
+  const head = parts[0], tail = parts.slice(1);
+  if (!tail.length) return null;
+  const headPat = headPattern(head.toLowerCase());
+  const tailPat = tail.map(esc).join('\\s+');
+  const pat = '\\b(' + headPat + ')((?:\\s+\\w+){1,3})?\\s+(' + tailPat + ')\\b';
+  const re = new RegExp(pat, 'i');
+  const m = sentence.match(re);
+  if (!m || !m[2] || !m[2].trim()) return null;
+  return m[2].trim();
+}
+function structureHtml(verb, ex1, ex2) {
+  const base = baseForm(verb);
+  const parts = base.split(' ');
+  if (parts.length < 2) return '';
+  const head = parts[0], tail = parts.slice(1).join(' ');
+  const obj = findObjectInSentence(ex2, verb) || findObjectInSentence(ex1, verb);
+  if (!obj) return '';
+  return `<div class="dd-structure">構文：<b>${escHtml(head)} ${escHtml(obj)} ${escHtml(tail)}</b>　／　<b>${escHtml(base)} ${escHtml(obj)}</b></div>`;
+}
+
 function blankSentence(sentence, verb) {
   if (!sentence) return null;
   const parts = baseForm(verb).split(' ');
@@ -476,6 +499,9 @@ function finishQuestion(ok, method, delay) {
   document.getElementById('reveal-speak-btn').dataset.text = q.full || '';
   document.getElementById('reveal-ja').textContent = q.ja;
   document.getElementById('reveal-def').textContent = q.def || '';
+  const nuanceEl = document.getElementById('reveal-nuance');
+  if (q.word.nuance) { nuanceEl.hidden = false; nuanceEl.textContent = '💡 ' + q.word.nuance; } else { nuanceEl.hidden = true; }
+  document.getElementById('reveal-structure').innerHTML = structureHtml(q.answer, q.word.ex1, q.word.ex2);
   const noteEl = document.getElementById('reveal-note');
   if (q.note) { noteEl.hidden = false; noteEl.textContent = '※ ' + q.note; } else { noteEl.hidden = true; }
 
@@ -697,6 +723,7 @@ function wordItemEl(w) {
     </div>
     <div class="wi-meaning">${escHtml(w.meaning || '')}</div>
     <div class="wi-detail">
+      ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}</div>` : ''}
       ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
       ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
       ${w.def ? `<div class="def">${escHtml(w.def)}</div>` : ''}

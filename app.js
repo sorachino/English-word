@@ -456,27 +456,33 @@ if ('speechSynthesis' in window) {
   window.speechSynthesis.onvoiceschanged = loadVoices;
 }
 function pickBestVoice() {
-  const voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
+  // 呼び出すたびに最新のリストを取り直す（読み込みタイミングのズレを防ぐ）
+  const fresh = window.speechSynthesis.getVoices();
+  const voices = fresh.length ? fresh : cachedVoices;
   if (!voices.length) return null;
-  // 名前で分かっている自然な音声（Apple/Google/Microsoftの高品質ボイス）を優先
+
+  const enUS = voices.filter(v => v.lang === 'en-US');
+  const pool = enUS.length ? enUS : voices.filter(v => v.lang && v.lang.startsWith('en'));
+  if (!pool.length) return voices[0];
+
+  // 最優先：名前やvoiceURIに「拡張／プレミアム」を含むもの（iOSでダウンロードした高音質ボイス）
+  const enhanced = pool.find(v => /premium|enhanced/i.test(v.name) || /premium|enhanced/i.test(v.voiceURI || ''));
+  if (enhanced) return enhanced;
+
+  // 次点：名前で分かっている自然な音声
   const preferredNames = [
-    'Samantha', 'Ava', 'Ava (Premium)', 'Ava (Enhanced)', 'Zoe (Premium)', 'Nicky (Premium)',
-    'Google US English', 'Microsoft Aria Online (Natural) - English (United States)',
+    'Samantha', 'Ava', 'Zoe', 'Nicky', 'Google US English',
+    'Microsoft Aria Online (Natural) - English (United States)',
     'Microsoft Jenny Online (Natural) - English (United States)', 'Karen',
   ];
   for (const name of preferredNames) {
-    const v = voices.find(v => v.name === name);
+    const v = pool.find(v => v.name === name);
     if (v) return v;
   }
-  // 次点：米語のうち「拡張／プレミアム」を含む名前（iOSでダウンロードした高音質ボイス）
-  const enUS = voices.filter(v => v.lang === 'en-US');
-  const enhanced = enUS.find(v => /premium|enhanced/i.test(v.name));
-  if (enhanced) return enhanced;
-  const def = enUS.find(v => v.default);
+
+  const def = pool.find(v => v.default);
   if (def) return def;
-  if (enUS.length) return enUS[0];
-  const en = voices.find(v => v.lang && v.lang.startsWith('en'));
-  return en || voices[0];
+  return pool[0];
 }
 function speak(text) {
   if (!text) return;

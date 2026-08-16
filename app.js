@@ -449,13 +449,43 @@ function playResultSound(correct) {
 function escAttr(s) {
   return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+let cachedVoices = [];
+function loadVoices() { cachedVoices = window.speechSynthesis.getVoices(); }
+if ('speechSynthesis' in window) {
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+function pickBestVoice() {
+  const voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  // 名前で分かっている自然な音声（Apple/Google/Microsoftの高品質ボイス）を優先
+  const preferredNames = [
+    'Samantha', 'Ava', 'Ava (Premium)', 'Ava (Enhanced)', 'Zoe (Premium)', 'Nicky (Premium)',
+    'Google US English', 'Microsoft Aria Online (Natural) - English (United States)',
+    'Microsoft Jenny Online (Natural) - English (United States)', 'Karen',
+  ];
+  for (const name of preferredNames) {
+    const v = voices.find(v => v.name === name);
+    if (v) return v;
+  }
+  // 次点：米語のうち「拡張／プレミアム」を含む名前（iOSでダウンロードした高音質ボイス）
+  const enUS = voices.filter(v => v.lang === 'en-US');
+  const enhanced = enUS.find(v => /premium|enhanced/i.test(v.name));
+  if (enhanced) return enhanced;
+  const def = enUS.find(v => v.default);
+  if (def) return def;
+  if (enUS.length) return enUS[0];
+  const en = voices.find(v => v.lang && v.lang.startsWith('en'));
+  return en || voices[0];
+}
 function speak(text) {
   if (!text) return;
   try {
     if (!('speechSynthesis' in window)) { toast('この端末は読み上げに対応していません'); return; }
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-US';
+    const voice = pickBestVoice();
+    if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = 'en-US'; }
     u.rate = 0.95;
     window.speechSynthesis.speak(u);
   } catch (e) { /* 無視 */ }

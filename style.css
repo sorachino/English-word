@@ -363,3 +363,18 @@ select{
 @media (min-width:600px){
   body{font-size:17px;}
 }
+
+/* ---------- 連続日数お祝いポップアップ ---------- */
+.streak-popup{position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center; padding:24px;}
+.streak-popup-backdrop{position:absolute; inset:0; background:rgba(14,24,38,.6);}
+.streak-popup-card{
+  position:relative; width:100%; max-width:320px; background:var(--paper-raised);
+  border-radius:16px; padding:28px 22px 22px; text-align:center;
+  box-shadow:0 12px 40px rgba(0,0,0,.3); border:2px solid var(--gold);
+  animation:streakPop .35s cubic-bezier(.3,1.6,.4,1);
+}
+@keyframes streakPop{from{transform:scale(.7); opacity:0;} to{transform:scale(1); opacity:1;}}
+.streak-popup-flame{font-size:52px; line-height:1; margin-bottom:8px;}
+.streak-popup-title{font-weight:900; font-size:21px; color:var(--navy); margin-bottom:6px;}
+.streak-popup-msg{font-size:13.5px; color:var(--ink-soft); margin-bottom:18px; line-height:1.6;}
+.streak-popup-card .btn-primary{margin-top:0;}

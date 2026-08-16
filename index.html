@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=13">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
 
@@ -217,6 +217,17 @@
 
 </main>
 
+<div class="streak-popup" id="streak-popup" hidden>
+  <div class="streak-popup-backdrop" id="streak-popup-backdrop"></div>
+  <div class="streak-popup-card">
+    <div class="streak-popup-flame">🔥</div>
+    <div class="streak-popup-title" id="streak-popup-title">2日連続！</div>
+    <div class="streak-popup-msg" id="streak-popup-msg">その調子です</div>
+    <button class="btn-primary" id="streak-popup-close">続ける</button>
+  </div>
+</div>
+
+
 <div class="dd-modal" id="lb-detail-modal" hidden>
   <div class="dd-backdrop" id="lb-detail-backdrop"></div>
   <div class="dd-card">
@@ -250,6 +261,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js?v=1"></script>
 <script src="data.js?v=3"></script>
-<script src="app.js?v=21"></script>
+<script src="app.js?v=22"></script>
 </body>
 </html>

@@ -802,6 +802,32 @@ function updateStreakPill() {
 }
 updateStreakPill();
 
+// ===================== 連続日数お祝いポップアップ =====================
+function streakMessage(n) {
+  if (n >= 30) return 'ものすごい継続力です！このペースを大事にしていきましょう。';
+  if (n >= 14) return '2週間連続、素晴らしいです！';
+  if (n >= 7) return '1週間連続達成です！';
+  if (n >= 3) return '3日以上連続、いい調子です！';
+  return 'この調子で続けましょう！';
+}
+function maybeShowStreakCelebration() {
+  const streak = calcStreak(loadJSON(LS.LOG, {}));
+  if (streak < 2) return;
+  const today = todayKey();
+  if (localStorage.getItem('pv_streak_popup_date') === today) return;
+  localStorage.setItem('pv_streak_popup_date', today);
+  document.getElementById('streak-popup-title').textContent = `${streak}日連続！`;
+  document.getElementById('streak-popup-msg').textContent = streakMessage(streak);
+  document.getElementById('streak-popup').hidden = false;
+}
+document.getElementById('streak-popup-close').addEventListener('click', () => {
+  document.getElementById('streak-popup').hidden = true;
+});
+document.getElementById('streak-popup-backdrop').addEventListener('click', () => {
+  document.getElementById('streak-popup').hidden = true;
+});
+maybeShowStreakCelebration();
+
 // ===================== ランキング =====================
 let fbDB = null;
 function initFirebase() {
@@ -899,6 +925,7 @@ function pullAndMergeCloud(nickname) {
       const listView = document.getElementById('view-list');
       if (listView && listView.classList.contains('active')) renderWordList();
       toast('前回までの記録を引き継ぎました');
+      maybeShowStreakCelebration();
     }
   }).catch(() => {});
 }

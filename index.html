@@ -222,6 +222,15 @@
       <div class="empty-note" id="leaderboard-empty" hidden>まだ記録がありません。</div>
       <div class="empty-note" id="leaderboard-setup-note">ランキング機能は設定が完了すると使えるようになります。</div>
     </div>
+
+    <div class="card">
+      <div class="section-label">読み上げ音声</div>
+      <select id="voice-select" style="width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:#fff; margin-bottom:10px;">
+        <option value="">自動選択（おすすめの声を自動で選ぶ）</option>
+      </select>
+      <button class="btn-ghost btn-block" id="voice-diag-btn">利用できる音声を確認する</button>
+      <div class="empty-note" id="voice-diag-result" style="white-space:pre-line; margin-top:10px;"></div>
+    </div>
   </section>
 
 </main>
@@ -270,6 +279,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js?v=1"></script>
 <script src="data.js?v=4"></script>
-<script src="app.js?v=34"></script>
+<script src="app.js?v=36"></script>
 </body>
 </html>

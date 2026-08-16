@@ -451,10 +451,27 @@ function escAttr(s) {
 }
 let cachedVoices = [];
 function loadVoices() { cachedVoices = window.speechSynthesis.getVoices(); }
+function populateVoiceSelect() {
+  const sel = document.getElementById('voice-select');
+  if (!sel) return;
+  const saved = localStorage.getItem('pv_voice_uri') || '';
+  const voices = window.speechSynthesis.getVoices();
+  const en = voices.filter(v => v.lang && v.lang.startsWith('en'));
+  const list = en.length ? en : voices;
+  if (!list.length) return;
+  sel.innerHTML = '<option value="">自動選択（おすすめの声を自動で選ぶ）</option>' +
+    list.map(v => `<option value="${escAttr(v.voiceURI)}">${escHtml(v.name)}（${escHtml(v.lang)}）</option>`).join('');
+  sel.value = list.some(v => v.voiceURI === saved) ? saved : '';
+}
 if ('speechSynthesis' in window) {
   loadVoices();
-  window.speechSynthesis.onvoiceschanged = loadVoices;
+  populateVoiceSelect();
+  window.speechSynthesis.onvoiceschanged = () => { loadVoices(); populateVoiceSelect(); };
 }
+document.getElementById('voice-select').addEventListener('change', (e) => {
+  localStorage.setItem('pv_voice_uri', e.target.value);
+  toast(e.target.value ? '声を変更しました' : '自動選択に戻しました');
+});
 function pickBestVoice() {
   // 呼び出すたびに最新のリストを取り直す（読み込みタイミングのズレを防ぐ）
   const fresh = window.speechSynthesis.getVoices();
@@ -490,7 +507,12 @@ function speak(text) {
     if (!('speechSynthesis' in window)) { toast('この端末は読み上げに対応していません'); return; }
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    const voice = pickBestVoice();
+    let voice = null;
+    const savedUri = localStorage.getItem('pv_voice_uri');
+    if (savedUri) {
+      voice = window.speechSynthesis.getVoices().find(v => v.voiceURI === savedUri) || null;
+    }
+    if (!voice) voice = pickBestVoice();
     if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = 'en-US'; }
     u.rate = 0.95;
     window.speechSynthesis.speak(u);
@@ -501,6 +523,25 @@ document.addEventListener('click', (e) => {
   if (!btn) return;
   e.stopPropagation();
   speak(btn.dataset.text || '');
+});
+
+document.getElementById('voice-diag-btn').addEventListener('click', () => {
+  const voices = window.speechSynthesis.getVoices();
+  const resultEl = document.getElementById('voice-diag-result');
+  if (!voices.length) {
+    resultEl.textContent = '音声リストが空でした（getVoices()の結果が0件）。少し待ってからもう一度押してみてください。';
+    return;
+  }
+  populateVoiceSelect();
+  const en = voices.filter(v => v.lang && v.lang.startsWith('en'));
+  const list = (en.length ? en : voices);
+  const savedUri = localStorage.getItem('pv_voice_uri');
+  const chosen = (savedUri && voices.find(v => v.voiceURI === savedUri)) || pickBestVoice();
+  const lines = list.map(v => {
+    const mark = (chosen && v.voiceURI === chosen.voiceURI) ? '★使用中★ ' : '';
+    return `${mark}${v.name}｜${v.lang}｜${v.localService ? '端末内' : 'ネットワーク'}`;
+  });
+  resultEl.textContent = `英語音声：${en.length}件 / 全体：${voices.length}件\n\n` + lines.join('\n');
 });
 
 function refreshSoundToggle() {

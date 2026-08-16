@@ -880,21 +880,6 @@ function pullAndMergeCloud(nickname) {
   const db = initFirebase();
   if (!db || !nickname) return;
 
-  // 「今日」の回答数はランキング側（アトミック加算で正確）を基準に、端末側が下回っていれば追いつかせる
-  const today = todayKey();
-  db.ref(`leaderboard/day/${today}/${nickname}`).get().then(daySnap => {
-    const cloudToday = daySnap.val() || 0;
-    const localLog = loadJSON(LS.LOG, {});
-    const localToday = (localLog[today] && localLog[today].solved) || 0;
-    if (cloudToday > localToday) {
-      localLog[today] = { solved: cloudToday, correct: (localLog[today] && localLog[today].correct) || 0 };
-      saveJSON(LS.LOG, localLog);
-      updateStreakPill();
-      const statsView = document.getElementById('view-stats');
-      if (statsView && statsView.classList.contains('active')) renderStats();
-    }
-  }).catch(() => {});
-
   db.ref(`users/${nickname}`).get().then(snap => {
     const cloud = snap.val() || {};
     let changed = false;
@@ -990,10 +975,8 @@ function syncLeaderboard(verb, ok) {
   if (!nickname) return;
   const today = todayKey();
   const updates = {};
-  updates[`leaderboard/day/${today}/${nickname}`] = firebase.database.ServerValue.increment(1);
-  updates[`leaderboard/week/${weekKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
-  updates[`leaderboard/month/${monthKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
-  // 日別ログはアトミック加算にする（端末側が一時的におかしくなっても、ここは壊れない）
+  // 日別ログ（アトミック加算）だけを唯一の情報源にする。ランキングの日/週/月は
+  // すべてこのログを都度集計して求めるので、別カウンターとのズレが起きない。
   updates[`users/${nickname}/log/${today}/solved`] = firebase.database.ServerValue.increment(1);
   if (ok) updates[`users/${nickname}/log/${today}/correct`] = firebase.database.ServerValue.increment(1);
   if (verb) {
@@ -1011,6 +994,12 @@ function syncLeaderboard(verb, ok) {
 }
 
 let lbPeriod = 'day';
+
+function isDateInCurrentWeek(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return false;
+  return weekKey(new Date(y, m - 1, d)) === weekKey();
+}
 
 function pushWordStateToCloud(verb) {
   const db = initFirebase();
@@ -1067,10 +1056,24 @@ function renderLeaderboard() {
     return;
   }
   setupEl.hidden = true;
-  const key = lbPeriod === 'day' ? todayKey() : (lbPeriod === 'week' ? weekKey() : monthKey());
-  db.ref(`leaderboard/${lbPeriod}/${key}`).get().then(snap => {
-    const val = snap.val() || {};
-    const rows = Object.entries(val).sort((a, b) => b[1] - a[1]);
+  const today = todayKey();
+  const ym = monthKey();
+  db.ref('users').get().then(snap => {
+    const all = snap.val() || {};
+    const rows = [];
+    Object.entries(all).forEach(([name, u]) => {
+      const log = (u && u.log) || {};
+      let sum = 0;
+      if (lbPeriod === 'day') {
+        sum = (log[today] && log[today].solved) || 0;
+      } else if (lbPeriod === 'week') {
+        Object.entries(log).forEach(([date, d]) => { if (isDateInCurrentWeek(date)) sum += (d && d.solved) || 0; });
+      } else {
+        Object.entries(log).forEach(([date, d]) => { if (date.startsWith(ym)) sum += (d && d.solved) || 0; });
+      }
+      if (sum > 0) rows.push([name, sum]);
+    });
+    rows.sort((a, b) => b[1] - a[1]);
     listEl.innerHTML = '';
     emptyEl.hidden = rows.length > 0;
     const me = getNickname();
@@ -1090,25 +1093,27 @@ function openLbDetail(name) {
   document.getElementById('lb-detail-modal').hidden = false;
   const db = initFirebase();
   if (!db) return;
-  db.ref(`answers/${name}`).get().then(snap => {
-    const data = snap.val() || {};
-    const entries = Object.entries(data);
-    let ok = 0, ng = 0;
+  Promise.all([
+    db.ref(`users/${name}/log`).get(),
+    db.ref(`answers/${name}`).get(),
+  ]).then(([logSnap, ansSnap]) => {
+    const log = logSnap.val() || {};
+    let solved = 0, correct = 0;
+    Object.values(log).forEach(d => { solved += (d && d.solved) || 0; correct += (d && d.correct) || 0; });
+    const rate = solved ? Math.round(100 * correct / solved) : 0;
+
+    const data = ansSnap.val() || {};
     const weakList = [];
-    entries.forEach(([verb, rec]) => {
-      const o = (rec && rec.ok) || 0;
+    Object.entries(data).forEach(([verb, rec]) => {
       const n = (rec && rec.ng) || 0;
-      ok += o; ng += n;
-      if (n > 0) weakList.push({ verb, ng: n, ok: o });
+      if (n > 0) weakList.push({ verb, ng: n });
     });
-    const total = ok + ng;
-    const rate = total ? Math.round(100 * ok / total) : 0;
     weakList.sort((a, b) => b.ng - a.ng);
 
     const statsHtml = `
       <div class="lb-detail-stats">
-        <div class="lb-detail-stat"><div class="n">${total}</div><div class="l">総回答数</div></div>
-        <div class="lb-detail-stat"><div class="n">${total ? rate + '%' : '–'}</div><div class="l">正答率</div></div>
+        <div class="lb-detail-stat"><div class="n">${solved}</div><div class="l">総回答数</div></div>
+        <div class="lb-detail-stat"><div class="n">${solved ? rate + '%' : '–'}</div><div class="l">正答率</div></div>
       </div>`;
 
     const weakHtml = weakList.length

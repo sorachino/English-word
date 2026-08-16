@@ -286,7 +286,13 @@ select{
 .stat-num{font-family:"JetBrains Mono",monospace; font-weight:800; font-size:22px; color:var(--navy);}
 .stat-label{font-size:10.5px; color:var(--ink-soft); margin-top:2px;}
 .section-label{font-weight:700; font-size:13px; color:var(--ink-soft); margin-bottom:10px;}
-.bar-chart{display:flex; align-items:flex-end; gap:5px; height:90px;}
+.bar-chart-wrap{display:flex; gap:6px; align-items:stretch;}
+.bar-axis{
+  display:flex; flex-direction:column; justify-content:space-between;
+  height:90px; padding-bottom:17px; flex:none;
+  font-family:"JetBrains Mono",monospace; font-size:9px; color:var(--ink-soft); text-align:right;
+}
+.bar-chart{display:flex; align-items:flex-end; gap:5px; height:90px; flex:1; min-width:0;}
 .bar-col{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%;}
 .bar{width:100%; background:var(--gold); border-radius:3px 3px 0 0; min-height:2px;}
 .bar-day{font-size:9px; color:var(--ink-soft); margin-top:4px; font-family:"JetBrains Mono",monospace;}

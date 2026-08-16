@@ -745,6 +745,13 @@ function renderStats() {
   const days = [];
   for (let i = 13; i >= 0; i--) days.push(todayKey(i));
   const max = Math.max(1, ...days.map(d => (log[d] || {}).solved || 0));
+
+  const axis = document.getElementById('bar-axis');
+  const steps = 4;
+  const axisLabels = [];
+  for (let i = steps; i >= 0; i--) axisLabels.push(Math.round(max * i / steps));
+  axis.innerHTML = axisLabels.map(n => `<div>${n}</div>`).join('');
+
   days.forEach(d => {
     const solved = (log[d] || {}).solved || 0;
     const col = document.createElement('div');

@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=15">
+<link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
 
@@ -190,7 +190,10 @@
 
     <div class="card">
       <div class="section-label">過去14日</div>
-      <div class="bar-chart" id="bar-chart"></div>
+      <div class="bar-chart-wrap">
+        <div class="bar-axis" id="bar-axis"></div>
+        <div class="bar-chart" id="bar-chart"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -262,6 +265,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js?v=1"></script>
 <script src="data.js?v=3"></script>
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>

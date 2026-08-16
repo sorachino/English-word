@@ -470,6 +470,9 @@ if ('speechSynthesis' in window) {
 }
 document.getElementById('voice-select').addEventListener('change', (e) => {
   localStorage.setItem('pv_voice_uri', e.target.value);
+  const sel = e.target;
+  const chosenName = e.target.value ? sel.options[sel.selectedIndex].textContent : '';
+  localStorage.setItem('pv_voice_name', chosenName);
   toast(e.target.value ? '声を変更しました' : '自動選択に戻しました');
 });
 function pickBestVoice() {
@@ -501,22 +504,116 @@ function pickBestVoice() {
   if (def) return def;
   return pool[0];
 }
-function speak(text) {
-  if (!text) return;
+const ttsCache = {};
+function playAudioBase64(b64) {
+  try {
+    const audio = new Audio('data:audio/mp3;base64,' + b64);
+    audio.play().catch(() => {});
+  } catch (e) { /* 無視 */ }
+}
+async function speakCloud(text) {
+  if (ttsCache[text]) { playAudioBase64(ttsCache[text]); return; }
+  try {
+    const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${TTS_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input: { text },
+        voice: { languageCode: 'en-US', name: (typeof TTS_VOICE_NAME !== 'undefined' && TTS_VOICE_NAME) || 'en-US-Neural2-C' },
+        audioConfig: { audioEncoding: 'MP3' },
+      }),
+    });
+    const data = await res.json();
+    if (data.audioContent) {
+      ttsCache[text] = data.audioContent;
+      playAudioBase64(data.audioContent);
+      ttsUsageCount += text.length;
+      updateVoiceCloudNote();
+      const db = initFirebase();
+      if (db) db.ref(`tts_usage/${ttsMonthKey()}`).set(firebase.database.ServerValue.increment(text.length)).catch(() => {});
+    } else {
+      toast('読み上げに失敗しました');
+    }
+  } catch (e) {
+    toast('読み上げに失敗しました（通信エラー）');
+  }
+}
+function ttsConfigured() {
+  return typeof TTS_API_KEY !== 'undefined' && TTS_API_KEY;
+}
+(() => {
+  const legacy = document.getElementById('voice-legacy-card');
+  const cloud = document.getElementById('voice-cloud-card');
+  if (ttsConfigured()) {
+    if (legacy) legacy.hidden = true;
+    if (cloud) cloud.hidden = false;
+  }
+})();
+// ===================== Cloud TTSの無料枠使用量管理（全員共有） =====================
+const TTS_FREE_LIMIT = 1000000; // Neural2の月間無料枠（文字数）
+const TTS_THRESHOLD_RATIO = 0.85;
+let ttsUsageCount = 0;
+function ttsMonthKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function initTtsUsage() {
+  const db = initFirebase();
+  if (!db) return;
+  db.ref(`tts_usage/${ttsMonthKey()}`).get().then(snap => {
+    ttsUsageCount = snap.val() || 0;
+    updateVoiceCloudNote();
+  }).catch(() => {});
+}
+function ttsOverThreshold() {
+  return ttsUsageCount >= TTS_FREE_LIMIT * TTS_THRESHOLD_RATIO;
+}
+function updateVoiceCloudNote() {
+  const el = document.getElementById('voice-cloud-note');
+  if (!el) return;
+  const pct = Math.min(100, Math.round(100 * ttsUsageCount / TTS_FREE_LIMIT));
+  if (ttsOverThreshold()) {
+    el.textContent = `今月の無料枠の85%に達したため、一時的にSamantha（標準の読み上げ）に切り替わっています。（使用量：${ttsUsageCount.toLocaleString()} / ${TTS_FREE_LIMIT.toLocaleString()}文字）`;
+  } else {
+    el.textContent = `Google Cloud Text-to-Speech（Neural2）を使用中です。今月の使用量：${ttsUsageCount.toLocaleString()} / ${TTS_FREE_LIMIT.toLocaleString()}文字（${pct}%）`;
+  }
+}
+if (ttsConfigured()) initTtsUsage();
+
+function speakWeb(text, forceName) {
   try {
     if (!('speechSynthesis' in window)) { toast('この端末は読み上げに対応していません'); return; }
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     let voice = null;
-    const savedUri = localStorage.getItem('pv_voice_uri');
-    if (savedUri) {
-      voice = window.speechSynthesis.getVoices().find(v => v.voiceURI === savedUri) || null;
+    if (forceName) {
+      voice = window.speechSynthesis.getVoices().find(v => v.name === forceName) || null;
+    }
+    if (!voice) {
+      const savedUri = localStorage.getItem('pv_voice_uri');
+      const savedName = localStorage.getItem('pv_voice_name');
+      if (savedUri) {
+        const voices = window.speechSynthesis.getVoices();
+        voice = voices.find(v => v.voiceURI === savedUri) || null;
+        if (!voice && savedName) {
+          voice = voices.find(v => v.name && savedName.startsWith(v.name)) || null;
+        }
+      }
     }
     if (!voice) voice = pickBestVoice();
     if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = 'en-US'; }
     u.rate = 0.95;
     window.speechSynthesis.speak(u);
   } catch (e) { /* 無視 */ }
+}
+function speak(text) {
+  if (!text) return;
+  if (ttsConfigured()) {
+    if (ttsOverThreshold()) { speakWeb(text, 'Samantha'); return; }
+    speakCloud(text);
+    return;
+  }
+  speakWeb(text, null);
 }
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('.speak-btn');

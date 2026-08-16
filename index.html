@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
 
@@ -98,7 +98,10 @@
 
       <div class="reveal-box" id="reveal-box" hidden>
         <div class="reveal-verb" id="reveal-verb"></div>
-        <div class="reveal-sentence" id="reveal-sentence"></div>
+        <div class="reveal-sentence-row">
+          <div class="reveal-sentence" id="reveal-sentence"></div>
+          <button class="speak-btn" id="reveal-speak-btn" type="button" aria-label="読み上げ">🔊</button>
+        </div>
         <div class="reveal-ja" id="reveal-ja"></div>
         <div class="reveal-def" id="reveal-def"></div>
         <div class="reveal-note" id="reveal-note" hidden></div>
@@ -265,6 +268,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js?v=1"></script>
 <script src="data.js?v=3"></script>
-<script src="app.js?v=28"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>

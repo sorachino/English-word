@@ -391,28 +391,59 @@ function beep(ctx, start, freq, dur, type, vol) {
   osc.start(start);
   osc.stop(start + dur + 0.02);
 }
+function scheduleChime(ctx, correct) {
+  const now = ctx.currentTime;
+  if (correct) {
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // ド・ミ・ソ・ド（上昇アルペジオ）
+    notes.forEach((f, i) => beep(ctx, now + i * 0.085, f, 0.22, 'sine', 0.18));
+  } else {
+    beep(ctx, now, 220, 0.16, 'square', 0.10);
+    beep(ctx, now + 0.1, 174.61, 0.2, 'square', 0.10);
+  }
+}
 function playResultSound(correct) {
   if (loadJSON('pv_sound_off', false)) return;
   try {
     const ctx = getAudioCtx();
-    const schedule = () => {
-      const now = ctx.currentTime;
-      if (correct) {
-        const notes = [523.25, 659.25, 783.99, 1046.50]; // ド・ミ・ソ・ド（上昇アルペジオ）
-        notes.forEach((f, i) => beep(ctx, now + i * 0.085, f, 0.22, 'sine', 0.18));
-      } else {
-        beep(ctx, now, 220, 0.16, 'square', 0.10);
-        beep(ctx, now + 0.1, 174.61, 0.2, 'square', 0.10);
-      }
-    };
     if (ctx.state === 'running') {
-      schedule();
-    } else {
-      // suspended（休止中）や電話の割り込み後などは、復帰を待ってから鳴らす
-      ctx.resume().then(schedule).catch(() => {});
+      scheduleChime(ctx, correct);
+      return;
     }
+    // suspended（休止中）や電話の割り込み後などは、復帰を待ってから鳴らす
+    ctx.resume().then(() => {
+      try { scheduleChime(ctx, correct); } catch (e) { /* 無視 */ }
+    }).catch(() => {
+      // 復帰に失敗した場合はコンテキストを作り直して一度だけ再挑戦する
+      try {
+        audioCtx = null;
+        const ctx2 = getAudioCtx();
+        scheduleChime(ctx2, correct);
+      } catch (e2) { /* それでも駄目なら無音のまま諦める */ }
+    });
   } catch (e) { /* AudioContextが使えない環境は無音のまま無視 */ }
 }
+// ===================== 英文の読み上げ =====================
+function escAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function speak(text) {
+  if (!text) return;
+  try {
+    if (!('speechSynthesis' in window)) { toast('この端末は読み上げに対応していません'); return; }
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    u.rate = 0.95;
+    window.speechSynthesis.speak(u);
+  } catch (e) { /* 無視 */ }
+}
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.speak-btn');
+  if (!btn) return;
+  e.stopPropagation();
+  speak(btn.dataset.text || '');
+});
+
 function refreshSoundToggle() {
   const off = loadJSON('pv_sound_off', false);
   document.getElementById('sound-toggle').textContent = off ? '🔇' : '🔊';
@@ -442,6 +473,7 @@ function finishQuestion(ok, method, delay) {
   const reveal = document.getElementById('reveal-box');
   document.getElementById('reveal-verb').textContent = q.answer;
   document.getElementById('reveal-sentence').textContent = q.full;
+  document.getElementById('reveal-speak-btn').dataset.text = q.full || '';
   document.getElementById('reveal-ja').textContent = q.ja;
   document.getElementById('reveal-def').textContent = q.def || '';
   const noteEl = document.getElementById('reveal-note');
@@ -535,8 +567,8 @@ function renderDoneDetail() {
   document.getElementById('dd-body').innerHTML = `
     ${markHtml}
     <div class="dd-verb">${escHtml(it.verb)}</div>
-    ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)}</div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
-    ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)}</div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
+    ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
+    ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
     <div class="def">${escHtml(w.meaning || '')}${w.def ? '／' + escHtml(w.def) : ''}</div>
     ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
   `;
@@ -665,8 +697,8 @@ function wordItemEl(w) {
     </div>
     <div class="wi-meaning">${escHtml(w.meaning || '')}</div>
     <div class="wi-detail">
-      ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)}</div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
-      ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)}</div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
+      ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
+      ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
       ${w.def ? `<div class="def">${escHtml(w.def)}</div>` : ''}
       ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
     </div>`;

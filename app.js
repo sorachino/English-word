@@ -872,6 +872,22 @@ function pushMyWordsToCloud() {
 function pullAndMergeCloud(nickname) {
   const db = initFirebase();
   if (!db || !nickname) return;
+
+  // 「今日」の回答数はランキング側（アトミック加算で正確）を基準に、端末側が下回っていれば追いつかせる
+  const today = todayKey();
+  db.ref(`leaderboard/day/${today}/${nickname}`).get().then(daySnap => {
+    const cloudToday = daySnap.val() || 0;
+    const localLog = loadJSON(LS.LOG, {});
+    const localToday = (localLog[today] && localLog[today].solved) || 0;
+    if (cloudToday > localToday) {
+      localLog[today] = { solved: cloudToday, correct: (localLog[today] && localLog[today].correct) || 0 };
+      saveJSON(LS.LOG, localLog);
+      updateStreakPill();
+      const statsView = document.getElementById('view-stats');
+      if (statsView && statsView.classList.contains('active')) renderStats();
+    }
+  }).catch(() => {});
+
   db.ref(`users/${nickname}`).get().then(snap => {
     const cloud = snap.val() || {};
     let changed = false;
@@ -891,9 +907,15 @@ function pullAndMergeCloud(nickname) {
       const localLog = loadJSON(LS.LOG, {});
       let sub = false;
       Object.entries(cloud.log).forEach(([date, cl]) => {
-        if (!cl || localLog[date]) return;
-        localLog[date] = { solved: cl.solved || 0, correct: cl.correct || 0 };
-        sub = true;
+        if (!cl) return;
+        const curSolved = (localLog[date] && localLog[date].solved) || 0;
+        const curCorrect = (localLog[date] && localLog[date].correct) || 0;
+        const newSolved = Math.max(curSolved, cl.solved || 0);
+        const newCorrect = Math.max(curCorrect, cl.correct || 0);
+        if (!localLog[date] || newSolved !== curSolved || newCorrect !== curCorrect) {
+          localLog[date] = { solved: newSolved, correct: newCorrect };
+          sub = true;
+        }
       });
       if (sub) { saveJSON(LS.LOG, localLog); changed = true; }
     }
@@ -902,9 +924,15 @@ function pullAndMergeCloud(nickname) {
       const localAnswered = loadJSON(LS_ANSWERED, {});
       let sub = false;
       Object.entries(cloud.answered).forEach(([verb, ca]) => {
-        if (!ca || localAnswered[verb]) return;
-        localAnswered[verb] = { ok: ca.ok || 0, ng: ca.ng || 0 };
-        sub = true;
+        if (!ca) return;
+        const curOk = (localAnswered[verb] && localAnswered[verb].ok) || 0;
+        const curNg = (localAnswered[verb] && localAnswered[verb].ng) || 0;
+        const newOk = Math.max(curOk, ca.ok || 0);
+        const newNg = Math.max(curNg, ca.ng || 0);
+        if (!localAnswered[verb] || newOk !== curOk || newNg !== curNg) {
+          localAnswered[verb] = { ok: newOk, ng: newNg };
+          sub = true;
+        }
       });
       if (sub) { saveJSON(LS_ANSWERED, localAnswered); changed = true; }
     }
@@ -953,38 +981,42 @@ function syncLeaderboard(verb, ok) {
   if (!db) return;
   const nickname = ensureNickname();
   if (!nickname) return;
+  const today = todayKey();
   const updates = {};
-  updates[`leaderboard/day/${todayKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
+  updates[`leaderboard/day/${today}/${nickname}`] = firebase.database.ServerValue.increment(1);
   updates[`leaderboard/week/${weekKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
   updates[`leaderboard/month/${monthKey()}/${nickname}`] = firebase.database.ServerValue.increment(1);
+  // 日別ログはアトミック加算にする（端末側が一時的におかしくなっても、ここは壊れない）
+  updates[`users/${nickname}/log/${today}/solved`] = firebase.database.ServerValue.increment(1);
+  if (ok) updates[`users/${nickname}/log/${today}/correct`] = firebase.database.ServerValue.increment(1);
   if (verb) {
     const safeVerb = sanitizeKey(verb);
     const field = ok ? 'ok' : 'ng';
     updates[`answers/${nickname}/${safeVerb}/${field}`] = firebase.database.ServerValue.increment(1);
+    // 苦手語・回答履歴は「今回の単語だけ」を書き込み、他の単語のデータを巻き込まない
+    const weak = loadJSON(LS.WEAK, {});
+    updates[`users/${nickname}/weak/${safeVerb}`] = weak[verb] || null;
+    const answered = loadJSON(LS_ANSWERED, {});
+    updates[`users/${nickname}/answered/${safeVerb}`] = answered[verb] || null;
   }
-  const weakForCloud = {};
-  Object.entries(loadJSON(LS.WEAK, {})).forEach(([k, v]) => { weakForCloud[sanitizeKey(k)] = v; });
-  updates[`users/${nickname}/weak`] = weakForCloud;
-  updates[`users/${nickname}/log`] = loadJSON(LS.LOG, {});
-  const answeredForCloud = {};
-  Object.entries(loadJSON(LS_ANSWERED, {})).forEach(([k, v]) => { answeredForCloud[sanitizeKey(k)] = v; });
-  updates[`users/${nickname}/answered`] = answeredForCloud;
   updates[`users/${nickname}/myWords`] = myWords();
   db.ref().update(updates).catch(() => {});
 }
 
 let lbPeriod = 'day';
 
-function pushStateSnapshotToCloud() {
+function pushWordStateToCloud(verb) {
   const db = initFirebase();
   if (!db) return;
   const nickname = getNickname();
   if (!nickname) return;
-  const weakForCloud = {};
-  Object.entries(loadJSON(LS.WEAK, {})).forEach(([k, v]) => { weakForCloud[sanitizeKey(k)] = v; });
-  const answeredForCloud = {};
-  Object.entries(loadJSON(LS_ANSWERED, {})).forEach(([k, v]) => { answeredForCloud[sanitizeKey(k)] = v; });
-  db.ref(`users/${nickname}`).update({ weak: weakForCloud, answered: answeredForCloud }).catch(() => {});
+  const safeVerb = sanitizeKey(verb);
+  const weak = loadJSON(LS.WEAK, {});
+  const answered = loadJSON(LS_ANSWERED, {});
+  const updates = {};
+  updates[`users/${nickname}/weak/${safeVerb}`] = weak[verb] || null;
+  updates[`users/${nickname}/answered/${safeVerb}`] = answered[verb] || null;
+  db.ref().update(updates).catch(() => {});
 }
 
 function markCurrentAsWrong() {
@@ -1010,7 +1042,7 @@ function markCurrentAsWrong() {
   }
 
   refreshWeakRow();
-  pushStateSnapshotToCloud();
+  pushWordStateToCloud(verb);
   const btn = document.getElementById('mark-wrong-btn');
   btn.hidden = true;
   toast('苦手な語として記録しました');

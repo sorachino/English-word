@@ -611,9 +611,9 @@ function updateVoiceCloudNote() {
   if (!el) return;
   const pct = Math.min(100, Math.round(100 * ttsUsageCount / TTS_FREE_LIMIT));
   if (ttsOverThreshold()) {
-    el.textContent = `今月の無料枠の85%に達したため、一時的にSamantha（標準の読み上げ）に切り替わっています。（使用量：${ttsUsageCount.toLocaleString()} / ${TTS_FREE_LIMIT.toLocaleString()}文字）`;
+    el.textContent = `今月の無料枠の85%に達したため、一時的にSamantha（標準の読み上げ）に切り替わっています。今月の無料枠分の使用量：${pct}%`;
   } else {
-    el.textContent = `Google Cloud Text-to-Speech（Neural2）を使用中です。今月の使用量：${ttsUsageCount.toLocaleString()} / ${TTS_FREE_LIMIT.toLocaleString()}文字（${pct}%）`;
+    el.textContent = `Google Cloud Text-to-Speech（Neural2）を使用中です。今月の無料枠分の使用量：${pct}%`;
   }
 }
 if (ttsConfigured()) initTtsUsage();

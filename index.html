@@ -235,7 +235,12 @@
     <div class="card" id="voice-cloud-card" hidden>
       <div class="section-label">読み上げ音声（Neural2）</div>
       <select id="cloud-voice-select" style="width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:#fff; margin-bottom:10px;"></select>
-      <div class="empty-note" id="voice-cloud-note">Google Cloud Text-to-Speech（Neural2）の高品質音声を使用中です。端末やブラウザによる声のばらつきはありません。</div>
+      <div class="tts-usage-row">
+        <span>今月の無料枠の使用量</span>
+        <span class="tts-usage-pct" id="tts-usage-pct">–%</span>
+      </div>
+      <div class="tts-usage-bar"><div class="tts-usage-bar-fill" id="tts-usage-bar-fill"></div></div>
+      <div class="empty-note" id="voice-cloud-note"></div>
     </div>
   </section>
 

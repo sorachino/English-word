@@ -614,6 +614,11 @@ function updateVoiceCloudNote() {
   } else {
     el.textContent = `Google Cloud Text-to-Speech（Neural2）を使用中です。`;
   }
+  const usageEl = document.getElementById('voice-cloud-usage');
+  if (usageEl) {
+    const pct = Math.min(100, Math.round(100 * ttsUsageCount / TTS_FREE_LIMIT));
+    usageEl.textContent = `今月の無料枠使用量：${pct}%`;
+  }
 }
 if (ttsConfigured()) initTtsUsage();
 

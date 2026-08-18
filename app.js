@@ -248,7 +248,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'list') renderWordList();
     if (btn.dataset.tab === 'dict') renderMyWordList();
-    if (btn.dataset.tab === 'stats') { renderStats(); renderLeaderboard(); updateLbNameDisplay(); }
+    if (btn.dataset.tab === 'stats') { renderStats(); renderLeaderboard(); updateLbNameDisplay(); renderChampionCalendar(); }
   });
 });
 
@@ -1381,6 +1381,62 @@ function renderLeaderboard() {
       listEl.appendChild(row);
     });
   }).catch(() => { listEl.innerHTML = ''; emptyEl.hidden = false; });
+}
+
+function renderChampionCalendar() {
+  const db = initFirebase();
+  const card = document.getElementById('champion-cal-card');
+  const grid = document.getElementById('champion-cal-grid');
+  const monthLabel = document.getElementById('champion-cal-month');
+  if (!card || !grid) return;
+  if (!db) { card.hidden = true; return; }
+  card.hidden = false;
+
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay();
+  monthLabel.textContent = `（${year}年${month + 1}月）`;
+
+  db.ref('users').get().then(snap => {
+    const all = snap.val() || {};
+    const champions = {};
+    Object.entries(all).forEach(([name, u]) => {
+      const log = (u && u.log) || {};
+      Object.entries(log).forEach(([date, d]) => {
+        const solved = (d && d.solved) || 0;
+        if (solved <= 0) return;
+        if (!champions[date] || solved > champions[date].solved) {
+          champions[date] = { name, solved };
+        }
+      });
+    });
+
+    grid.innerHTML = '';
+    ['日', '月', '火', '水', '木', '金', '土'].forEach(h => {
+      const el = document.createElement('div');
+      el.className = 'champion-cal-dow';
+      el.textContent = h;
+      grid.appendChild(el);
+    });
+    for (let i = 0; i < firstDow; i++) {
+      const el = document.createElement('div');
+      el.className = 'champion-cal-cell empty';
+      grid.appendChild(el);
+    }
+    const today = todayKey();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const champ = champions[dateStr];
+      const cell = document.createElement('div');
+      cell.className = 'champion-cal-cell' + (dateStr === today ? ' today' : '');
+      const stampHtml = champ
+        ? `<div class="cc-stamp" title="${escAttr(champ.name)}（${champ.solved}問）">${escHtml(champ.name.slice(0, 4))}</div>`
+        : '';
+      cell.innerHTML = `<div class="cc-day">${d}</div>${stampHtml}`;
+      grid.appendChild(cell);
+    }
+  }).catch(() => {});
 }
 
 function openLbDetail(name) {

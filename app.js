@@ -1443,6 +1443,7 @@ function renderLeaderboard() {
 }
 
 let ccYear, ccMonth;
+let ccAllUsersCache = null;
 function initChampionCalState() {
   if (ccYear === undefined) {
     const now = new Date();
@@ -1473,6 +1474,7 @@ function renderChampionCalendar() {
 
   db.ref('users').get().then(snap => {
     const all = snap.val() || {};
+    ccAllUsersCache = all;
     const champions = {};
     Object.entries(all).forEach(([name, u]) => {
       const log = (u && u.log) || {};
@@ -1511,9 +1513,41 @@ function renderChampionCalendar() {
       }
       cell.innerHTML = `<div class="cc-day">${d}</div>${stampHtml}`;
       grid.appendChild(cell);
+      if (champ) {
+        const stampEl = cell.querySelector('.cc-stamp');
+        if (stampEl) {
+          stampEl.style.cursor = 'pointer';
+          stampEl.addEventListener('click', (e) => { e.stopPropagation(); openDayDetail(dateStr); });
+        }
+      }
     }
   }).catch(() => {});
 }
+
+function openDayDetail(dateStr) {
+  const modal = document.getElementById('day-detail-modal');
+  document.getElementById('day-detail-title').textContent = dateStr + 'の順位';
+  const bodyEl = document.getElementById('day-detail-body');
+  const all = ccAllUsersCache || {};
+  const rows = [];
+  Object.entries(all).forEach(([name, u]) => {
+    const log = (u && u.log) || {};
+    const solved = (log[dateStr] && log[dateStr].solved) || 0;
+    if (solved > 0) rows.push([name, solved]);
+  });
+  rows.sort((a, b) => b[1] - a[1]);
+  const me = getNickname();
+  bodyEl.innerHTML = rows.length
+    ? rows.map(([name, count], i) => `<div class="lb-row${name === me ? ' me' : ''}"><span class="lb-rank">${i + 1}</span><span class="lb-name">${escHtml(name)}</span><span class="lb-count">${count}</span></div>`).join('')
+    : '<div class="empty-note">この日の記録はありません。</div>';
+  modal.hidden = false;
+}
+document.getElementById('day-detail-close').addEventListener('click', () => {
+  document.getElementById('day-detail-modal').hidden = true;
+});
+document.getElementById('day-detail-backdrop').addEventListener('click', () => {
+  document.getElementById('day-detail-modal').hidden = true;
+});
 document.getElementById('cc-prev').addEventListener('click', () => {
   initChampionCalState();
   ccMonth--;

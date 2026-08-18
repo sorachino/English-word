@@ -46,7 +46,6 @@
         <label>範囲</label>
         <select id="quiz-stage">
           <option value="0">全ステージ</option>
-          <option value="weak" id="weak-option">苦手語のみ</option>
         </select>
       </div>
       <div class="setup-row">
@@ -57,9 +56,21 @@
           <button class="chip" data-count="20">20</button>
         </div>
       </div>
+      <div class="setup-row" id="weak-only-row">
+        <label>絞り込み</label>
+        <label class="switch"><input type="checkbox" id="weak-only-toggle"><span>苦手語のみ（<span id="weak-only-count">0</span>語）</span></label>
+      </div>
+      <div class="setup-row" id="srs-only-row">
+        <label></label>
+        <label class="switch"><input type="checkbox" id="srs-only-toggle"><span>復習期限が来た語のみ（<span id="srs-only-count">0</span>語）</span></label>
+      </div>
       <div class="setup-row" id="weak-row" style="display:none">
         <label>苦手語</label>
         <label class="switch"><input type="checkbox" id="weak-toggle" checked><span>優先的に混ぜる（<span id="weak-count">0</span>語）</span></label>
+      </div>
+      <div class="setup-row" id="srs-row" style="display:none">
+        <label>復習</label>
+        <label class="switch"><input type="checkbox" id="srs-toggle" checked><span>復習期限の語を優先的に混ぜる（<span id="srs-count">0</span>語）</span></label>
       </div>
       <button class="btn-primary" id="start-quiz">はじめる</button>
     </div>
@@ -312,6 +323,6 @@
 <script src="firebase-config.js?v=1"></script>
 <script src="tts-config.js?v=2"></script>
 <script src="data.js?v=4"></script>
-<script src="app.js?v=52"></script>
+<script src="app.js?v=54"></script>
 </body>
 </html>

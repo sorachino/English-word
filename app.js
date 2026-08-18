@@ -3,6 +3,7 @@ const LS = {
   MY_WORDS: 'pv_my_words',
   WEAK: 'pv_weak',          // { "verb": {level:'hint'|'choice'|'wrong', streak:0} }
   LOG: 'pv_daily_log',      // { "2026-08-15": {solved:10, correct:8} }
+  SRS: 'pv_srs',            // { "verb": {interval:N, dueDate:'YYYY-MM-DD', reps:N} }
 };
 
 // Firebase接続の使い回し用（宣言はファイル先頭で行う。
@@ -112,24 +113,39 @@ function blankSentence(sentence, verb) {
 // ===================== クイズエンジン =====================
 let quizState = null;
 
-function buildQuiz(stageFilter, count, useWeak) {
+function buildQuiz(stageFilter, count, mixWeak, mixSrs, onlyWeak, onlySrs) {
   const words = allWords();
   const weak = loadJSON(LS.WEAK, {});
   const weakVerbs = Object.keys(weak);
 
-  let pool;
-  if (stageFilter === 'weak') {
-    pool = words.filter(w => weakVerbs.includes(baseForm(w.verb)));
-  } else {
-    pool = stageFilter ? words.filter(w => w.stage === stageFilter) : words.slice();
-  }
+  let pool = stageFilter ? words.filter(w => w.stage === stageFilter) : words.slice();
+  if (onlyWeak) pool = pool.filter(w => weakVerbs.includes(baseForm(w.verb)));
+  if (onlySrs) pool = pool.filter(w => srsScore(baseForm(w.verb)) <= 0);
+  if (onlySrs) pool.sort((a, b) => srsScore(baseForm(a.verb)) - srsScore(baseForm(b.verb)));
 
   let picks = [];
-  if (stageFilter !== 'weak' && useWeak && weakVerbs.length) {
-    const weakPool = pool.filter(w => weakVerbs.includes(baseForm(w.verb)));
-    shuffle(weakPool);
-    const n = Math.min(Math.ceil(count * 0.3), weakPool.length, count);
-    picks = weakPool.slice(0, n);
+  if (onlySrs) {
+    // 優先度順（未出題→期限切れが長い順）にそのまま採用
+    picks = pool.slice(0, count);
+  } else if (onlyWeak) {
+    const p = pool.slice();
+    shuffle(p);
+    picks = p.slice(0, count);
+  } else {
+    if (mixWeak && weakVerbs.length) {
+      const weakPool = pool.filter(w => weakVerbs.includes(baseForm(w.verb)));
+      shuffle(weakPool);
+      const n = Math.min(Math.ceil(count * 0.3), weakPool.length, count);
+      picks = weakPool.slice(0, n);
+    }
+    if (mixSrs) {
+      const duePool = srsDuePool(pool)
+        .filter(w => !picks.includes(w))
+        .sort((a, b) => srsScore(baseForm(a.verb)) - srsScore(baseForm(b.verb)));
+      const remainingSlots = count - picks.length;
+      const n = Math.min(Math.ceil(count * 0.3), duePool.length, remainingSlots);
+      picks = picks.concat(duePool.slice(0, n));
+    }
   }
   const rest = pool.filter(w => !picks.includes(w));
   shuffle(rest);
@@ -184,6 +200,46 @@ function answerMatches(input, answer) {
 }
 
 // ===================== 苦手語の記録 =====================
+// ===================== 忘却曲線（簡易SRS） =====================
+function loadSrs() { return loadJSON(LS.SRS, {}); }
+function saveSrs(s) { saveJSON(LS.SRS, s); }
+function daysBetween(dateStrA, dateStrB) {
+  const [ay, am, ad] = dateStrA.split('-').map(Number);
+  const [by, bm, bd] = dateStrB.split('-').map(Number);
+  const a = new Date(ay, am - 1, ad), b = new Date(by, bm - 1, bd);
+  return Math.round((a - b) / 86400000);
+}
+function updateSrs(verb, ok, usedHelp) {
+  const srs = loadSrs();
+  const key = baseForm(verb);
+  const today = todayKey();
+  const entry = srs[key] || { interval: 1, dueDate: today, reps: 0 };
+  if (ok && !usedHelp) {
+    entry.reps = (entry.reps || 0) + 1;
+    entry.interval = entry.reps <= 1 ? 1 : Math.min(60, entry.interval * 2);
+  } else if (ok && usedHelp) {
+    entry.interval = entry.interval || 1; // ヒント/4択正解は間隔を伸ばさず据え置き
+  } else {
+    entry.interval = 1;
+    entry.reps = 0;
+  }
+  const due = new Date();
+  due.setDate(due.getDate() + entry.interval);
+  entry.dueDate = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}-${String(due.getDate()).padStart(2, '0')}`;
+  srs[key] = entry;
+  saveSrs(srs);
+}
+function srsScore(verb) {
+  // 数値が小さいほど優先度が高い。未出題は最優先、期限切れが長いほど優先。
+  const srs = loadSrs();
+  const entry = srs[baseForm(verb)];
+  if (!entry) return -100000;
+  return -daysBetween(todayKey(), entry.dueDate);
+}
+function srsDuePool(words) {
+  return words.filter(w => srsScore(baseForm(w.verb)) <= 0);
+}
+
 function recordResult(verb, method) {
   // method: 'first'（記録なし対象）| 'hint' | 'choice' | 'wrong'
   const weak = loadJSON(LS.WEAK, {});
@@ -257,10 +313,8 @@ function populateStageSelects() {
   const stages = [...new Set(PV_DATA.map(w => w.stage))].sort((a, b) => a - b);
   const sel1 = document.getElementById('quiz-stage');
   const sel2 = document.getElementById('list-stage-filter');
-  const weakOption = document.getElementById('weak-option');
   for (const s of stages) {
-    const o1 = document.createElement('option'); o1.value = s; o1.textContent = 'Stage ' + s;
-    sel1.insertBefore(o1, weakOption);
+    const o1 = document.createElement('option'); o1.value = s; o1.textContent = 'Stage ' + s; sel1.appendChild(o1);
     const o2 = document.createElement('option'); o2.value = s; o2.textContent = 'Stage ' + s; sel2.appendChild(o2);
   }
 }
@@ -278,27 +332,39 @@ document.querySelectorAll('#quiz-count-group .chip').forEach(chip => {
 function refreshWeakRow() {
   const weak = loadJSON(LS.WEAK, {});
   const n = Object.keys(weak).length;
+  const onlyWeak = document.getElementById('weak-only-toggle').checked;
+  const onlySrs = document.getElementById('srs-only-toggle').checked;
+  document.getElementById('weak-only-count').textContent = n;
+  document.getElementById('weak-only-toggle').disabled = n === 0;
   document.getElementById('weak-count').textContent = n;
-  document.getElementById('weak-row').style.display = n > 0 ? 'flex' : 'none';
-  const opt = document.getElementById('weak-option');
-  opt.textContent = '苦手語のみ（' + n + '語）';
-  opt.disabled = n === 0;
-  if (n === 0 && document.getElementById('quiz-stage').value === 'weak') {
-    document.getElementById('quiz-stage').value = '0';
-  }
+  document.getElementById('weak-row').style.display = (n > 0 && !onlyWeak && !onlySrs) ? 'flex' : 'none';
+  if (n === 0 && onlyWeak) document.getElementById('weak-only-toggle').checked = false;
 }
 refreshWeakRow();
 
-document.getElementById('quiz-stage').addEventListener('change', (e) => {
-  document.getElementById('weak-row').style.display =
-    (e.target.value === 'weak' || Object.keys(loadJSON(LS.WEAK, {})).length === 0) ? 'none' : 'flex';
-});
+function refreshSrsRow() {
+  const n = srsDuePool(allWords()).length;
+  const onlyWeak = document.getElementById('weak-only-toggle').checked;
+  const onlySrs = document.getElementById('srs-only-toggle').checked;
+  document.getElementById('srs-only-count').textContent = n;
+  document.getElementById('srs-only-toggle').disabled = n === 0;
+  document.getElementById('srs-count').textContent = n;
+  document.getElementById('srs-row').style.display = (n > 0 && !onlyWeak && !onlySrs) ? 'flex' : 'none';
+  if (n === 0 && onlySrs) document.getElementById('srs-only-toggle').checked = false;
+}
+refreshSrsRow();
+
+document.getElementById('weak-only-toggle').addEventListener('change', () => { refreshWeakRow(); refreshSrsRow(); });
+document.getElementById('srs-only-toggle').addEventListener('change', () => { refreshWeakRow(); refreshSrsRow(); });
 
 document.getElementById('start-quiz').addEventListener('click', () => {
   const raw = document.getElementById('quiz-stage').value;
-  const stage = raw === 'weak' ? 'weak' : (parseInt(raw, 10) || 0);
-  const useWeak = document.getElementById('weak-toggle').checked;
-  const qs = buildQuiz(stage, quizCount, useWeak);
+  const stage = parseInt(raw, 10) || 0;
+  const onlyWeak = document.getElementById('weak-only-toggle').checked;
+  const onlySrs = document.getElementById('srs-only-toggle').checked;
+  const mixWeak = !onlyWeak && !onlySrs && document.getElementById('weak-toggle').checked;
+  const mixSrs = !onlyWeak && !onlySrs && document.getElementById('srs-toggle').checked;
+  const qs = buildQuiz(stage, quizCount, mixWeak, mixSrs, onlyWeak, onlySrs);
   if (!qs.length) { toast('この範囲では問題が作れませんでした'); return; }
   quizState = { questions: qs, idx: 0, correctCount: 0, results: [] };
   document.getElementById('quiz-setup').hidden = true;
@@ -700,6 +766,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
   const q = quizState.questions[quizState.idx];
   q.resolved = true; q.method = method;
   recordResult(q.answer, ok ? method : 'wrong');
+  updateSrs(q.answer, ok, method === 'hint' || method === 'choice');
   recordAnswered(q.answer, ok);
   logToday(ok);
   playResultSound(ok);

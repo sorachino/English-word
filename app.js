@@ -320,6 +320,7 @@ function showQuestion() {
   document.getElementById('stamp-result').hidden = true;
   document.getElementById('stamp-result').innerHTML = '';
   document.getElementById('reveal-box').hidden = true;
+  document.getElementById('reveal-wrong-info').hidden = true;
   document.getElementById('mark-wrong-btn').hidden = true;
   document.getElementById('choice-btn').disabled = false;
   document.getElementById('choice-btn').hidden = false;
@@ -354,7 +355,7 @@ document.getElementById('giveup-btn').addEventListener('click', () => {
   document.getElementById('hint-btn').disabled = true;
   document.getElementById('choice-btn').disabled = true;
   document.getElementById('giveup-btn').disabled = true;
-  finishQuestion(false, 'wrong');
+  finishQuestion(false, 'wrong', false, '');
 });
 
 function switchToChoices() {
@@ -380,7 +381,7 @@ document.getElementById('answer-form').addEventListener('submit', e => {
   const val = document.getElementById('answer-input').value.trim();
   if (!val) return;
   const ok = answerMatches(val, q.answer);
-  finishQuestion(ok, ok ? (q.usedHint ? 'hint' : 'first') : 'wrong');
+  finishQuestion(ok, ok ? (q.usedHint ? 'hint' : 'first') : 'wrong', false, val);
 });
 
 function resolveChoice(chosen, btnEl) {
@@ -391,7 +392,7 @@ function resolveChoice(chosen, btnEl) {
     if (b.textContent === q.answer) b.classList.add('correct');
     else if (b === btnEl) b.classList.add('wrong');
   });
-  finishQuestion(ok, ok ? 'choice' : 'wrong', true);
+  finishQuestion(ok, ok ? 'choice' : 'wrong', true, chosen);
 }
 
 // ===================== 効果音 =====================
@@ -652,7 +653,7 @@ document.getElementById('sound-toggle').addEventListener('click', () => {
 });
 refreshSoundToggle();
 
-function finishQuestion(ok, method, delay) {
+function finishQuestion(ok, method, delay, userAnswer) {
   const q = quizState.questions[quizState.idx];
   q.resolved = true; q.method = method;
   recordResult(q.answer, ok ? method : 'wrong');
@@ -678,6 +679,26 @@ function finishQuestion(ok, method, delay) {
   document.getElementById('reveal-structure').innerHTML = structureHtml(q.answer, q.word.ex1, q.word.ex2);
   const noteEl = document.getElementById('reveal-note');
   if (q.note) { noteEl.hidden = false; noteEl.textContent = '※ ' + q.note; } else { noteEl.hidden = true; }
+
+  const wrongInfoEl = document.getElementById('reveal-wrong-info');
+  const cleanedInput = (userAnswer || '').trim();
+  if (!ok && cleanedInput) {
+    const inputKey = cleanedInput.toLowerCase();
+    const hit = allWords().find(w => baseForm(w.verb).toLowerCase() === inputKey);
+    wrongInfoEl.hidden = false;
+    if (hit) {
+      wrongInfoEl.innerHTML = `
+        <div class="wrong-info-title">あなたの回答「${escHtml(cleanedInput)}」の意味</div>
+        <div class="wrong-info-meaning">${escHtml(hit.meaning || '')}</div>
+        ${hit.def ? `<div class="wrong-info-def">${escHtml(hit.def)}</div>` : ''}
+      `;
+    } else {
+      wrongInfoEl.innerHTML = `<div class="wrong-info-title">あなたの回答「${escHtml(cleanedInput)}」</div><div class="wrong-info-meaning">この単語帳にありません。</div>`;
+    }
+  } else {
+    wrongInfoEl.hidden = true;
+    wrongInfoEl.innerHTML = '';
+  }
 
   const markWrongBtn = document.getElementById('mark-wrong-btn');
   if (ok && (method === 'hint' || method === 'choice')) {

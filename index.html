@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=22">
+<link rel="stylesheet" href="style.css?v=23">
 </head>
 <body>
 
@@ -225,7 +225,11 @@
     </div>
 
     <div class="card" id="champion-cal-card" hidden>
-      <div class="section-label">デイリーチャンピオン<span id="champion-cal-month"></span></div>
+      <div class="cc-head-row">
+        <button class="cc-nav" id="cc-prev" aria-label="前の月">‹</button>
+        <div class="section-label" style="margin-bottom:0;">デイリーチャンピオン<span id="champion-cal-month"></span></div>
+        <button class="cc-nav" id="cc-next" aria-label="次の月">›</button>
+      </div>
       <div class="champion-cal-grid" id="champion-cal-grid"></div>
       <div class="empty-note">その日、最も多く問題を解いた人にスタンプが押されます。</div>
     </div>
@@ -293,6 +297,6 @@
 <script src="firebase-config.js?v=1"></script>
 <script src="tts-config.js?v=2"></script>
 <script src="data.js?v=4"></script>
-<script src="app.js?v=48"></script>
+<script src="app.js?v=49"></script>
 </body>
 </html>

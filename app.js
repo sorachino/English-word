@@ -1383,6 +1383,20 @@ function renderLeaderboard() {
   }).catch(() => { listEl.innerHTML = ''; emptyEl.hidden = false; });
 }
 
+let ccYear, ccMonth;
+function initChampionCalState() {
+  if (ccYear === undefined) {
+    const now = new Date();
+    ccYear = now.getFullYear();
+    ccMonth = now.getMonth();
+  }
+}
+function nameHue(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return hash % 360;
+}
+
 function renderChampionCalendar() {
   const db = initFirebase();
   const card = document.getElementById('champion-cal-card');
@@ -1391,9 +1405,9 @@ function renderChampionCalendar() {
   if (!card || !grid) return;
   if (!db) { card.hidden = true; return; }
   card.hidden = false;
+  initChampionCalState();
 
-  const now = new Date();
-  const year = now.getFullYear(), month = now.getMonth();
+  const year = ccYear, month = ccMonth;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDow = new Date(year, month, 1).getDay();
   monthLabel.textContent = `（${year}年${month + 1}月）`;
@@ -1430,14 +1444,29 @@ function renderChampionCalendar() {
       const champ = champions[dateStr];
       const cell = document.createElement('div');
       cell.className = 'champion-cal-cell' + (dateStr === today ? ' today' : '');
-      const stampHtml = champ
-        ? `<div class="cc-stamp" title="${escAttr(champ.name)}（${champ.solved}問）">${escHtml(champ.name.slice(0, 4))}</div>`
-        : '';
+      let stampHtml = '';
+      if (champ) {
+        const hue = nameHue(champ.name);
+        const style = `color:hsl(${hue},68%,32%); border-color:hsl(${hue},68%,32%); background:hsl(${hue},70%,90%);`;
+        stampHtml = `<div class="cc-stamp" style="${style}" title="${escAttr(champ.name)}（${champ.solved}問）">${escHtml(champ.name.slice(0, 4))}</div>`;
+      }
       cell.innerHTML = `<div class="cc-day">${d}</div>${stampHtml}`;
       grid.appendChild(cell);
     }
   }).catch(() => {});
 }
+document.getElementById('cc-prev').addEventListener('click', () => {
+  initChampionCalState();
+  ccMonth--;
+  if (ccMonth < 0) { ccMonth = 11; ccYear--; }
+  renderChampionCalendar();
+});
+document.getElementById('cc-next').addEventListener('click', () => {
+  initChampionCalState();
+  ccMonth++;
+  if (ccMonth > 11) { ccMonth = 0; ccYear++; }
+  renderChampionCalendar();
+});
 
 function openLbDetail(name) {
   document.getElementById('lb-detail-name').textContent = name;

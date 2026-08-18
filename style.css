@@ -419,11 +419,16 @@ select{
 .champion-cal-cell.empty{border:none; background:transparent;}
 .champion-cal-cell.today{border-color:var(--gold); border-width:2px;}
 .cc-day{font-family:"JetBrains Mono",monospace; font-size:10px; color:var(--ink-soft); position:absolute; top:2px; left:4px;}
+.cc-head-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+.cc-nav{
+  flex:none; width:30px; height:30px; border-radius:50%; border:1px solid var(--line);
+  background:#fff; font-size:16px; color:var(--navy); cursor:pointer;
+}
 .cc-stamp{
-  font-family:"JetBrains Mono",monospace; font-weight:900; font-size:9.5px; color:var(--hanko);
-  border:1.5px solid var(--hanko); border-radius:50%; width:26px; height:26px;
+  font-family:"JetBrains Mono",monospace; font-weight:900; font-size:9.5px;
+  border:1.5px solid; border-radius:50%; width:26px; height:26px;
   display:flex; align-items:center; justify-content:center; text-align:center; line-height:1;
-  transform:rotate(-8deg); background:var(--hanko-soft); overflow:hidden; padding:2px;
+  transform:rotate(-8deg); overflow:hidden; padding:2px;
 }
 
 

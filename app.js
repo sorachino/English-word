@@ -520,7 +520,7 @@ async function speakCloud(text) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         input: { text },
-        voice: { languageCode: 'en-US', name: (typeof TTS_VOICE_NAME !== 'undefined' && TTS_VOICE_NAME) || 'en-US-Neural2-C' },
+        voice: { languageCode: 'en-US', name: getCloudVoiceName() },
         audioConfig: { audioEncoding: 'MP3' },
       }),
     });
@@ -542,12 +542,43 @@ async function speakCloud(text) {
 function ttsConfigured() {
   return typeof TTS_API_KEY !== 'undefined' && TTS_API_KEY;
 }
+const CLOUD_VOICES = [
+  { name: 'en-US-Neural2-C', label: 'Neural2-C（女性・標準）' },
+  { name: 'en-US-Neural2-F', label: 'Neural2-F（女性）' },
+  { name: 'en-US-Neural2-G', label: 'Neural2-G（女性）' },
+  { name: 'en-US-Neural2-H', label: 'Neural2-H（女性）' },
+  { name: 'en-US-Neural2-A', label: 'Neural2-A（男性）' },
+  { name: 'en-US-Neural2-D', label: 'Neural2-D（男性）' },
+  { name: 'en-US-Neural2-I', label: 'Neural2-I（男性）' },
+  { name: 'en-US-Neural2-J', label: 'Neural2-J（男性）' },
+];
+function getCloudVoiceName() {
+  return localStorage.getItem('pv_cloud_voice_name') || (typeof TTS_VOICE_NAME !== 'undefined' && TTS_VOICE_NAME) || 'en-US-Neural2-C';
+}
+function initCloudVoiceSelect() {
+  const sel = document.getElementById('cloud-voice-select');
+  if (!sel) return;
+  const current = localStorage.getItem('pv_cloud_voice_name') || getCloudVoiceName();
+  sel.innerHTML = CLOUD_VOICES.map(v => `<option value="${v.name}">${v.label}</option>`).join('')
+    + `<option value="__samantha__">Samantha（標準・無料）</option>`;
+  sel.value = current;
+  sel.addEventListener('change', () => {
+    localStorage.setItem('pv_cloud_voice_name', sel.value);
+    Object.keys(ttsCache).forEach(k => delete ttsCache[k]); // 声が変わるのでキャッシュを破棄
+    toast('声を変更しました');
+    speak('This is a sample sentence.');
+  });
+}
 (() => {
   const legacy = document.getElementById('voice-legacy-card');
   const cloud = document.getElementById('voice-cloud-card');
   if (ttsConfigured()) {
     if (legacy) legacy.hidden = true;
     if (cloud) cloud.hidden = false;
+    initCloudVoiceSelect();
+  } else {
+    if (legacy) legacy.hidden = false;
+    if (cloud) cloud.hidden = true;
   }
 })();
 // ===================== Cloud TTSの無料枠使用量管理（全員共有） =====================
@@ -610,6 +641,8 @@ function speakWeb(text, forceName) {
 function speak(text) {
   if (!text) return;
   if (ttsConfigured()) {
+    const cloudSel = localStorage.getItem('pv_cloud_voice_name');
+    if (cloudSel === '__samantha__') { speakWeb(text, 'Samantha'); return; }
     if (ttsOverThreshold()) { speakWeb(text, 'Samantha'); return; }
     speakCloud(text);
     return;

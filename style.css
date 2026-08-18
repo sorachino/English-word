@@ -285,6 +285,7 @@ select{
 .wi-detail .ja{color:var(--ink-soft); margin-bottom:8px;}
 .wi-detail .def{color:var(--ink-soft); font-size:12px; margin-top:4px;}
 .wi-badge-mine{display:inline-block; font-size:10px; background:var(--ok-soft); color:var(--ok); padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:700;}
+.wi-badge-author{display:inline-block; font-size:10px; background:var(--gold-soft); color:#8A6A1E; padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:700;}
 .wi-right{display:flex; align-items:center; gap:8px; flex:none;}
 .wi-mark{
   background:none; border:none; font-size:19px; line-height:1; cursor:pointer;

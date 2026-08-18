@@ -247,7 +247,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'list') renderWordList();
-    if (btn.dataset.tab === 'dict') renderMyWordList();
+    if (btn.dataset.tab === 'dict') { renderMyWordList(); renderSharedWordList(); }
     if (btn.dataset.tab === 'stats') { renderStats(); renderLeaderboard(); updateLbNameDisplay(); renderChampionCalendar(); }
   });
 });
@@ -1025,6 +1025,65 @@ function renderMyWordList() {
     item.querySelector('.wi-detail').appendChild(delBtn);
     el.appendChild(item);
   });
+}
+
+function renderSharedWordList() {
+  const db = initFirebase();
+  const listEl = document.getElementById('shared-word-list');
+  const emptyEl = document.getElementById('shared-word-empty');
+  if (!listEl) return;
+  if (!db) { listEl.innerHTML = ''; if (emptyEl) emptyEl.hidden = true; return; }
+  const me = getNickname();
+  db.ref('users').get().then(snap => {
+    const all = snap.val() || {};
+    const items = [];
+    Object.entries(all).forEach(([name, u]) => {
+      if (name === me) return; // 自分の分は「追加した単語」に出るのでここでは除く
+      const words = (u && u.myWords) || [];
+      words.forEach(w => { if (w && w.verb) items.push({ ...w, author: name }); });
+    });
+    listEl.innerHTML = '';
+    if (emptyEl) emptyEl.hidden = items.length > 0;
+    items.forEach(w => listEl.appendChild(sharedWordItemEl(w)));
+  }).catch(() => {});
+}
+
+function sharedWordItemEl(w) {
+  const div = wordItemEl({ ...w, mine: true });
+  const verbSpan = div.querySelector('.wi-verb');
+  if (verbSpan) {
+    const badge = document.createElement('span');
+    badge.className = 'wi-badge-author';
+    badge.textContent = '作成者：' + w.author;
+    verbSpan.after(badge);
+  }
+  const mineBadge = div.querySelector('.wi-badge-mine');
+  if (mineBadge) mineBadge.remove(); // 元のwordItemElが付ける「マイ単語」表記は不要
+  const detail = div.querySelector('.wi-detail');
+  if (detail) {
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn-ghost btn-block';
+    copyBtn.textContent = '自分の単語帳にコピー';
+    copyBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      copySharedWord(w);
+    });
+    detail.appendChild(copyBtn);
+  }
+  return div;
+}
+
+function copySharedWord(w) {
+  if (!getNickname()) { toast('先にランキングで表示名を設定してください'); return; }
+  const list = myWords();
+  const already = list.some(x => (x.verb || '').trim().toLowerCase() === (w.verb || '').trim().toLowerCase());
+  if (already) { toast('すでに同じ句動詞が単語帳にあります'); return; }
+  const { author, mine, ...rest } = w;
+  list.push(rest);
+  saveJSON(LS.MY_WORDS, list);
+  pushMyWordsToCloud();
+  toast('自分の単語帳にコピーしました');
+  renderMyWordList();
 }
 
 // ===================== UI: 記録 =====================

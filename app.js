@@ -5,6 +5,12 @@ const LS = {
   LOG: 'pv_daily_log',      // { "2026-08-15": {solved:10, correct:8} }
 };
 
+// Firebase接続の使い回し用（宣言はファイル先頭で行う。
+// 以前はランキング機能のセクションで宣言していたが、Cloud TTS初期化処理が
+// ページ読み込み時にこれより先にinitFirebase()を呼ぶため、
+// 「宣言前に変数へアクセスした」エラーで以降の処理が全て止まる不具合があった）
+let fbDB = null;
+
 function loadJSON(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
   catch (e) { return fallback; }
@@ -1129,7 +1135,6 @@ document.getElementById('streak-popup-backdrop').addEventListener('click', () =>
 maybeShowStreakCelebration();
 
 // ===================== ランキング =====================
-let fbDB = null;
 function initFirebase() {
   if (fbDB) return fbDB;
   if (typeof FIREBASE_CONFIG === 'undefined' || !FIREBASE_CONFIG.apiKey || !FIREBASE_CONFIG.databaseURL) return null;

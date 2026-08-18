@@ -734,6 +734,8 @@ function finishQuestion(ok, method, delay, userAnswer) {
         <div class="wrong-info-title">あなたの回答「${escHtml(cleanedInput)}」の意味</div>
         <div class="wrong-info-meaning">${escHtml(hit.meaning || '')}</div>
         ${hit.def ? `<div class="wrong-info-def">${escHtml(hit.def)}</div>` : ''}
+        ${hit.ex1 ? `<div class="ex">${escHtml(hit.ex1)} <button class="speak-btn" data-text="${escAttr(hit.ex1)}">🔊</button></div><div class="ja">${escHtml(hit.ja1 || '')}</div>` : ''}
+        ${hit.ex2 ? `<div class="ex">${escHtml(hit.ex2)} <button class="speak-btn" data-text="${escAttr(hit.ex2)}">🔊</button></div><div class="ja">${escHtml(hit.ja2 || '')}</div>` : ''}
       `;
     } else {
       wrongInfoEl.innerHTML = `<div class="wrong-info-title">あなたの回答「${escHtml(cleanedInput)}」</div><div class="wrong-info-meaning">この単語帳にありません。</div>`;

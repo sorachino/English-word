@@ -238,6 +238,8 @@ select{
 .wrong-info-title{font-weight:700; color:var(--hanko); margin-bottom:3px;}
 .wrong-info-meaning{color:var(--ink);}
 .wrong-info-def{color:var(--ink-soft); font-size:11.5px; margin-top:3px;}
+.wrong-info .ex{color:var(--ink); margin-top:6px; font-size:12.5px;}
+.wrong-info .ja{color:var(--ink-soft); font-size:11.5px; margin-bottom:2px;}
 .btn-block{width:100%; margin-top:8px;}
 #mark-wrong-btn{color:var(--hanko); border-color:var(--hanko-soft);}
 

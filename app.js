@@ -329,41 +329,51 @@ document.querySelectorAll('#quiz-count-group .chip').forEach(chip => {
   });
 });
 
+let weakMode = 'off'; // 'off' | 'mix' | 'only'
+let srsMode = 'off';
+
 function refreshWeakRow() {
-  const weak = loadJSON(LS.WEAK, {});
-  const n = Object.keys(weak).length;
-  const onlyWeak = document.getElementById('weak-only-toggle').checked;
-  const onlySrs = document.getElementById('srs-only-toggle').checked;
-  document.getElementById('weak-only-count').textContent = n;
-  document.getElementById('weak-only-toggle').disabled = n === 0;
+  const n = Object.keys(loadJSON(LS.WEAK, {})).length;
   document.getElementById('weak-count').textContent = n;
-  document.getElementById('weak-row').style.display = (n > 0 && !onlyWeak && !onlySrs) ? 'flex' : 'none';
-  if (n === 0 && onlyWeak) document.getElementById('weak-only-toggle').checked = false;
+  document.getElementById('weak-only-count').textContent = n;
+  const group = document.getElementById('weak-mode-group');
+  group.querySelectorAll('.chip').forEach(chip => {
+    const disable = chip.dataset.mode !== 'off' && n === 0;
+    chip.disabled = disable;
+    chip.classList.toggle('active', chip.dataset.mode === weakMode);
+  });
+  if (n === 0 && weakMode !== 'off') { weakMode = 'off'; refreshWeakRow(); }
 }
 refreshWeakRow();
 
 function refreshSrsRow() {
   const n = srsDuePool(allWords()).length;
-  const onlyWeak = document.getElementById('weak-only-toggle').checked;
-  const onlySrs = document.getElementById('srs-only-toggle').checked;
-  document.getElementById('srs-only-count').textContent = n;
-  document.getElementById('srs-only-toggle').disabled = n === 0;
   document.getElementById('srs-count').textContent = n;
-  document.getElementById('srs-row').style.display = (n > 0 && !onlyWeak && !onlySrs) ? 'flex' : 'none';
-  if (n === 0 && onlySrs) document.getElementById('srs-only-toggle').checked = false;
+  document.getElementById('srs-only-count').textContent = n;
+  const group = document.getElementById('srs-mode-group');
+  group.querySelectorAll('.chip').forEach(chip => {
+    const disable = chip.dataset.mode !== 'off' && n === 0;
+    chip.disabled = disable;
+    chip.classList.toggle('active', chip.dataset.mode === srsMode);
+  });
+  if (n === 0 && srsMode !== 'off') { srsMode = 'off'; refreshSrsRow(); }
 }
 refreshSrsRow();
 
-document.getElementById('weak-only-toggle').addEventListener('change', () => { refreshWeakRow(); refreshSrsRow(); });
-document.getElementById('srs-only-toggle').addEventListener('change', () => { refreshWeakRow(); refreshSrsRow(); });
+document.getElementById('weak-mode-group').querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => { weakMode = chip.dataset.mode; refreshWeakRow(); });
+});
+document.getElementById('srs-mode-group').querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => { srsMode = chip.dataset.mode; refreshSrsRow(); });
+});
 
 document.getElementById('start-quiz').addEventListener('click', () => {
   const raw = document.getElementById('quiz-stage').value;
   const stage = parseInt(raw, 10) || 0;
-  const onlyWeak = document.getElementById('weak-only-toggle').checked;
-  const onlySrs = document.getElementById('srs-only-toggle').checked;
-  const mixWeak = !onlyWeak && !onlySrs && document.getElementById('weak-toggle').checked;
-  const mixSrs = !onlyWeak && !onlySrs && document.getElementById('srs-toggle').checked;
+  const onlyWeak = weakMode === 'only';
+  const onlySrs = srsMode === 'only';
+  const mixWeak = weakMode === 'mix';
+  const mixSrs = srsMode === 'mix';
   const qs = buildQuiz(stage, quizCount, mixWeak, mixSrs, onlyWeak, onlySrs);
   if (!qs.length) { toast('この範囲では問題が作れませんでした'); return; }
   quizState = { questions: qs, idx: 0, correctCount: 0, results: [] };

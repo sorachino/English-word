@@ -116,6 +116,7 @@ select{
   padding:6px 12px; border-radius:16px; cursor:pointer;
 }
 .chip.active{background:var(--navy); border-color:var(--navy); color:#fff;}
+.chip:disabled{opacity:.4; cursor:not-allowed;}
 .switch{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); cursor:pointer;}
 
 .btn-primary{

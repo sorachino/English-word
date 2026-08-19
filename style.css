@@ -175,6 +175,16 @@ select{
 }
 
 .answer-form{display:flex; gap:8px; margin-bottom:10px;}
+.self-grade-box{
+  background:var(--paper-raised); border:1px solid var(--line); border-radius:10px;
+  padding:14px; margin-bottom:10px;
+}
+.self-grade-row{display:flex; justify-content:space-between; align-items:baseline; font-size:14px; margin-bottom:8px; gap:10px;}
+.self-grade-label{color:var(--ink-soft); font-size:12px; flex:none;}
+.self-grade-row b{color:var(--navy); font-size:16px; text-align:right;}
+.self-grade-buttons{display:flex; gap:8px; margin-top:12px;}
+.self-grade-buttons button{flex:1;}
+#self-grade-wrong-btn{color:var(--hanko); border-color:var(--hanko);}
 .answer-form input{
   flex:1; padding:12px 14px; font-size:16px; border:1.5px solid var(--line);
   border-radius:8px; font-family:"Noto Sans JP",sans-serif; background:#fff;

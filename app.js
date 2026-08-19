@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '65'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '66'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -231,13 +231,6 @@ function answerMatches(input, answer) {
   if (aw.length !== bw.length) return false;
   return aw.every((w, i) => w === bw[i] || (w.length > 3 && bw[i].startsWith(w.slice(0, Math.max(3, w.length - 3)))));
 }
-function meaningMatches(input, correctMeaning) {
-  const norm = s => String(s).replace(/[\s　]/g, '').replace(/[，,]/g, '、');
-  const target = norm(input);
-  if (!target) return false;
-  const segments = norm(correctMeaning).split(/[、\/／]/).map(s => s.trim()).filter(Boolean);
-  return segments.some(seg => seg === target || seg.includes(target) || target.includes(seg));
-}
 
 // ===================== 苦手語の記録 =====================
 // ===================== 忘却曲線（簡易SRS） =====================
@@ -462,10 +455,12 @@ function showQuestion() {
     replayBtn.hidden = true;
   }
   document.getElementById('ja-preview').textContent = quizState.mode === 'reverse' ? '' : q.ja;
+  document.getElementById('answer-input').placeholder = quizState.mode === 'reverse' ? '意味を日本語で入力' : '句動詞を入力';
   document.getElementById('hint-box').hidden = true;
   document.getElementById('hint-box').textContent = '';
   document.getElementById('answer-form').hidden = false;
   document.getElementById('answer-input').value = '';
+  document.getElementById('self-grade-box').hidden = true;
   document.getElementById('choice-grid').hidden = true;
   document.getElementById('choice-grid').innerHTML = '';
   document.getElementById('stamp-result').hidden = true;
@@ -539,9 +534,32 @@ document.getElementById('answer-form').addEventListener('submit', e => {
   const q = quizState.questions[quizState.idx];
   const val = document.getElementById('answer-input').value.trim();
   if (!val) return;
-  const ok = quizState.mode === 'reverse' ? meaningMatches(val, q.meaning) : answerMatches(val, q.answer);
+  if (quizState.mode === 'reverse') {
+    showSelfGrade(val, q);
+    return;
+  }
+  const ok = answerMatches(val, q.answer);
   finishQuestion(ok, ok ? (q.usedHint ? 'hint' : 'first') : 'wrong', false, val);
 });
+
+function showSelfGrade(userVal, q) {
+  document.getElementById('answer-form').hidden = true;
+  document.getElementById('submit-btn').hidden = true;
+  document.getElementById('hint-btn').hidden = true;
+  document.getElementById('choice-btn').hidden = true;
+  document.getElementById('giveup-btn').hidden = true;
+  document.getElementById('self-grade-user-answer').textContent = userVal;
+  document.getElementById('self-grade-correct-answer').textContent = q.meaning;
+  document.getElementById('self-grade-box').hidden = false;
+  document.getElementById('self-grade-ok-btn').onclick = () => {
+    document.getElementById('self-grade-box').hidden = true;
+    finishQuestion(true, q.usedHint ? 'hint' : 'first', false, userVal);
+  };
+  document.getElementById('self-grade-wrong-btn').onclick = () => {
+    document.getElementById('self-grade-box').hidden = true;
+    finishQuestion(false, 'wrong', false, userVal);
+  };
+}
 
 function resolveChoice(chosen, btnEl) {
   const q = quizState.questions[quizState.idx];

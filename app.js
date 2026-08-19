@@ -1173,9 +1173,10 @@ function renderStats() {
   const log = loadJSON(LS.LOG, {});
   let total = 0, correct = 0;
   Object.values(log).forEach(d => { total += d.solved; correct += d.correct; });
+  const todayLog = log[todayKey()] || { solved: 0, correct: 0 };
   document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-today').textContent = (log[todayKey()] || {}).solved || 0;
-  document.getElementById('stat-accuracy').textContent = total ? Math.round(100 * correct / total) + '%' : '–';
+  document.getElementById('stat-today').textContent = todayLog.solved || 0;
+  document.getElementById('stat-accuracy').textContent = todayLog.solved ? Math.round(100 * todayLog.correct / todayLog.solved) + '%' : '–';
   document.getElementById('stat-streak').textContent = calcStreak(log);
 
   const chart = document.getElementById('bar-chart');
@@ -1474,8 +1475,23 @@ function markCurrentAsWrong() {
     quizState.correctCount = Math.max(0, quizState.correctCount - 1);
   }
 
+  // 正答率のもとになる日別ログも訂正する（ここが抜けていると正答率が実態より高く出続ける）
+  const log = loadJSON(LS.LOG, {});
+  const today = todayKey();
+  if (log[today] && log[today].correct > 0) {
+    log[today].correct -= 1;
+    saveJSON(LS.LOG, log);
+  }
+  const db = initFirebase();
+  const nickname = getNickname();
+  if (db && nickname) {
+    db.ref(`users/${nickname}/log/${today}/correct`).set(firebase.database.ServerValue.increment(-1)).catch(() => {});
+  }
+
   refreshWeakRow();
   pushWordStateToCloud(verb);
+  const statsView = document.getElementById('view-stats');
+  if (statsView && statsView.classList.contains('active')) renderStats();
   const btn = document.getElementById('mark-wrong-btn');
   btn.hidden = true;
   toast('苦手な語として記録しました');

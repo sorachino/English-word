@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '66'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '67'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -454,7 +454,8 @@ function showQuestion() {
     document.getElementById('question-text').innerHTML = q.questionHtml;
     replayBtn.hidden = true;
   }
-  document.getElementById('ja-preview').textContent = quizState.mode === 'reverse' ? '' : q.ja;
+  document.getElementById('ja-preview').textContent =
+    (quizState.mode === 'reverse' || quizState.mode === 'listening') ? '' : q.ja;
   document.getElementById('answer-input').placeholder = quizState.mode === 'reverse' ? '意味を日本語で入力' : '句動詞を入力';
   document.getElementById('hint-box').hidden = true;
   document.getElementById('hint-box').textContent = '';
@@ -482,7 +483,14 @@ function showQuestion() {
 document.getElementById('hint-btn').addEventListener('click', () => {
   const q = quizState.questions[quizState.idx];
   const box = document.getElementById('hint-box');
-  if (quizState.mode === 'reverse') {
+  if (quizState.mode === 'listening') {
+    if (!q.hintShown) {
+      box.textContent = '和訳: ' + q.ja;
+      q.hintShown = 1;
+    } else {
+      box.textContent = '単語数: ' + q.answer.split(' ').length + '語';
+    }
+  } else if (quizState.mode === 'reverse') {
     if (!q.hintShown) {
       box.textContent = q.def ? '英語定義: ' + q.def : '意味の文字数: ' + q.meaning.length + '文字';
       q.hintShown = 1;

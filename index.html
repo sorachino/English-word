@@ -58,19 +58,15 @@
       </div>
       <div class="setup-row">
         <label>苦手語</label>
-        <div class="chip-group" id="weak-mode-group">
-          <button class="chip active" data-mode="off">なし</button>
-          <button class="chip" data-mode="mix">混ぜる（<span id="weak-count">0</span>語）</button>
-          <button class="chip" data-mode="only">のみ<br>（<span id="weak-only-count">0</span>語）</button>
-        </div>
+        <label class="switch"><input type="checkbox" id="weak-on-toggle"><span>優先する（<span id="weak-count">0</span>語）</span></label>
       </div>
       <div class="setup-row">
         <label>復習</label>
-        <div class="chip-group" id="srs-mode-group">
-          <button class="chip active" data-mode="off">なし</button>
-          <button class="chip" data-mode="mix">混ぜる（<span id="srs-count">0</span>語）</button>
-          <button class="chip" data-mode="only">のみ<br>（<span id="srs-only-count">0</span>語）</button>
-        </div>
+        <label class="switch"><input type="checkbox" id="srs-on-toggle"><span>優先する（<span id="srs-count">0</span>語）</span></label>
+      </div>
+      <div class="setup-row" id="strict-only-row" style="display:none">
+        <label></label>
+        <label class="switch"><input type="checkbox" id="strict-only-toggle"><span>優先した語だけに絞る</span></label>
       </div>
       <button class="btn-primary" id="start-quiz">はじめる</button>
     </div>
@@ -323,6 +319,6 @@
 <script src="firebase-config.js?v=1"></script>
 <script src="tts-config.js?v=2"></script>
 <script src="data.js?v=4"></script>
-<script src="app.js?v=57"></script>
+<script src="app.js?v=58"></script>
 </body>
 </html>

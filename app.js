@@ -113,39 +113,35 @@ function blankSentence(sentence, verb) {
 // ===================== クイズエンジン =====================
 let quizState = null;
 
-function buildQuiz(stageFilter, count, mixWeak, mixSrs, onlyWeak, onlySrs) {
+function buildQuiz(stageFilter, count, weakOn, srsOn, strictOnly) {
   const words = allWords();
   const weak = loadJSON(LS.WEAK, {});
   const weakVerbs = Object.keys(weak);
+  const isWeak = w => weakVerbs.includes(baseForm(w.verb));
+  const isDue = w => srsScore(baseForm(w.verb)) <= 0;
 
   let pool = stageFilter ? words.filter(w => w.stage === stageFilter) : words.slice();
-  if (onlyWeak) pool = pool.filter(w => weakVerbs.includes(baseForm(w.verb)));
-  if (onlySrs) pool = pool.filter(w => srsScore(baseForm(w.verb)) <= 0);
-  if (onlySrs) pool.sort((a, b) => srsScore(baseForm(a.verb)) - srsScore(baseForm(b.verb)));
+  if (strictOnly && weakOn) pool = pool.filter(isWeak);
+  if (strictOnly && srsOn) pool = pool.filter(isDue);
+
+  // 優先度スコア：小さいほど優先。苦手語は一律で優先度を大きく上げ、復習は期限切れが長いほど優先。
+  function priority(w) {
+    let score = srsOn ? srsScore(baseForm(w.verb)) : 0;
+    if (weakOn && isWeak(w)) score -= 50000;
+    return score;
+  }
 
   let picks = [];
-  if (onlySrs) {
-    // 優先度順（未出題→期限切れが長い順）にそのまま採用
+  if (strictOnly && (weakOn || srsOn)) {
+    // 優先条件を満たす語だけのプールから、優先度順にそのまま採用
+    pool.sort((a, b) => priority(a) - priority(b));
     picks = pool.slice(0, count);
-  } else if (onlyWeak) {
-    const p = pool.slice();
-    shuffle(p);
-    picks = p.slice(0, count);
-  } else {
-    if (mixWeak && weakVerbs.length) {
-      const weakPool = pool.filter(w => weakVerbs.includes(baseForm(w.verb)));
-      shuffle(weakPool);
-      const n = Math.min(Math.ceil(count * 0.3), weakPool.length, count);
-      picks = weakPool.slice(0, n);
-    }
-    if (mixSrs) {
-      const duePool = srsDuePool(pool)
-        .filter(w => !picks.includes(w))
-        .sort((a, b) => srsScore(baseForm(a.verb)) - srsScore(baseForm(b.verb)));
-      const remainingSlots = count - picks.length;
-      const n = Math.min(Math.ceil(count * 0.3), duePool.length, remainingSlots);
-      picks = picks.concat(duePool.slice(0, n));
-    }
+  } else if (weakOn || srsOn) {
+    // 優先条件を満たす語を最大30%確保し、残りはランダム
+    const priorityPool = pool.filter(w => (weakOn && isWeak(w)) || (srsOn && isDue(w)));
+    priorityPool.sort((a, b) => priority(a) - priority(b));
+    const n = Math.min(Math.ceil(count * 0.3), priorityPool.length, count);
+    picks = priorityPool.slice(0, n);
   }
   const rest = pool.filter(w => !picks.includes(w));
   shuffle(rest);
@@ -334,60 +330,53 @@ document.querySelectorAll('#quiz-count-group .chip').forEach(chip => {
   });
 });
 
-let weakMode = localStorage.getItem('pv_quiz_weak_mode') || 'off'; // 'off' | 'mix' | 'only'
-let srsMode = localStorage.getItem('pv_quiz_srs_mode') || 'off';
 function saveQuizSettings() {
-  localStorage.setItem('pv_quiz_weak_mode', weakMode);
-  localStorage.setItem('pv_quiz_srs_mode', srsMode);
+  localStorage.setItem('pv_quiz_weak_on', document.getElementById('weak-on-toggle').checked ? '1' : '0');
+  localStorage.setItem('pv_quiz_srs_on', document.getElementById('srs-on-toggle').checked ? '1' : '0');
+  localStorage.setItem('pv_quiz_strict_only', document.getElementById('strict-only-toggle').checked ? '1' : '0');
   localStorage.setItem('pv_quiz_stage', document.getElementById('quiz-stage').value);
   localStorage.setItem('pv_quiz_count', String(quizCount));
+}
+document.getElementById('weak-on-toggle').checked = localStorage.getItem('pv_quiz_weak_on') === '1';
+document.getElementById('srs-on-toggle').checked = localStorage.getItem('pv_quiz_srs_on') === '1';
+document.getElementById('strict-only-toggle').checked = localStorage.getItem('pv_quiz_strict_only') === '1';
+
+function refreshStrictRow() {
+  const weakOn = document.getElementById('weak-on-toggle').checked;
+  const srsOn = document.getElementById('srs-on-toggle').checked;
+  document.getElementById('strict-only-row').style.display = (weakOn || srsOn) ? 'flex' : 'none';
+  if (!weakOn && !srsOn) document.getElementById('strict-only-toggle').checked = false;
 }
 
 function refreshWeakRow() {
   const n = Object.keys(loadJSON(LS.WEAK, {})).length;
   document.getElementById('weak-count').textContent = n;
-  document.getElementById('weak-only-count').textContent = n;
-  const group = document.getElementById('weak-mode-group');
-  if (!group) return;
-  group.querySelectorAll('.chip').forEach(chip => {
-    const disable = chip.dataset.mode !== 'off' && n === 0;
-    chip.disabled = disable;
-    chip.classList.toggle('active', chip.dataset.mode === weakMode);
-  });
-  if (n === 0 && weakMode !== 'off') { weakMode = 'off'; refreshWeakRow(); }
+  document.getElementById('weak-on-toggle').disabled = n === 0;
+  if (n === 0) document.getElementById('weak-on-toggle').checked = false;
+  refreshStrictRow();
 }
 refreshWeakRow();
 
 function refreshSrsRow() {
   const n = srsDuePool(allWords()).length;
   document.getElementById('srs-count').textContent = n;
-  document.getElementById('srs-only-count').textContent = n;
-  const group = document.getElementById('srs-mode-group');
-  if (!group) return;
-  group.querySelectorAll('.chip').forEach(chip => {
-    const disable = chip.dataset.mode !== 'off' && n === 0;
-    chip.disabled = disable;
-    chip.classList.toggle('active', chip.dataset.mode === srsMode);
-  });
-  if (n === 0 && srsMode !== 'off') { srsMode = 'off'; refreshSrsRow(); }
+  document.getElementById('srs-on-toggle').disabled = n === 0;
+  if (n === 0) document.getElementById('srs-on-toggle').checked = false;
+  refreshStrictRow();
 }
 refreshSrsRow();
 
-document.getElementById('weak-mode-group')?.querySelectorAll('.chip').forEach(chip => {
-  chip.addEventListener('click', () => { weakMode = chip.dataset.mode; refreshWeakRow(); saveQuizSettings(); });
-});
-document.getElementById('srs-mode-group')?.querySelectorAll('.chip').forEach(chip => {
-  chip.addEventListener('click', () => { srsMode = chip.dataset.mode; refreshSrsRow(); saveQuizSettings(); });
-});
+document.getElementById('weak-on-toggle').addEventListener('change', () => { refreshStrictRow(); saveQuizSettings(); });
+document.getElementById('srs-on-toggle').addEventListener('change', () => { refreshStrictRow(); saveQuizSettings(); });
+document.getElementById('strict-only-toggle').addEventListener('change', saveQuizSettings);
 
 document.getElementById('start-quiz').addEventListener('click', () => {
   const raw = document.getElementById('quiz-stage').value;
   const stage = parseInt(raw, 10) || 0;
-  const onlyWeak = weakMode === 'only';
-  const onlySrs = srsMode === 'only';
-  const mixWeak = weakMode === 'mix';
-  const mixSrs = srsMode === 'mix';
-  const qs = buildQuiz(stage, quizCount, mixWeak, mixSrs, onlyWeak, onlySrs);
+  const weakOn = document.getElementById('weak-on-toggle').checked;
+  const srsOn = document.getElementById('srs-on-toggle').checked;
+  const strictOnly = document.getElementById('strict-only-toggle').checked;
+  const qs = buildQuiz(stage, quizCount, weakOn, srsOn, strictOnly);
   if (!qs.length) { toast('この範囲では問題が作れませんでした'); return; }
   quizState = { questions: qs, idx: 0, correctCount: 0, results: [] };
   document.getElementById('quiz-setup').hidden = true;

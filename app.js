@@ -317,20 +317,31 @@ function populateStageSelects() {
     const o1 = document.createElement('option'); o1.value = s; o1.textContent = 'Stage ' + s; sel1.appendChild(o1);
     const o2 = document.createElement('option'); o2.value = s; o2.textContent = 'Stage ' + s; sel2.appendChild(o2);
   }
+  const savedStage = localStorage.getItem('pv_quiz_stage');
+  if (savedStage && [...sel1.options].some(o => o.value === savedStage)) sel1.value = savedStage;
 }
 populateStageSelects();
+document.getElementById('quiz-stage').addEventListener('change', saveQuizSettings);
 
-let quizCount = 10;
+let quizCount = parseInt(localStorage.getItem('pv_quiz_count'), 10) || 10;
 document.querySelectorAll('#quiz-count-group .chip').forEach(chip => {
+  chip.classList.toggle('active', parseInt(chip.dataset.count, 10) === quizCount);
   chip.addEventListener('click', () => {
     document.querySelectorAll('#quiz-count-group .chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
     quizCount = parseInt(chip.dataset.count, 10);
+    saveQuizSettings();
   });
 });
 
-let weakMode = 'off'; // 'off' | 'mix' | 'only'
-let srsMode = 'off';
+let weakMode = localStorage.getItem('pv_quiz_weak_mode') || 'off'; // 'off' | 'mix' | 'only'
+let srsMode = localStorage.getItem('pv_quiz_srs_mode') || 'off';
+function saveQuizSettings() {
+  localStorage.setItem('pv_quiz_weak_mode', weakMode);
+  localStorage.setItem('pv_quiz_srs_mode', srsMode);
+  localStorage.setItem('pv_quiz_stage', document.getElementById('quiz-stage').value);
+  localStorage.setItem('pv_quiz_count', String(quizCount));
+}
 
 function refreshWeakRow() {
   const n = Object.keys(loadJSON(LS.WEAK, {})).length;
@@ -361,10 +372,10 @@ function refreshSrsRow() {
 refreshSrsRow();
 
 document.getElementById('weak-mode-group').querySelectorAll('.chip').forEach(chip => {
-  chip.addEventListener('click', () => { weakMode = chip.dataset.mode; refreshWeakRow(); });
+  chip.addEventListener('click', () => { weakMode = chip.dataset.mode; refreshWeakRow(); saveQuizSettings(); });
 });
 document.getElementById('srs-mode-group').querySelectorAll('.chip').forEach(chip => {
-  chip.addEventListener('click', () => { srsMode = chip.dataset.mode; refreshSrsRow(); });
+  chip.addEventListener('click', () => { srsMode = chip.dataset.mode; refreshSrsRow(); saveQuizSettings(); });
 });
 
 document.getElementById('start-quiz').addEventListener('click', () => {
@@ -949,6 +960,7 @@ document.getElementById('restart-btn').addEventListener('click', () => {
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-setup').hidden = false;
   refreshWeakRow();
+  refreshSrsRow();
 });
 
 // ===================== UI: 単語帳 =====================

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '64'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '65'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -197,9 +197,15 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, strictOnly) {
     const distractors = sameHeadSameCount.concat(otherSameCount).concat(fallbackAny).slice(0, 3);
     const choices = shuffle(distractors.concat([verb]));
 
+    // 逆方向モード（英語→日本語）用の意味の4択
+    const otherMeanings = words.filter(w2 => w2 !== w && w2.meaning && w2.meaning !== w.meaning);
+    shuffle(otherMeanings);
+    const meaningDistractors = otherMeanings.slice(0, 3).map(w2 => w2.meaning);
+    const meaningChoices = shuffle(meaningDistractors.concat([w.meaning]));
+
     questions.push({
       word: w, answer: verb, questionHtml: blanked.html, full: blanked.full, ja: blanked.ja,
-      meaning: w.meaning, def: w.def, note: w.note, choices,
+      meaning: w.meaning, def: w.def, note: w.note, choices, meaningChoices,
       resolved: false, method: null, // 'first' | 'hint' | 'choice' | 'wrong'
       hintShown: false,
     });
@@ -224,6 +230,13 @@ function answerMatches(input, answer) {
   const aw = a.split(' '), bw = b.split(' ');
   if (aw.length !== bw.length) return false;
   return aw.every((w, i) => w === bw[i] || (w.length > 3 && bw[i].startsWith(w.slice(0, Math.max(3, w.length - 3)))));
+}
+function meaningMatches(input, correctMeaning) {
+  const norm = s => String(s).replace(/[\s　]/g, '').replace(/[，,]/g, '、');
+  const target = norm(input);
+  if (!target) return false;
+  const segments = norm(correctMeaning).split(/[、\/／]/).map(s => s.trim()).filter(Boolean);
+  return segments.some(seg => seg === target || seg.includes(target) || target.includes(seg));
 }
 
 // ===================== 苦手語の記録 =====================
@@ -442,13 +455,13 @@ function showQuestion() {
     replayBtn.onclick = () => speak(q.full);
     speak(q.full);
   } else if (quizState.mode === 'reverse') {
-    document.getElementById('question-text').textContent = q.meaning;
+    document.getElementById('question-text').textContent = q.answer;
     replayBtn.hidden = true;
   } else {
     document.getElementById('question-text').innerHTML = q.questionHtml;
     replayBtn.hidden = true;
   }
-  document.getElementById('ja-preview').textContent = q.ja;
+  document.getElementById('ja-preview').textContent = quizState.mode === 'reverse' ? '' : q.ja;
   document.getElementById('hint-box').hidden = true;
   document.getElementById('hint-box').textContent = '';
   document.getElementById('answer-form').hidden = false;
@@ -474,7 +487,14 @@ function showQuestion() {
 document.getElementById('hint-btn').addEventListener('click', () => {
   const q = quizState.questions[quizState.idx];
   const box = document.getElementById('hint-box');
-  if (!q.hintShown) {
+  if (quizState.mode === 'reverse') {
+    if (!q.hintShown) {
+      box.textContent = q.def ? '英語定義: ' + q.def : '意味の文字数: ' + q.meaning.length + '文字';
+      q.hintShown = 1;
+    } else {
+      box.textContent = '意味の文字数: ' + q.meaning.length + '文字';
+    }
+  } else if (!q.hintShown) {
     box.textContent = '意味: ' + q.meaning + (q.def ? '（' + q.def + '）' : '');
     q.hintShown = 1;
   } else {
@@ -502,7 +522,8 @@ function switchToChoices() {
   document.getElementById('submit-btn').hidden = true;
   const grid = document.getElementById('choice-grid');
   grid.innerHTML = '';
-  q.choices.forEach(c => {
+  const list = quizState.mode === 'reverse' ? q.meaningChoices : q.choices;
+  list.forEach(c => {
     const b = document.createElement('button');
     b.className = 'choice-btn'; b.textContent = c;
     b.addEventListener('click', () => resolveChoice(c, b));
@@ -518,16 +539,17 @@ document.getElementById('answer-form').addEventListener('submit', e => {
   const q = quizState.questions[quizState.idx];
   const val = document.getElementById('answer-input').value.trim();
   if (!val) return;
-  const ok = answerMatches(val, q.answer);
+  const ok = quizState.mode === 'reverse' ? meaningMatches(val, q.meaning) : answerMatches(val, q.answer);
   finishQuestion(ok, ok ? (q.usedHint ? 'hint' : 'first') : 'wrong', false, val);
 });
 
 function resolveChoice(chosen, btnEl) {
   const q = quizState.questions[quizState.idx];
-  const ok = chosen === q.answer;
+  const correctText = quizState.mode === 'reverse' ? q.meaning : q.answer;
+  const ok = chosen === correctText;
   document.querySelectorAll('.choice-btn').forEach(b => {
     b.disabled = true;
-    if (b.textContent === q.answer) b.classList.add('correct');
+    if (b.textContent === correctText) b.classList.add('correct');
     else if (b === btnEl) b.classList.add('wrong');
   });
   finishQuestion(ok, ok ? 'choice' : 'wrong', true, chosen);
@@ -858,7 +880,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
 
   const wrongInfoEl = document.getElementById('reveal-wrong-info');
   const cleanedInput = (userAnswer || '').trim();
-  if (!ok && cleanedInput) {
+  if (!ok && cleanedInput && quizState.mode !== 'reverse') {
     const inputKey = cleanedInput.toLowerCase();
     const hit = allWords().find(w => baseForm(w.verb).toLowerCase() === inputKey);
     wrongInfoEl.hidden = false;

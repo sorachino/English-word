@@ -1,3 +1,21 @@
+// ===================== バージョン整合性チェック（最優先で実行） =====================
+// index.htmlとapp.jsの組み合わせがズレていないかを、他の何よりも先に確認する。
+// ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
+(function checkBuildVersion() {
+  try {
+    const EXPECTED_BUILD = '64'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const meta = document.querySelector('meta[name="build-version"]');
+    const htmlBuild = meta ? meta.getAttribute('content') : null;
+    if (htmlBuild !== EXPECTED_BUILD) {
+      const banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed; top:0; left:0; right:0; z-index:99999; background:#B23A2E; color:#fff; padding:10px 14px; font-size:12.5px; text-align:center; font-family:sans-serif; line-height:1.5;';
+      banner.textContent = `⚠ index.html と app.js のバージョンが一致していません（HTML: ${htmlBuild || '不明'} / JS: ${EXPECTED_BUILD}）。index.html・app.js・style.css を全部まとめて、最新版に上書きアップロードし直してください。`;
+      document.addEventListener('DOMContentLoaded', () => document.body.prepend(banner));
+      if (document.body) document.body.prepend(banner);
+    }
+  } catch (e) { /* 検知処理自体が失敗しても、本体の動作は止めない */ }
+})();
+
 // ===================== ストレージキー =====================
 const LS = {
   MY_WORDS: 'pv_my_words',
@@ -143,6 +161,19 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, strictOnly) {
     const n = Math.min(Math.ceil(count * 0.3), priorityPool.length, count);
     picks = priorityPool.slice(0, n);
   }
+  // 得意な語（復習間隔が十分伸びた語）を、たまに1問だけ静かに紛れ込ませる（完全に忘れるのを防ぐ）
+  if (picks.length < count) {
+    const srsAll = loadSrs();
+    const masteredPool = pool.filter(w => {
+      if (picks.includes(w)) return false;
+      const entry = srsAll[baseForm(w.verb)];
+      return entry && entry.interval >= 30;
+    });
+    if (masteredPool.length && Math.random() < 0.2) {
+      picks.push(masteredPool[Math.floor(Math.random() * masteredPool.length)]);
+    }
+  }
+
   const rest = pool.filter(w => !picks.includes(w));
   shuffle(rest);
   while (picks.length < count && rest.length) picks.push(rest.shift());
@@ -330,16 +361,27 @@ document.querySelectorAll('#quiz-count-group .chip').forEach(chip => {
   });
 });
 
+let quizMode = localStorage.getItem('pv_quiz_mode') || 'normal'; // 'normal' | 'listening' | 'reverse'
 function saveQuizSettings() {
   localStorage.setItem('pv_quiz_weak_on', document.getElementById('weak-on-toggle').checked ? '1' : '0');
   localStorage.setItem('pv_quiz_srs_on', document.getElementById('srs-on-toggle').checked ? '1' : '0');
   localStorage.setItem('pv_quiz_strict_only', document.getElementById('strict-only-toggle').checked ? '1' : '0');
   localStorage.setItem('pv_quiz_stage', document.getElementById('quiz-stage').value);
   localStorage.setItem('pv_quiz_count', String(quizCount));
+  localStorage.setItem('pv_quiz_mode', quizMode);
 }
 document.getElementById('weak-on-toggle').checked = localStorage.getItem('pv_quiz_weak_on') === '1';
 document.getElementById('srs-on-toggle').checked = localStorage.getItem('pv_quiz_srs_on') === '1';
 document.getElementById('strict-only-toggle').checked = localStorage.getItem('pv_quiz_strict_only') === '1';
+
+document.querySelectorAll('#quiz-mode-group .chip').forEach(chip => {
+  chip.classList.toggle('active', chip.dataset.mode === quizMode);
+  chip.addEventListener('click', () => {
+    quizMode = chip.dataset.mode;
+    document.querySelectorAll('#quiz-mode-group .chip').forEach(c => c.classList.toggle('active', c.dataset.mode === quizMode));
+    saveQuizSettings();
+  });
+});
 
 function refreshStrictRow() {
   const weakOn = document.getElementById('weak-on-toggle').checked;
@@ -378,7 +420,7 @@ document.getElementById('start-quiz').addEventListener('click', () => {
   const strictOnly = document.getElementById('strict-only-toggle').checked;
   const qs = buildQuiz(stage, quizCount, weakOn, srsOn, strictOnly);
   if (!qs.length) { toast('この範囲では問題が作れませんでした'); return; }
-  quizState = { questions: qs, idx: 0, correctCount: 0, results: [] };
+  quizState = { questions: qs, idx: 0, correctCount: 0, results: [], mode: quizMode };
   document.getElementById('quiz-setup').hidden = true;
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-play').hidden = false;
@@ -393,7 +435,19 @@ function showQuestion() {
   document.getElementById('progress-fill').style.width = (100 * (quizState.idx) / quizState.questions.length) + '%';
   document.getElementById('card-stage').textContent = q.word.mine ? 'マイ単語' : ('Stage ' + q.word.stage + ' · No.' + q.word.no);
   refreshQuizMarkBtn();
-  document.getElementById('question-text').innerHTML = q.questionHtml;
+  const replayBtn = document.getElementById('listen-replay-btn');
+  if (quizState.mode === 'listening') {
+    document.getElementById('question-text').innerHTML = '（音声を聞いて、句動詞を答えてください）';
+    replayBtn.hidden = false;
+    replayBtn.onclick = () => speak(q.full);
+    speak(q.full);
+  } else if (quizState.mode === 'reverse') {
+    document.getElementById('question-text').textContent = q.meaning;
+    replayBtn.hidden = true;
+  } else {
+    document.getElementById('question-text').innerHTML = q.questionHtml;
+    replayBtn.hidden = true;
+  }
   document.getElementById('ja-preview').textContent = q.ja;
   document.getElementById('hint-box').hidden = true;
   document.getElementById('hint-box').textContent = '';

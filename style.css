@@ -167,6 +167,7 @@ select{
   min-height:64px;
 }
 .question-text b{color:var(--navy); border-bottom:2px solid var(--gold);}
+#listen-replay-btn{margin:6px 0;}
 .ja-preview{margin-top:8px; font-size:13.5px; color:var(--ink-soft);}
 .hint-box{
   margin-top:12px; padding:10px 12px; background:var(--gold-soft);

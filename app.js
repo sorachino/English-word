@@ -348,6 +348,7 @@ function refreshWeakRow() {
   document.getElementById('weak-count').textContent = n;
   document.getElementById('weak-only-count').textContent = n;
   const group = document.getElementById('weak-mode-group');
+  if (!group) return;
   group.querySelectorAll('.chip').forEach(chip => {
     const disable = chip.dataset.mode !== 'off' && n === 0;
     chip.disabled = disable;
@@ -362,6 +363,7 @@ function refreshSrsRow() {
   document.getElementById('srs-count').textContent = n;
   document.getElementById('srs-only-count').textContent = n;
   const group = document.getElementById('srs-mode-group');
+  if (!group) return;
   group.querySelectorAll('.chip').forEach(chip => {
     const disable = chip.dataset.mode !== 'off' && n === 0;
     chip.disabled = disable;
@@ -371,10 +373,10 @@ function refreshSrsRow() {
 }
 refreshSrsRow();
 
-document.getElementById('weak-mode-group').querySelectorAll('.chip').forEach(chip => {
+document.getElementById('weak-mode-group')?.querySelectorAll('.chip').forEach(chip => {
   chip.addEventListener('click', () => { weakMode = chip.dataset.mode; refreshWeakRow(); saveQuizSettings(); });
 });
-document.getElementById('srs-mode-group').querySelectorAll('.chip').forEach(chip => {
+document.getElementById('srs-mode-group')?.querySelectorAll('.chip').forEach(chip => {
   chip.addEventListener('click', () => { srsMode = chip.dataset.mode; refreshSrsRow(); saveQuizSettings(); });
 });
 

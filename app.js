@@ -817,7 +817,9 @@ function finishQuestion(ok, method, delay, userAnswer) {
         ${hit.ex2 ? `<div class="ex">${escHtml(hit.ex2)} <button class="speak-btn" data-text="${escAttr(hit.ex2)}">🔊</button></div><div class="ja">${escHtml(hit.ja2 || '')}</div>` : ''}
       `;
     } else {
-      wrongInfoEl.innerHTML = `<div class="wrong-info-title">あなたの回答「${escHtml(cleanedInput)}」</div><div class="wrong-info-meaning">この単語帳にありません。</div>`;
+      wrongInfoEl.innerHTML = `<div class="wrong-info-title">あなたの回答「${escHtml(cleanedInput)}」</div><div class="wrong-info-meaning">この単語帳にありません。</div><button class="btn-ghost btn-block" id="wrong-add-dict-btn">辞書に追加する</button>`;
+      const addBtn = document.getElementById('wrong-add-dict-btn');
+      if (addBtn) addBtn.addEventListener('click', () => goToAddDict(cleanedInput));
     }
   } else {
     wrongInfoEl.hidden = true;
@@ -1066,6 +1068,57 @@ document.getElementById('list-sort').addEventListener('change', renderWordList);
 document.getElementById('marked-only-toggle').addEventListener('change', renderWordList);
 
 // ===================== UI: 辞書に追加 =====================
+function goToAddDict(verb) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.tab[data-tab="dict"]').classList.add('active');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-dict').classList.add('active');
+  document.getElementById('d-verb').value = verb;
+  renderMyWordList();
+  renderSharedWordList();
+  refreshAiFillBtn();
+}
+
+function refreshAiFillBtn() {
+  const btn = document.getElementById('ai-fill-btn');
+  if (!btn) return;
+  btn.hidden = !(typeof AI_WORKER_URL !== 'undefined' && AI_WORKER_URL);
+}
+refreshAiFillBtn();
+
+document.getElementById('ai-fill-btn').addEventListener('click', async () => {
+  const verb = val('d-verb');
+  const statusEl = document.getElementById('ai-fill-status');
+  if (!verb) { toast('先に句動詞を入力してください'); return; }
+  const btn = document.getElementById('ai-fill-btn');
+  btn.disabled = true;
+  statusEl.hidden = false;
+  statusEl.textContent = 'Claudeに問い合わせ中…';
+  try {
+    const res = await fetch(AI_WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ verb }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      statusEl.textContent = '自動入力に失敗しました：' + data.error;
+    } else {
+      document.getElementById('d-meaning').value = data.meaning || '';
+      document.getElementById('d-def').value = data.def || '';
+      document.getElementById('d-ex1').value = data.ex1 || '';
+      document.getElementById('d-ja1').value = data.ja1 || '';
+      document.getElementById('d-ex2').value = data.ex2 || '';
+      document.getElementById('d-ja2').value = data.ja2 || '';
+      statusEl.textContent = '自動入力しました。内容を確認してから追加してください。';
+    }
+  } catch (e) {
+    statusEl.textContent = '通信に失敗しました。時間をおいて再度お試しください。';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 document.getElementById('dict-form').addEventListener('submit', e => {
   e.preventDefault();
   const w = {

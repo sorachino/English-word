@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=27">
+<link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
 
@@ -159,6 +159,8 @@
       <div class="form-title">マイ単語を追加</div>
       <label>句動詞 <span class="req">必須</span></label>
       <input type="text" id="d-verb" required placeholder="例: iron out">
+      <button type="button" class="btn-ghost btn-block" id="ai-fill-btn" hidden>✨ Claudeで自動入力</button>
+      <div class="empty-note" id="ai-fill-status" hidden></div>
       <label>意味（日本語） <span class="req">必須</span></label>
       <input type="text" id="d-meaning" required placeholder="例: （問題を）解決する、詰める">
       <label>English definition</label>
@@ -318,7 +320,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js?v=1"></script>
 <script src="tts-config.js?v=2"></script>
+<script src="ai-config.js?v=1"></script>
 <script src="data.js?v=4"></script>
-<script src="app.js?v=60"></script>
+<script src="app.js?v=61"></script>
 </body>
 </html>

@@ -437,3 +437,6 @@ select{
 }
 
 
+
+#ai-fill-btn{margin-top:8px; margin-bottom:14px; color:var(--navy); border-color:var(--navy);}
+#ai-fill-status{margin-top:-8px; margin-bottom:14px;}

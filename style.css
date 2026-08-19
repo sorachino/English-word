@@ -183,7 +183,7 @@ select{
 .self-grade-label{color:var(--ink-soft); font-size:12px; flex:none;}
 .self-grade-row b{color:var(--navy); font-size:16px; text-align:right;}
 .self-grade-buttons{display:flex; gap:8px; margin-top:12px;}
-.self-grade-buttons button{flex:1;}
+.self-grade-buttons button{flex:1 1 0; width:auto; margin-top:0; min-width:0;}
 #self-grade-wrong-btn{color:var(--hanko); border-color:var(--hanko);}
 .answer-form input{
   flex:1; padding:12px 14px; font-size:16px; border:1.5px solid var(--line);

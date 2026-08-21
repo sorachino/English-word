@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '89'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '90'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -306,16 +306,6 @@ function recordResult(verb, method) {
   } else {
     if (!weak[verb]) weak[verb] = { hint: 0, choice: 0, wrong: 0, okStreak: 0 };
     weak[verb].wrong = (weak[verb].wrong || 0) + 1;
-  }
-  // 上限30語：ヒントのみの語から間引く
-  let keys = Object.keys(weak);
-  if (keys.length > 30) {
-    keys.sort((x, y) => {
-      const sx = weak[x].wrong * 3 + weak[x].choice * 2 + weak[x].hint;
-      const sy = weak[y].wrong * 3 + weak[y].choice * 2 + weak[y].hint;
-      return sx - sy;
-    });
-    while (Object.keys(weak).length > 30) delete weak[keys.shift()];
   }
   saveJSON(LS.WEAK, weak);
 }

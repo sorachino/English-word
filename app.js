@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '90'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '91'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -154,12 +154,16 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, strictOnly) {
 
   let picks = [];
   if (strictOnly && (weakOn || srsOn)) {
-    // 優先条件を満たす語だけのプールから、優先度順にそのまま採用
+    // 優先条件を満たす語だけのプールから、優先度順にそのまま採用。
+    // 同点（苦手語は一律同スコア）だと安定ソートで元のデータ順になり、データ上近い位置に
+    // 固まっている似た語ばかり選ばれてしまうため、ソート前に必ずシャッフルしておく。
+    shuffle(pool);
     pool.sort((a, b) => priority(a) - priority(b));
     picks = pool.slice(0, count);
   } else if (weakOn || srsOn) {
     // 優先条件を満たす語を最大30%確保し、残りはランダム
     const priorityPool = pool.filter(w => (weakOn && isWeak(w)) || (srsOn && isDue(w)));
+    shuffle(priorityPool); // 同点時の並びが常にデータ順に偏らないように
     priorityPool.sort((a, b) => priority(a) - priority(b));
     const n = Math.min(Math.ceil(count * 0.3), priorityPool.length, count);
     picks = priorityPool.slice(0, n);

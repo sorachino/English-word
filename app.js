@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '82'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '84'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1441,7 +1441,7 @@ document.getElementById('ai-fill-btn').addEventListener('click', async () => {
     const res = await fetch(AI_WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ verb }),
+      body: JSON.stringify({ verb, groupOptions: allGroupEntries() }),
     });
     const data = await res.json();
     if (data.error) {
@@ -1453,7 +1453,30 @@ document.getElementById('ai-fill-btn').addEventListener('click', async () => {
       document.getElementById('d-ja1').value = data.ja1 || '';
       document.getElementById('d-ex2').value = data.ex2 || '';
       document.getElementById('d-ja2').value = data.ja2 || '';
-      statusEl.textContent = '自動入力しました。内容を確認してから追加してください。';
+
+      let groupLine = '';
+      const existingId = data.suggestedGroupId || '';
+      const newLabel = data.suggestedNewGroupLabel || '';
+      const suggestedNote = data.suggestedGroupNote || '';
+      if (existingId && allGroupEntries().some(g => g.id === existingId)) {
+        document.getElementById('d-group-mode').value = 'existing';
+        populateGroupExistingSelect();
+        document.getElementById('d-group-existing').value = existingId;
+        updateGroupModeUI();
+        document.getElementById('d-group-note').value = suggestedNote;
+        const label = allGroupEntries().find(g => g.id === existingId).label;
+        groupLine = `<br>グループ提案：既存「${escHtml(label)}」（理由：${escHtml(data.groupReason || '')}）`;
+      } else if (newLabel) {
+        document.getElementById('d-group-mode').value = 'new';
+        document.getElementById('d-group-new-label').value = newLabel;
+        updateGroupModeUI();
+        document.getElementById('d-group-note').value = suggestedNote;
+        groupLine = `<br>グループ提案：新規「${escHtml(newLabel)}」（理由：${escHtml(data.groupReason || '')}）`;
+      } else {
+        document.getElementById('d-group-mode').value = 'none';
+        updateGroupModeUI();
+      }
+      statusEl.innerHTML = '自動入力しました。内容を確認してから追加してください。' + groupLine;
     }
   } catch (e) {
     statusEl.textContent = '通信に失敗しました。時間をおいて再度お試しください。';

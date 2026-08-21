@@ -320,10 +320,11 @@ select{
 .form-title{font-weight:900; font-size:16px; margin-bottom:12px; color:var(--navy);}
 .dict-form label{display:block; font-size:12px; font-weight:700; color:var(--ink-soft); margin:10px 0 4px;}
 .dict-form .req{color:var(--hanko); font-weight:700;}
-.dict-form input{
+.dict-form input, .dict-form select, .dict-form textarea{
   width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:6px;
   font-family:inherit; font-size:14px; background:#fff;
 }
+.dict-form textarea{resize:vertical; min-height:64px; line-height:1.6;}
 .my-words-head{font-weight:700; font-size:13.5px; color:var(--ink-soft); margin:18px 0 8px;}
 
 /* ---------- Stats ---------- */

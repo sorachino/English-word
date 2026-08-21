@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '79'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '81'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -23,6 +23,8 @@ const LS = {
   LOG: 'pv_daily_log',      // { "2026-08-15": {solved:10, correct:8} }
   SRS: 'pv_srs',            // { "verb": {interval:N, dueDate:'YYYY-MM-DD', reps:N} }
   MATCH_RECENT_GROUPS: 'pv_match_recent_groups', // マッチングゲームで直近使った意味グループの履歴（同じグループの連発を防ぐ）
+  CUSTOM_GROUPS: 'pv_custom_groups',       // { [customGroupId]: {label, note} } ユーザーが自分で作った使い分けグループ
+  GROUP_NOTE_EXTRA: 'pv_group_note_extra', // { [groupId]: "追記文" } 既存グループの解説文への手動追記
 };
 
 // Firebase接続の使い回し用（宣言はファイル先頭で行う。
@@ -358,9 +360,9 @@ document.querySelectorAll('.tab').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'list') renderWordList();
-    if (btn.dataset.tab === 'dict') { renderMyWordList(); renderSharedWordList(); }
+    if (btn.dataset.tab === 'dict') { renderMyWordList(); renderSharedWordList(); pullGlobalGroupDefs(); }
     if (btn.dataset.tab === 'stats') { renderStats(); renderLeaderboard(); updateLbNameDisplay(); renderChampionCalendar(); }
-    if (btn.dataset.tab === 'nuance') { renderNuanceList(); }
+    if (btn.dataset.tab === 'nuance') { pullGlobalGroupDefs(); renderNuanceList(); }
   });
 });
 
@@ -553,11 +555,16 @@ function wordNuanceCardHtml(pair) {
 
 // group1件分の「使い分け」カードのHTMLを組み立てる（マッチングゲーム完了時と使い分けタブで共通利用）
 function nuanceCardHtml(group) {
-  if (!group || typeof GROUP_INFO === 'undefined' || !GROUP_INFO[group]) return '';
-  const info = GROUP_INFO[group];
+  if (!group) return '';
+  const customGroups = loadJSON(LS.CUSTOM_GROUPS, {});
+  const extraNotes = loadJSON(LS.GROUP_NOTE_EXTRA, {});
+  const label = (GROUP_INFO[group] && GROUP_INFO[group].label) || (customGroups[group] && customGroups[group].label);
+  if (!label) return '';
+  let note = (GROUP_INFO[group] && GROUP_INFO[group].note) || (customGroups[group] && customGroups[group].note) || '';
+  if (extraNotes[group]) note = note ? note + '\n（追記）' + extraNotes[group] : extraNotes[group];
   return `<div class="nuance-card">
-      <div class="nuance-label">${escHtml(info.label)}</div>
-      <div class="nuance-note">${escHtml(info.note)}</div>
+      <div class="nuance-label">${escHtml(label)}</div>
+      <div class="nuance-note">${escHtml(note)}</div>
     </div>`;
 }
 
@@ -1446,16 +1453,43 @@ document.getElementById('ai-fill-btn').addEventListener('click', async () => {
   }
 });
 
-function suggestGroupForMeaning(meaning) {
-  const segs = (meaning || '').split(/[、\/／]/).map(s => s.trim()).filter(s => s.length >= 2);
-  if (!segs.length) return '';
-  for (const w of PV_DATA) {
-    if (!w.group) continue;
-    const wSegs = (w.meaning || '').split(/[、\/／]/).map(s => s.trim()).filter(s => s.length >= 2);
-    if (segs.some(s => wSegs.some(ws => ws.includes(s) || s.includes(ws)))) return w.group;
-  }
-  return '';
+// ===================== 使い分けグループ：手動選択 =====================
+// 自動判定（文字列一致）は誤判定（例：関係ない語が"批判する"つながりで同じグループに混入する）が
+// 起きるため廃止。ユーザーが「グループなし／既存グループ／新規グループ」を明示的に選ぶ方式にする。
+function allGroupEntries() {
+  const custom = loadJSON(LS.CUSTOM_GROUPS, {});
+  const entries = Object.keys(GROUP_INFO || {}).map(id => ({ id, label: GROUP_INFO[id].label }));
+  Object.keys(custom).forEach(id => entries.push({ id, label: custom[id].label }));
+  entries.sort((a, b) => a.label.localeCompare(b.label, 'ja'));
+  return entries;
 }
+function populateGroupExistingSelect() {
+  const sel = document.getElementById('d-group-existing');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '';
+  allGroupEntries().forEach(({ id, label }) => {
+    const opt = document.createElement('option');
+    opt.value = id; opt.textContent = label;
+    sel.appendChild(opt);
+  });
+  if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+}
+populateGroupExistingSelect();
+pullGlobalGroupDefs();
+
+function updateGroupModeUI() {
+  const mode = document.getElementById('d-group-mode').value;
+  document.getElementById('d-group-existing').hidden = mode !== 'existing';
+  document.getElementById('d-group-new-label').hidden = mode !== 'new';
+  document.getElementById('d-group-note-label').hidden = mode === 'none';
+  document.getElementById('d-group-note').hidden = mode === 'none';
+  const noteLabel = document.getElementById('d-group-note-label');
+  if (mode === 'existing') noteLabel.textContent = '使い分けメモ（このグループの解説に追記されます・任意）';
+  else if (mode === 'new') noteLabel.textContent = 'このグループの使い分け解説（任意）';
+}
+document.getElementById('d-group-mode').addEventListener('change', updateGroupModeUI);
+updateGroupModeUI();
 
 document.getElementById('dict-form').addEventListener('submit', e => {
   e.preventDefault();
@@ -1465,12 +1499,42 @@ document.getElementById('dict-form').addEventListener('submit', e => {
     note: val('d-note'),
   };
   if (!w.verb || !w.meaning) return;
-  w.group = suggestGroupForMeaning(w.meaning);
+
+  const groupMode = document.getElementById('d-group-mode').value;
+  const groupNote = val('d-group-note');
+  if (groupMode === 'existing') {
+    w.group = document.getElementById('d-group-existing').value || '';
+    if (w.group && groupNote) {
+      const extra = loadJSON(LS.GROUP_NOTE_EXTRA, {});
+      const merged = extra[w.group] ? extra[w.group] + '\n' + groupNote : groupNote;
+      extra[w.group] = merged;
+      saveJSON(LS.GROUP_NOTE_EXTRA, extra);
+      pushGroupNoteExtraToCloud(w.group, merged);
+    }
+  } else if (groupMode === 'new') {
+    const label = val('d-group-new-label');
+    if (label) {
+      const id = 'custom_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      const custom = loadJSON(LS.CUSTOM_GROUPS, {});
+      custom[id] = { label, note: groupNote || '' };
+      saveJSON(LS.CUSTOM_GROUPS, custom);
+      pushCustomGroupToCloud(id, label, groupNote || '');
+      w.group = id;
+      populateGroupExistingSelect();
+    } else {
+      w.group = '';
+    }
+  } else {
+    w.group = '';
+  }
+
   const list = myWords();
   list.push(w);
   saveJSON(LS.MY_WORDS, list);
   pushMyWordsToCloud();
   e.target.reset();
+  document.getElementById('d-group-mode').value = 'none';
+  updateGroupModeUI();
   toast('辞書に追加しました');
   renderMyWordList();
 });
@@ -1483,6 +1547,15 @@ function renderNuanceList() {
   if (!listEl) return;
   if (typeof GROUP_INFO === 'undefined') { listEl.innerHTML = '<div class="empty-note">グループ情報が読み込めませんでした。</div>'; return; }
 
+  const customGroups = loadJSON(LS.CUSTOM_GROUPS, {});
+  const extraNotes = loadJSON(LS.GROUP_NOTE_EXTRA, {});
+  function labelOf(gid) { return (GROUP_INFO[gid] && GROUP_INFO[gid].label) || (customGroups[gid] && customGroups[gid].label) || gid; }
+  function noteOf(gid) {
+    let note = (GROUP_INFO[gid] && GROUP_INFO[gid].note) || (customGroups[gid] && customGroups[gid].note) || '';
+    if (extraNotes[gid]) note = note ? note + '\n（追記）' + extraNotes[gid] : extraNotes[gid];
+    return note;
+  }
+
   const words = allWords();
   const byGroup = {};
   words.forEach(w => {
@@ -1491,13 +1564,13 @@ function renderNuanceList() {
     byGroup[w.group].push(w);
   });
 
-  const groupIds = Object.keys(GROUP_INFO).filter(gid => (byGroup[gid] || []).length >= 2);
-  groupIds.sort((a, b) => GROUP_INFO[a].label.localeCompare(GROUP_INFO[b].label, 'ja'));
+  const allGroupIds = [...new Set([...Object.keys(GROUP_INFO), ...Object.keys(customGroups)])];
+  const groupIds = allGroupIds.filter(gid => (byGroup[gid] || []).length >= 2);
+  groupIds.sort((a, b) => labelOf(a).localeCompare(labelOf(b), 'ja'));
 
   const filtered = groupIds.filter(gid => {
     if (!q) return true;
-    const info = GROUP_INFO[gid];
-    if (info.label.toLowerCase().includes(q)) return true;
+    if (labelOf(gid).toLowerCase().includes(q)) return true;
     return (byGroup[gid] || []).some(w => baseForm(w.verb).toLowerCase().includes(q));
   });
 
@@ -1505,15 +1578,14 @@ function renderNuanceList() {
   if (!filtered.length) { listEl.innerHTML = '<div class="empty-note">該当するグループがありません。</div>'; return; }
 
   filtered.forEach(gid => {
-    const info = GROUP_INFO[gid];
     const members = byGroup[gid];
     const card = document.createElement('div');
     card.className = 'nuance-card';
     const verbsHtml = members.map(w => `<span class="nuance-verb-chip">${escHtml(baseForm(w.verb))}</span>`).join('');
     card.innerHTML = `
-      <div class="nuance-label">${escHtml(info.label)}</div>
+      <div class="nuance-label">${escHtml(labelOf(gid))}</div>
       <div class="nuance-verbs">${verbsHtml}</div>
-      <div class="nuance-note">${escHtml(info.note)}</div>
+      <div class="nuance-note">${escHtml(noteOf(gid))}</div>
     `;
     listEl.appendChild(card);
   });
@@ -1741,6 +1813,58 @@ function ensureNickname() {
 }
 
 function sanitizeKey(k) { return String(k).replace(/[.#$/\[\]]/g, '_'); }
+
+// 使い分けの「新規グループ」「既存グループへの追記メモ」はユーザー個人のデータではなく、
+// 単語データと同じ「共有の参照情報」なので、users/{nickname}配下ではなくトップレベルの
+// customGroups / groupNoteExtra に置き、誰の端末からでも同じ内容が見えるようにする。
+function pushCustomGroupToCloud(id, label, note) {
+  const db = initFirebase();
+  if (!db) return;
+  db.ref(`customGroups/${id}`).set({ label, note: note || '' }).catch(() => {});
+}
+function pushGroupNoteExtraToCloud(groupId, mergedText) {
+  const db = initFirebase();
+  if (!db) return;
+  db.ref(`groupNoteExtra/${groupId}`).set(mergedText).catch(() => {});
+}
+function pullGlobalGroupDefs() {
+  const db = initFirebase();
+  if (!db) return;
+  db.ref('customGroups').get().then(snap => {
+    const cloud = snap.val() || {};
+    const local = loadJSON(LS.CUSTOM_GROUPS, {});
+    let changed = false;
+    Object.entries(cloud).forEach(([id, v]) => {
+      if (!v || local[id]) return;
+      local[id] = { label: v.label || id, note: v.note || '' };
+      changed = true;
+    });
+    if (changed) {
+      saveJSON(LS.CUSTOM_GROUPS, local);
+      populateGroupExistingSelect();
+      const nuanceView = document.getElementById('view-nuance');
+      if (nuanceView && nuanceView.classList.contains('active')) renderNuanceList();
+    }
+  }).catch(() => {});
+  db.ref('groupNoteExtra').get().then(snap => {
+    const cloud = snap.val() || {};
+    const local = loadJSON(LS.GROUP_NOTE_EXTRA, {});
+    let changed = false;
+    Object.entries(cloud).forEach(([gid, cloudText]) => {
+      if (!cloudText) return;
+      const localText = local[gid] || '';
+      const localLines = localText ? localText.split('\n') : [];
+      const cloudLines = cloudText.split('\n');
+      const merged = [...new Set([...localLines, ...cloudLines].filter(Boolean))].join('\n');
+      if (merged !== localText) { local[gid] = merged; changed = true; }
+    });
+    if (changed) {
+      saveJSON(LS.GROUP_NOTE_EXTRA, local);
+      const nuanceView = document.getElementById('view-nuance');
+      if (nuanceView && nuanceView.classList.contains('active')) renderNuanceList();
+    }
+  }).catch(() => {});
+}
 
 function pushMyWordsToCloud() {
   const db = initFirebase();

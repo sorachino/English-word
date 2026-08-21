@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '85'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '86'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -2021,6 +2021,17 @@ function pullAndMergeCloud(nickname) {
       if (sub) { saveJSON(LS.WEAK, localWeak); changed = true; }
     }
 
+    if (cloud.srs && typeof cloud.srs === 'object') {
+      const localSrs = loadJSON(LS.SRS, {});
+      let sub = false;
+      Object.entries(cloud.srs).forEach(([verb, cs]) => {
+        if (!cs || localSrs[verb]) return;
+        localSrs[verb] = { interval: cs.interval || 1, dueDate: cs.dueDate || todayKey(), reps: cs.reps || 0 };
+        sub = true;
+      });
+      if (sub) { saveJSON(LS.SRS, localSrs); changed = true; }
+    }
+
     if (cloud.log && typeof cloud.log === 'object') {
       const localLog = loadJSON(LS.LOG, {});
       let sub = false;
@@ -2114,6 +2125,10 @@ function syncLeaderboard(verb, ok) {
     updates[`users/${nickname}/weak/${safeVerb}`] = weak[verb] || null;
     const answered = loadJSON(LS_ANSWERED, {});
     updates[`users/${nickname}/answered/${safeVerb}`] = answered[verb] || null;
+    // 復習（SRS）データもクラウドに保存。ローカルのキャッシュだけに依存すると
+    // 端末やブラウザのキャッシュを消した時に復習間隔がリセットされてしまうため。
+    const srs = loadJSON(LS.SRS, {});
+    updates[`users/${nickname}/srs/${safeVerb}`] = srs[verb] || null;
   }
   updates[`users/${nickname}/myWords`] = myWords();
   db.ref().update(updates).catch(() => {});

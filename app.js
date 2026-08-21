@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '75'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '76'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -509,13 +509,13 @@ function startMatchingGame() {
   shuffle(chosen);
 
   matchState = {
-    pairs: chosen.map(w => ({ verb: baseForm(w.verb), meaning: w.meaning, group: w.group || '' })),
+    pairs: chosen.map(w => ({ verb: baseForm(w.verb), meaning: w.meaning, group: w.group || '', nuance: w.nuance || '' })),
     verbOrder: shuffle(chosen.map(w => baseForm(w.verb))),
     meaningOrder: shuffle(chosen.map(w => w.meaning)),
     matched: new Set(),
     selectedVerb: null,
     selectedMeaning: null,
-    lastNuanceGroup: null,
+    lastMatchedPair: null,
   };
   document.getElementById('quiz-setup').hidden = true;
   document.getElementById('quiz-play').hidden = true;
@@ -524,7 +524,16 @@ function startMatchingGame() {
   renderMatchBoard();
 }
 
-// group1件分の「使い分け」カードのHTMLを組み立てる（マッチングゲームと使い分けタブで共通利用）
+// 正解したその語1件分のニュアンス解説カードのHTML（データ内の各語が個別に持つ nuance フィールドを使う）
+function wordNuanceCardHtml(pair) {
+  if (!pair || !pair.nuance) return '';
+  return `<div class="nuance-card">
+      <div class="nuance-label">${escHtml(pair.verb)}</div>
+      <div class="nuance-note">${escHtml(pair.nuance)}</div>
+    </div>`;
+}
+
+// group1件分の「使い分け」カードのHTMLを組み立てる（マッチングゲーム完了時と使い分けタブで共通利用）
 function nuanceCardHtml(group) {
   if (!group || typeof GROUP_INFO === 'undefined' || !GROUP_INFO[group]) return '';
   const info = GROUP_INFO[group];
@@ -573,9 +582,9 @@ function renderMatchBoard() {
       } else {
         nuanceEl.hidden = true;
       }
-    } else if (matchState.lastNuanceGroup) {
-      // 途中：直近に正解したペアの意味グループの解説を簡易表示
-      const html = nuanceCardHtml(matchState.lastNuanceGroup);
+    } else if (matchState.lastMatchedPair) {
+      // 途中：直近に正解したペア自体の語のニュアンス解説を簡易表示
+      const html = wordNuanceCardHtml(matchState.lastMatchedPair);
       if (html) { nuanceEl.innerHTML = html; nuanceEl.hidden = false; }
       else nuanceEl.hidden = true;
     } else {
@@ -607,7 +616,7 @@ function tryResolveMatch() {
   const pair = matchState.pairs.find(p => p.verb === matchState.selectedVerb);
   if (pair && pair.meaning === matchState.selectedMeaning) {
     matchState.matched.add(matchState.selectedVerb);
-    matchState.lastNuanceGroup = pair.group || null;
+    matchState.lastMatchedPair = pair;
   } else {
     toast('不一致です、もう一度');
   }

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '72'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '73'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -457,18 +457,33 @@ function startMatchingGame() {
   usableGroups.sort((a, b) => b.length - a.length);
 
   let chosen = [];
+  const usedVerbKeys = new Set();
+  const usedMeanings = new Set();
+  function tryAdd(w) {
+    if (chosen.length >= roundSize) return;
+    if (chosen.includes(w)) return;
+    const vKey = baseForm(w.verb);
+    const mKey = w.meaning;
+    if (usedVerbKeys.has(vKey) || usedMeanings.has(mKey)) return; // 見た目が同じ札になるものは弾く
+    chosen.push(w);
+    usedVerbKeys.add(vKey);
+    usedMeanings.add(mKey);
+  }
   for (const grp of usableGroups) {
     const shuffledGrp = shuffle(grp.slice());
     for (const w of shuffledGrp) {
       if (chosen.length >= roundSize) break;
-      if (!chosen.includes(w)) chosen.push(w);
+      tryAdd(w);
     }
     if (chosen.length >= roundSize) break;
   }
   if (chosen.length < roundSize) {
     const rest = words.filter(w => !chosen.includes(w));
     shuffle(rest);
-    while (chosen.length < roundSize && rest.length) chosen.push(rest.shift());
+    for (const w of rest) {
+      if (chosen.length >= roundSize) break;
+      tryAdd(w);
+    }
   }
   shuffle(chosen);
 

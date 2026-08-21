@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="81">
+<meta name="build-version" content="82">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -219,7 +219,8 @@
       <label id="d-group-note-label" hidden>使い分けメモ（このグループ内での違いなど）</label>
       <textarea id="d-group-note" hidden placeholder="例：〜は物理的に壊す意味合いが強く、〜は主に比喩的な批判で使う"></textarea>
 
-      <button type="submit" class="btn-primary">辞書に追加</button>
+      <button type="submit" class="btn-primary" id="dict-submit-btn">辞書に追加</button>
+      <button type="button" class="btn-ghost" id="dict-cancel-edit-btn" hidden>編集をキャンセル</button>
     </form>
 
     <div class="my-words-head">追加した単語（<span id="my-count">0</span>）</div>
@@ -374,6 +375,6 @@
 <script src="tts-config.js?v=2"></script>
 <script src="ai-config.js?v=1"></script>
 <script src="data.js?v=7"></script>
-<script src="app.js?v=81"></script>
+<script src="app.js?v=82"></script>
 </body>
 </html>

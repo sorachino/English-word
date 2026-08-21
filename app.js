@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '81'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '82'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1384,6 +1384,7 @@ function wordItemEl(w) {
       ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
       ${w.def ? `<div class="def">${escHtml(w.def)}</div>` : ''}
       ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
+      ${(w.mine && typeof w.no === 'string' && w.no.startsWith('M')) ? '<button type="button" class="btn-ghost btn-block wi-edit-btn">編集する</button>' : ''}
     </div>`;
   div.querySelector('.wi-mark').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1391,6 +1392,14 @@ function wordItemEl(w) {
     e.currentTarget.textContent = nowOn ? '★' : '☆';
     e.currentTarget.classList.toggle('on', nowOn);
   });
+  const editBtn = div.querySelector('.wi-edit-btn');
+  if (editBtn) {
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(w.no.slice(1), 10) - 1;
+      startEditWord(idx);
+    });
+  }
   div.addEventListener('click', () => div.classList.toggle('open'));
   return div;
 }
@@ -1478,18 +1487,81 @@ function populateGroupExistingSelect() {
 populateGroupExistingSelect();
 pullGlobalGroupDefs();
 
+let editingWordIndex = null; // nullなら新規追加、数値ならmyWords()内のそのindexを編集中
+function currentNoteForGroup(gid) {
+  if (!gid) return '';
+  const custom = loadJSON(LS.CUSTOM_GROUPS, {});
+  if (custom[gid]) return custom[gid].note || '';
+  const extra = loadJSON(LS.GROUP_NOTE_EXTRA, {});
+  return extra[gid] || '';
+}
+
 function updateGroupModeUI() {
   const mode = document.getElementById('d-group-mode').value;
-  document.getElementById('d-group-existing').hidden = mode !== 'existing';
-  document.getElementById('d-group-new-label').hidden = mode !== 'new';
-  document.getElementById('d-group-note-label').hidden = mode === 'none';
-  document.getElementById('d-group-note').hidden = mode === 'none';
+  const existingSel = document.getElementById('d-group-existing');
   const noteLabel = document.getElementById('d-group-note-label');
-  if (mode === 'existing') noteLabel.textContent = '使い分けメモ（このグループの解説に追記されます・任意）';
-  else if (mode === 'new') noteLabel.textContent = 'このグループの使い分け解説（任意）';
+  const noteField = document.getElementById('d-group-note');
+  existingSel.hidden = mode !== 'existing';
+  document.getElementById('d-group-new-label').hidden = mode !== 'new';
+  noteLabel.hidden = mode === 'none';
+  noteField.hidden = mode === 'none';
+
+  if (mode === 'existing') {
+    if (editingWordIndex !== null) {
+      noteLabel.textContent = 'このグループの使い分け解説を編集（既存の内容を書き換えます）';
+      noteField.value = currentNoteForGroup(existingSel.value);
+    } else {
+      noteLabel.textContent = '使い分けメモ（このグループの解説に追記されます・任意）';
+    }
+  } else if (mode === 'new') {
+    noteLabel.textContent = 'このグループの使い分け解説（任意）';
+  }
 }
 document.getElementById('d-group-mode').addEventListener('change', updateGroupModeUI);
+document.getElementById('d-group-existing').addEventListener('change', updateGroupModeUI);
 updateGroupModeUI();
+
+function startEditWord(idx) {
+  const list = myWords();
+  const w = list[idx];
+  if (!w) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.tab[data-tab="dict"]').classList.add('active');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-dict').classList.add('active');
+
+  editingWordIndex = idx;
+  document.getElementById('d-verb').value = w.verb || '';
+  document.getElementById('d-meaning').value = w.meaning || '';
+  document.getElementById('d-def').value = w.def || '';
+  document.getElementById('d-ex1').value = w.ex1 || '';
+  document.getElementById('d-ja1').value = w.ja1 || '';
+  document.getElementById('d-ex2').value = w.ex2 || '';
+  document.getElementById('d-ja2').value = w.ja2 || '';
+  document.getElementById('d-note').value = w.note || '';
+
+  populateGroupExistingSelect();
+  if (w.group) {
+    document.getElementById('d-group-mode').value = 'existing';
+    document.getElementById('d-group-existing').value = w.group;
+  } else {
+    document.getElementById('d-group-mode').value = 'none';
+  }
+  updateGroupModeUI();
+
+  document.getElementById('dict-submit-btn').textContent = '更新する';
+  document.getElementById('dict-cancel-edit-btn').hidden = false;
+  document.getElementById('d-verb').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function cancelEditWord() {
+  editingWordIndex = null;
+  document.getElementById('dict-form').reset();
+  document.getElementById('d-group-mode').value = 'none';
+  updateGroupModeUI();
+  document.getElementById('dict-submit-btn').textContent = '辞書に追加';
+  document.getElementById('dict-cancel-edit-btn').hidden = true;
+}
+document.getElementById('dict-cancel-edit-btn').addEventListener('click', cancelEditWord);
 
 document.getElementById('dict-form').addEventListener('submit', e => {
   e.preventDefault();
@@ -1500,16 +1572,33 @@ document.getElementById('dict-form').addEventListener('submit', e => {
   };
   if (!w.verb || !w.meaning) return;
 
+  const isEdit = editingWordIndex !== null;
   const groupMode = document.getElementById('d-group-mode').value;
   const groupNote = val('d-group-note');
   if (groupMode === 'existing') {
     w.group = document.getElementById('d-group-existing').value || '';
-    if (w.group && groupNote) {
-      const extra = loadJSON(LS.GROUP_NOTE_EXTRA, {});
-      const merged = extra[w.group] ? extra[w.group] + '\n' + groupNote : groupNote;
-      extra[w.group] = merged;
-      saveJSON(LS.GROUP_NOTE_EXTRA, extra);
-      pushGroupNoteExtraToCloud(w.group, merged);
+    if (w.group) {
+      const custom = loadJSON(LS.CUSTOM_GROUPS, {});
+      if (isEdit) {
+        // 編集時：解説文は追記ではなく、手動で書き換えた内容にそのまま置き換える
+        if (custom[w.group]) {
+          custom[w.group].note = groupNote;
+          saveJSON(LS.CUSTOM_GROUPS, custom);
+          pushCustomGroupToCloud(w.group, custom[w.group].label, groupNote);
+        } else {
+          const extra = loadJSON(LS.GROUP_NOTE_EXTRA, {});
+          extra[w.group] = groupNote;
+          saveJSON(LS.GROUP_NOTE_EXTRA, extra);
+          pushGroupNoteExtraToCloud(w.group, groupNote);
+        }
+      } else if (groupNote) {
+        // 新規追加時：既存の解説文に追記する
+        const extra = loadJSON(LS.GROUP_NOTE_EXTRA, {});
+        const merged = extra[w.group] ? extra[w.group] + '\n' + groupNote : groupNote;
+        extra[w.group] = merged;
+        saveJSON(LS.GROUP_NOTE_EXTRA, extra);
+        pushGroupNoteExtraToCloud(w.group, merged);
+      }
     }
   } else if (groupMode === 'new') {
     const label = val('d-group-new-label');
@@ -1529,14 +1618,22 @@ document.getElementById('dict-form').addEventListener('submit', e => {
   }
 
   const list = myWords();
-  list.push(w);
+  if (isEdit) {
+    if (!list[editingWordIndex]) { toast('編集対象が見つかりませんでした'); return; }
+    list[editingWordIndex] = w;
+  } else {
+    list.push(w);
+  }
   saveJSON(LS.MY_WORDS, list);
   pushMyWordsToCloud();
-  e.target.reset();
-  document.getElementById('d-group-mode').value = 'none';
-  updateGroupModeUI();
-  toast('辞書に追加しました');
+
+  const wasEdit = isEdit;
+  cancelEditWord(); // フォームのリセット・編集状態の解除をまとめて行う
+  toast(wasEdit ? '更新しました' : '辞書に追加しました');
   renderMyWordList();
+  renderWordList();
+  const nuanceView = document.getElementById('view-nuance');
+  if (nuanceView && nuanceView.classList.contains('active')) renderNuanceList();
 });
 function val(id) { return document.getElementById(id).value.trim(); }
 
@@ -1600,12 +1697,20 @@ function renderMyWordList() {
   if (!list.length) { el.innerHTML = '<div class="empty-note">まだ追加した単語はありません</div>'; return; }
   list.slice().reverse().forEach((w, i) => {
     const item = wordItemEl({ ...w, mine: true });
+    const idx = list.length - 1 - i;
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '編集'; editBtn.className = 'btn-ghost';
+    editBtn.style.marginTop = '8px'; editBtn.style.width = '100%';
+    editBtn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      startEditWord(idx);
+    });
+    item.querySelector('.wi-detail').appendChild(editBtn);
     const delBtn = document.createElement('button');
     delBtn.textContent = '削除'; delBtn.className = 'btn-ghost';
     delBtn.style.marginTop = '8px'; delBtn.style.width = '100%';
     delBtn.addEventListener('click', ev => {
       ev.stopPropagation();
-      const idx = list.length - 1 - i;
       list.splice(idx, 1);
       saveJSON(LS.MY_WORDS, list);
       pushMyWordsToCloud();

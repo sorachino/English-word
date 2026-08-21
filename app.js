@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '70'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '72'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -338,6 +338,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     if (btn.dataset.tab === 'list') renderWordList();
     if (btn.dataset.tab === 'dict') { renderMyWordList(); renderSharedWordList(); }
     if (btn.dataset.tab === 'stats') { renderStats(); renderLeaderboard(); updateLbNameDisplay(); renderChampionCalendar(); }
+    if (btn.dataset.tab === 'nuance') { renderNuanceList(); }
   });
 });
 
@@ -1337,6 +1338,17 @@ document.getElementById('ai-fill-btn').addEventListener('click', async () => {
   }
 });
 
+function suggestGroupForMeaning(meaning) {
+  const segs = (meaning || '').split(/[、\/／]/).map(s => s.trim()).filter(s => s.length >= 2);
+  if (!segs.length) return '';
+  for (const w of PV_DATA) {
+    if (!w.group) continue;
+    const wSegs = (w.meaning || '').split(/[、\/／]/).map(s => s.trim()).filter(s => s.length >= 2);
+    if (segs.some(s => wSegs.some(ws => ws.includes(s) || s.includes(ws)))) return w.group;
+  }
+  return '';
+}
+
 document.getElementById('dict-form').addEventListener('submit', e => {
   e.preventDefault();
   const w = {
@@ -1345,6 +1357,7 @@ document.getElementById('dict-form').addEventListener('submit', e => {
     note: val('d-note'),
   };
   if (!w.verb || !w.meaning) return;
+  w.group = suggestGroupForMeaning(w.meaning);
   const list = myWords();
   list.push(w);
   saveJSON(LS.MY_WORDS, list);
@@ -1354,6 +1367,50 @@ document.getElementById('dict-form').addEventListener('submit', e => {
   renderMyWordList();
 });
 function val(id) { return document.getElementById(id).value.trim(); }
+
+// ===================== UI: 使い分け =====================
+function renderNuanceList() {
+  const listEl = document.getElementById('nuance-list');
+  const q = (document.getElementById('nuance-search').value || '').trim().toLowerCase();
+  if (!listEl) return;
+  if (typeof GROUP_INFO === 'undefined') { listEl.innerHTML = '<div class="empty-note">グループ情報が読み込めませんでした。</div>'; return; }
+
+  const words = allWords();
+  const byGroup = {};
+  words.forEach(w => {
+    if (!w.group) return;
+    if (!byGroup[w.group]) byGroup[w.group] = [];
+    byGroup[w.group].push(w);
+  });
+
+  const groupIds = Object.keys(GROUP_INFO).filter(gid => (byGroup[gid] || []).length >= 2);
+  groupIds.sort((a, b) => GROUP_INFO[a].label.localeCompare(GROUP_INFO[b].label, 'ja'));
+
+  const filtered = groupIds.filter(gid => {
+    if (!q) return true;
+    const info = GROUP_INFO[gid];
+    if (info.label.toLowerCase().includes(q)) return true;
+    return (byGroup[gid] || []).some(w => baseForm(w.verb).toLowerCase().includes(q));
+  });
+
+  listEl.innerHTML = '';
+  if (!filtered.length) { listEl.innerHTML = '<div class="empty-note">該当するグループがありません。</div>'; return; }
+
+  filtered.forEach(gid => {
+    const info = GROUP_INFO[gid];
+    const members = byGroup[gid];
+    const card = document.createElement('div');
+    card.className = 'nuance-card';
+    const verbsHtml = members.map(w => `<span class="nuance-verb-chip">${escHtml(baseForm(w.verb))}</span>`).join('');
+    card.innerHTML = `
+      <div class="nuance-label">${escHtml(info.label)}</div>
+      <div class="nuance-verbs">${verbsHtml}</div>
+      <div class="nuance-note">${escHtml(info.note)}</div>
+    `;
+    listEl.appendChild(card);
+  });
+}
+document.getElementById('nuance-search').addEventListener('input', renderNuanceList);
 
 function renderMyWordList() {
   const list = myWords();

@@ -471,3 +471,16 @@ select{
 }
 .match-card.selected{border-color:var(--navy); background:var(--gold-soft); font-weight:700;}
 .match-card.matched{background:var(--ok-soft); border-color:var(--ok); color:var(--ok); cursor:default; opacity:.65;}
+
+/* ---------- 使い分けページ ---------- */
+.nuance-list{display:flex; flex-direction:column; gap:10px; margin-top:12px;}
+.nuance-card{
+  background:var(--paper-raised); border:1px solid var(--line); border-radius:10px; padding:14px;
+}
+.nuance-label{font-weight:900; font-size:15px; color:var(--navy); margin-bottom:6px;}
+.nuance-verbs{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;}
+.nuance-verb-chip{
+  font-family:"JetBrains Mono",monospace; font-size:12px; font-weight:700; color:var(--ink);
+  background:var(--gold-soft); border:1px solid var(--gold); border-radius:12px; padding:3px 10px;
+}
+.nuance-note{font-size:13px; color:var(--ink); line-height:1.7;}

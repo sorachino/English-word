@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '78'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '79'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -527,7 +527,7 @@ function startMatchingGame() {
   }
 
   matchState = {
-    pairs: chosen.map(w => ({ verb: baseForm(w.verb), meaning: w.meaning, group: w.group || '', nuance: w.nuance || '' })),
+    pairs: chosen.map(w => ({ verb: baseForm(w.verb), meaning: w.meaning, group: w.group || '', nuance: w.nuance || '', hadMistake: false })),
     verbOrder: shuffle(chosen.map(w => baseForm(w.verb))),
     meaningOrder: shuffle(chosen.map(w => w.meaning)),
     matched: new Set(),
@@ -612,8 +612,14 @@ function renderMatchBoard() {
 
   if (done && !matchState.counted) {
     matchState.counted = true;
-    logToday(true);
-    syncLeaderboard(null, true);
+    matchState.pairs.forEach(p => {
+      const ok = !p.hadMistake;
+      if (ok) recordResult(p.verb, 'first'); // 間違いなく正解＝苦手リストから外す（間違えた分は既に'wrong'で登録済みなので二重処理しない）
+      updateSrs(p.verb, ok, false);
+      recordAnswered(p.verb, ok);
+      logToday(ok);
+      syncLeaderboard(p.verb, ok);
+    });
     updateStreakPill();
     toast('全部そろいました！');
   }
@@ -625,6 +631,7 @@ function onTapMatchVerb(v) {
   renderMatchBoard();
 }
 function onTapMatchMeaning(m) {
+  if (!matchState.selectedVerb) { toast('先に句動詞を選んでください'); return; }
   matchState.selectedMeaning = matchState.selectedMeaning === m ? null : m;
   tryResolveMatch();
   renderMatchBoard();
@@ -637,6 +644,10 @@ function tryResolveMatch() {
     matchState.lastMatchedPair = pair;
   } else {
     toast('不一致です、もう一度');
+    if (pair) {
+      pair.hadMistake = true;
+      recordResult(pair.verb, 'wrong'); // 日本語訳を間違えたので、この句動詞を苦手単語に登録する
+    }
   }
   matchState.selectedVerb = null;
   matchState.selectedMeaning = null;

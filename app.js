@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '84'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '85'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -2413,7 +2413,20 @@ document.querySelectorAll('#lb-period-group .chip').forEach(chip => {
   });
 });
 
+function deleteCloudUser(name) {
+  const db = initFirebase();
+  if (!db || !name) return;
+  db.ref(`users/${name}`).remove().catch(() => {});
+  db.ref(`answers/${name}`).remove().catch(() => {});
+}
+
 document.getElementById('lb-rename-btn').addEventListener('click', () => {
+  const oldName = getNickname();
+  if (oldName) {
+    const ok = window.confirm(`名前を変更すると、古い名前「${oldName}」の記録（ランキング等）はクラウドから完全に削除されます。よろしいですか？\n（このデバイスに残っているクイズの記録・苦手単語などのローカルデータは消えません）`);
+    if (!ok) return;
+    deleteCloudUser(oldName);
+  }
   localStorage.removeItem('pv_nickname');
   ensureNickname();
   updateLbNameDisplay();

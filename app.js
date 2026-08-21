@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '76'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '77'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -22,6 +22,7 @@ const LS = {
   WEAK: 'pv_weak',          // { "verb": {level:'hint'|'choice'|'wrong', streak:0} }
   LOG: 'pv_daily_log',      // { "2026-08-15": {solved:10, correct:8} }
   SRS: 'pv_srs',            // { "verb": {interval:N, dueDate:'YYYY-MM-DD', reps:N} }
+  MATCH_RECENT_GROUPS: 'pv_match_recent_groups', // マッチングゲームで直近使った意味グループの履歴（同じグループの連発を防ぐ）
 };
 
 // Firebase接続の使い回し用（宣言はファイル先頭で行う。
@@ -474,8 +475,15 @@ function startMatchingGame() {
     byGroup[w.group].push(w);
   });
   const usableGroups = Object.values(byGroup).filter(arr => arr.length >= 2);
-  shuffle(usableGroups);
-  usableGroups.sort((a, b) => b.length - a.length);
+  // グループの大小で優先度をつけると毎回同じ大きいグループ（例：backの「return」）ばかりになるので、
+  // サイズでは並べ替えない。代わりに、直近使ったグループを後回しにして連続を防ぐ。
+  const recentGroupIds = loadJSON(LS.MATCH_RECENT_GROUPS, []);
+  const groupIdOf = arr => arr[0].group;
+  const freshGroups = usableGroups.filter(arr => !recentGroupIds.includes(groupIdOf(arr)));
+  const recentGroups = usableGroups.filter(arr => recentGroupIds.includes(groupIdOf(arr)));
+  shuffle(freshGroups);
+  shuffle(recentGroups);
+  const orderedGroups = freshGroups.concat(recentGroups); // 直近使ったグループは選択肢が尽きた場合のみ使う
 
   let chosen = [];
   const usedVerbKeys = new Set();
@@ -490,7 +498,7 @@ function startMatchingGame() {
     usedVerbKeys.add(vKey);
     usedMeanings.add(mKey);
   }
-  for (const grp of usableGroups) {
+  for (const grp of orderedGroups) {
     const shuffledGrp = shuffle(grp.slice());
     for (const w of shuffledGrp) {
       if (chosen.length >= roundSize) break;
@@ -507,6 +515,16 @@ function startMatchingGame() {
     }
   }
   shuffle(chosen);
+
+  // このラウンドで実際に使ったグループを履歴に記録し、次回以降は選ばれにくくする
+  const usedGroupIds = [...new Set(chosen.map(w => w.group).filter(Boolean))];
+  if (usedGroupIds.length) {
+    let recent = recentGroupIds.filter(g => !usedGroupIds.includes(g));
+    recent = recent.concat(usedGroupIds);
+    const MAX_RECENT = 3; // 直近3グループ分は次回以降で優先度を下げる
+    if (recent.length > MAX_RECENT) recent = recent.slice(recent.length - MAX_RECENT);
+    saveJSON(LS.MATCH_RECENT_GROUPS, recent);
+  }
 
   matchState = {
     pairs: chosen.map(w => ({ verb: baseForm(w.verb), meaning: w.meaning, group: w.group || '', nuance: w.nuance || '' })),

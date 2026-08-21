@@ -471,6 +471,10 @@ select{
 }
 .match-card.selected{border-color:var(--navy); background:var(--gold-soft); font-weight:700;}
 .match-card.matched{background:var(--ok-soft); border-color:var(--ok); color:var(--ok); cursor:default; opacity:.65;}
+.match-nuance{margin-bottom:14px;}
+.match-nuance .nuance-summary-title{font-weight:900; font-size:13.5px; color:var(--navy); margin-bottom:8px;}
+.match-nuance .nuance-card{margin-bottom:8px;}
+.match-nuance .nuance-card:last-child{margin-bottom:0;}
 
 /* ---------- 使い分けページ ---------- */
 .nuance-list{display:flex; flex-direction:column; gap:10px; margin-top:12px;}

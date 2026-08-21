@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '74'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '75'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -509,18 +509,29 @@ function startMatchingGame() {
   shuffle(chosen);
 
   matchState = {
-    pairs: chosen.map(w => ({ verb: baseForm(w.verb), meaning: w.meaning })),
+    pairs: chosen.map(w => ({ verb: baseForm(w.verb), meaning: w.meaning, group: w.group || '' })),
     verbOrder: shuffle(chosen.map(w => baseForm(w.verb))),
     meaningOrder: shuffle(chosen.map(w => w.meaning)),
     matched: new Set(),
     selectedVerb: null,
     selectedMeaning: null,
+    lastNuanceGroup: null,
   };
   document.getElementById('quiz-setup').hidden = true;
   document.getElementById('quiz-play').hidden = true;
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-match').hidden = false;
   renderMatchBoard();
+}
+
+// group1件分の「使い分け」カードのHTMLを組み立てる（マッチングゲームと使い分けタブで共通利用）
+function nuanceCardHtml(group) {
+  if (!group || typeof GROUP_INFO === 'undefined' || !GROUP_INFO[group]) return '';
+  const info = GROUP_INFO[group];
+  return `<div class="nuance-card">
+      <div class="nuance-label">${escHtml(info.label)}</div>
+      <div class="nuance-note">${escHtml(info.note)}</div>
+    </div>`;
 }
 
 function renderMatchBoard() {
@@ -550,6 +561,28 @@ function renderMatchBoard() {
   const done = matchState.matched.size === matchState.pairs.length;
   document.getElementById('match-again-btn').hidden = !done;
   document.getElementById('match-back-btn').hidden = !done;
+
+  const nuanceEl = document.getElementById('match-nuance');
+  if (nuanceEl) {
+    if (done) {
+      // 完了時：このラウンドに登場した意味グループをすべてまとめて表示
+      const groups = [...new Set(matchState.pairs.map(p => p.group).filter(Boolean))];
+      if (groups.length) {
+        nuanceEl.innerHTML = '<div class="nuance-summary-title">今回の使い分けまとめ</div>' + groups.map(nuanceCardHtml).join('');
+        nuanceEl.hidden = false;
+      } else {
+        nuanceEl.hidden = true;
+      }
+    } else if (matchState.lastNuanceGroup) {
+      // 途中：直近に正解したペアの意味グループの解説を簡易表示
+      const html = nuanceCardHtml(matchState.lastNuanceGroup);
+      if (html) { nuanceEl.innerHTML = html; nuanceEl.hidden = false; }
+      else nuanceEl.hidden = true;
+    } else {
+      nuanceEl.hidden = true;
+    }
+  }
+
   if (done && !matchState.counted) {
     matchState.counted = true;
     logToday(true);
@@ -574,6 +607,7 @@ function tryResolveMatch() {
   const pair = matchState.pairs.find(p => p.verb === matchState.selectedVerb);
   if (pair && pair.meaning === matchState.selectedMeaning) {
     matchState.matched.add(matchState.selectedVerb);
+    matchState.lastNuanceGroup = pair.group || null;
   } else {
     toast('不一致です、もう一度');
   }

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '69'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '70'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -444,29 +444,32 @@ function startMatchingGame() {
   if (words.length < 2) { toast('この範囲では作れませんでした'); return; }
   const roundSize = Math.min(6, words.length);
 
-  const pool = words.slice();
-  shuffle(pool);
-  function segsOf(m) { return (m || '').split(/[、\/／]/).map(s => s.trim()).filter(s => s.length >= 2); }
-  function overlapCount(seedWord) {
-    const seedSegs = segsOf(seedWord.meaning);
-    return pool.filter(w => w !== seedWord && segsOf(w.meaning).some(s => seedSegs.some(ss => ss.includes(s) || s.includes(ss)))).length;
-  }
-  // 候補シードを何個か試し、一番「相方」が多く見つかるものを採用する
-  let bestSeed = pool[0], bestCount = -1;
-  for (let i = 0; i < Math.min(10, pool.length); i++) {
-    const c = overlapCount(pool[i]);
-    if (c > bestCount) { bestCount = c; bestSeed = pool[i]; }
-  }
-  const seed = bestSeed;
-  const seedSegs = segsOf(seed.meaning);
-  const scored = pool.map(w => {
-    if (w === seed) return { w, score: 999 };
-    const segs = segsOf(w.meaning);
-    const overlap = segs.some(s => seedSegs.some(ss => ss.includes(s) || s.includes(ss)));
-    return { w, score: overlap ? 2 : Math.random() };
+  // 手動で作成した「意味グループ」から、このプール内で2語以上そろっているものを集める
+  const byGroup = {};
+  words.forEach(w => {
+    if (!w.group) return;
+    if (!byGroup[w.group]) byGroup[w.group] = [];
+    byGroup[w.group].push(w);
   });
-  scored.sort((a, b) => b.score - a.score);
-  const chosen = scored.slice(0, roundSize).map(x => x.w);
+  const usableGroups = Object.values(byGroup).filter(arr => arr.length >= 2);
+  shuffle(usableGroups);
+  usableGroups.sort((a, b) => b.length - a.length);
+
+  let chosen = [];
+  for (const grp of usableGroups) {
+    const shuffledGrp = shuffle(grp.slice());
+    for (const w of shuffledGrp) {
+      if (chosen.length >= roundSize) break;
+      if (!chosen.includes(w)) chosen.push(w);
+    }
+    if (chosen.length >= roundSize) break;
+  }
+  if (chosen.length < roundSize) {
+    const rest = words.filter(w => !chosen.includes(w));
+    shuffle(rest);
+    while (chosen.length < roundSize && rest.length) chosen.push(rest.shift());
+  }
+  shuffle(chosen);
 
   matchState = {
     pairs: chosen.map(w => ({ verb: baseForm(w.verb), meaning: w.meaning })),

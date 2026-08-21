@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '92'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '95'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -25,6 +25,7 @@ const LS = {
   MATCH_RECENT_GROUPS: 'pv_match_recent_groups', // マッチングゲームで直近使った意味グループの履歴（同じグループの連発を防ぐ）
   CUSTOM_GROUPS: 'pv_custom_groups',       // { [customGroupId]: {label, note} } ユーザーが自分で作った使い分けグループ
   GROUP_NOTE_EXTRA: 'pv_group_note_extra', // { [groupId]: "追記文" } 既存グループの解説文への手動追記
+  EXTRA_WORD_GROUPS: 'pv_extra_word_groups', // { [no]: [groupId, ...] } 402語の組み込みデータに後から追加されたグループ所属
 };
 
 // Firebase接続の使い回し用（宣言はファイル先頭で行う。
@@ -44,6 +45,21 @@ function myWords() { return loadJSON(LS.MY_WORDS, []); }
 function allWords() {
   const mine = myWords().map((w, i) => ({ ...w, stage: 0, no: 'M' + (i + 1), mine: true }));
   return PV_DATA.concat(mine);
+}
+// 単語が属する使い分けグループのidを配列で返す。
+// - groups配列（新形式）、旧形式の単一group文字列（後方互換）の両方に対応
+// - 402語の組み込みデータについては、後からAI検索などで追加された
+//   「追加グループ」（LS.EXTRA_WORD_GROUPS、noをキーに保持）も合算する
+function wordGroups(w) {
+  const base = Array.isArray(w.groups) ? w.groups.slice() : (w.group ? [w.group] : []);
+  if (w.no && typeof w.no !== 'undefined') {
+    const extra = loadJSON(LS.EXTRA_WORD_GROUPS, {});
+    const extraForWord = extra[w.no];
+    if (Array.isArray(extraForWord)) {
+      extraForWord.forEach(g => { if (!base.includes(g)) base.push(g); });
+    }
+  }
+  return base;
 }
 function baseForm(verb) {
   return verb.replace(/\s*\*\d+.*$/, '').replace(/\s*\(\d+\)\s*$/, '').trim();
@@ -224,7 +240,7 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, strictOnly) {
 // groupの多い方から交互に配置する貪欲法（タスクスケジューラ問題と同じ考え方）。
 // 1グループが全体の半数を超える場合は数学的に完全回避できないため、その分は諦めて最善を尽くす。
 function declusterByGroup(arr) {
-  const withKey = arr.map((w, idx) => ({ w, key: w.group || ('__none_' + idx) }));
+  const withKey = arr.map((w, idx) => ({ w, key: wordGroups(w)[0] || ('__none_' + idx) }));
   const buckets = {};
   withKey.forEach(it => { (buckets[it.key] = buckets[it.key] || []).push(it); });
   const result = [];
@@ -464,17 +480,19 @@ function startMatchingGame() {
   const roundSize = Math.min(6, words.length);
 
   // 手動で作成した「意味グループ」から、このプール内で2語以上そろっているものを集める
+  // 1語が複数グループに属する場合は、そのすべてのグループのバケツに入る
   const byGroup = {};
   words.forEach(w => {
-    if (!w.group) return;
-    if (!byGroup[w.group]) byGroup[w.group] = [];
-    byGroup[w.group].push(w);
+    wordGroups(w).forEach(gid => {
+      if (!byGroup[gid]) byGroup[gid] = [];
+      byGroup[gid].push(w);
+    });
   });
   const usableGroups = Object.values(byGroup).filter(arr => arr.length >= 2);
   // グループの大小で優先度をつけると毎回同じ大きいグループ（例：backの「return」）ばかりになるので、
   // サイズでは並べ替えない。代わりに、直近使ったグループを後回しにして連続を防ぐ。
   const recentGroupIds = loadJSON(LS.MATCH_RECENT_GROUPS, []);
-  const groupIdOf = arr => arr[0].group;
+  const groupIdOf = arr => wordGroups(arr[0]).find(g => byGroup[g] === arr) || wordGroups(arr[0])[0];
   const freshGroups = usableGroups.filter(arr => !recentGroupIds.includes(groupIdOf(arr)));
   const recentGroups = usableGroups.filter(arr => recentGroupIds.includes(groupIdOf(arr)));
   shuffle(freshGroups);
@@ -513,7 +531,7 @@ function startMatchingGame() {
   shuffle(chosen);
 
   // このラウンドで実際に使ったグループを履歴に記録し、次回以降は選ばれにくくする
-  const usedGroupIds = [...new Set(chosen.map(w => w.group).filter(Boolean))];
+  const usedGroupIds = [...new Set(chosen.flatMap(w => wordGroups(w)))];
   if (usedGroupIds.length) {
     let recent = recentGroupIds.filter(g => !usedGroupIds.includes(g));
     recent = recent.concat(usedGroupIds);
@@ -523,7 +541,7 @@ function startMatchingGame() {
   }
 
   matchState = {
-    pairs: chosen.map(w => ({ verb: baseForm(w.verb), meaning: w.meaning, group: w.group || '', nuance: w.nuance || '', hadMistake: false })),
+    pairs: chosen.map(w => ({ verb: baseForm(w.verb), meaning: w.meaning, groups: wordGroups(w), nuance: w.nuance || '', hadMistake: false })),
     verbOrder: shuffle(chosen.map(w => baseForm(w.verb))),
     meaningOrder: shuffle(chosen.map(w => w.meaning)),
     matched: new Set(),
@@ -593,8 +611,8 @@ function renderMatchBoard() {
   const nuanceEl = document.getElementById('match-nuance');
   if (nuanceEl) {
     if (done) {
-      // 完了時：このラウンドに登場した意味グループをすべてまとめて表示
-      const groups = [...new Set(matchState.pairs.map(p => p.group).filter(Boolean))];
+      // 完了時：このラウンドに登場した意味グループをすべてまとめて表示（1語が複数グループのこともある）
+      const groups = [...new Set(matchState.pairs.flatMap(p => p.groups || []))];
       if (groups.length) {
         nuanceEl.innerHTML = '<div class="nuance-summary-title">今回の使い分けまとめ</div>' + groups.map(nuanceCardHtml).join('');
         nuanceEl.hidden = false;
@@ -1458,22 +1476,19 @@ document.getElementById('ai-fill-btn').addEventListener('click', async () => {
       const newLabel = data.suggestedNewGroupLabel || '';
       const suggestedNote = data.suggestedGroupNote || '';
       if (existingId && allGroupEntries().some(g => g.id === existingId)) {
-        document.getElementById('d-group-mode').value = 'existing';
         populateGroupExistingSelect();
-        document.getElementById('d-group-existing').value = existingId;
+        const sel = document.getElementById('d-group-existing');
+        [...sel.options].forEach(o => { o.selected = o.value === existingId; });
+        document.getElementById('d-group-new-label').value = '';
         updateGroupModeUI();
         document.getElementById('d-group-note').value = suggestedNote;
         const label = allGroupEntries().find(g => g.id === existingId).label;
         groupLine = `<br>グループ提案：既存「${escHtml(label)}」（理由：${escHtml(data.groupReason || '')}）`;
       } else if (newLabel) {
-        document.getElementById('d-group-mode').value = 'new';
         document.getElementById('d-group-new-label').value = newLabel;
         updateGroupModeUI();
         document.getElementById('d-group-note').value = suggestedNote;
         groupLine = `<br>グループ提案：新規「${escHtml(newLabel)}」（理由：${escHtml(data.groupReason || '')}）`;
-      } else {
-        document.getElementById('d-group-mode').value = 'none';
-        updateGroupModeUI();
       }
       statusEl.innerHTML = '自動入力しました。内容を確認してから追加してください。' + groupLine;
     }
@@ -1497,14 +1512,14 @@ function allGroupEntries() {
 function populateGroupExistingSelect() {
   const sel = document.getElementById('d-group-existing');
   if (!sel) return;
-  const current = sel.value;
+  const current = [...sel.selectedOptions].map(o => o.value);
   sel.innerHTML = '';
   allGroupEntries().forEach(({ id, label }) => {
     const opt = document.createElement('option');
     opt.value = id; opt.textContent = label;
+    if (current.includes(id)) opt.selected = true;
     sel.appendChild(opt);
   });
-  if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
 }
 populateGroupExistingSelect();
 pullGlobalGroupDefs();
@@ -1518,29 +1533,33 @@ function currentNoteForGroup(gid) {
   return extra[gid] || '';
 }
 
+// 使い分けメモ欄は「新しいグループを作る」時、または（編集時に）既存グループを
+// ちょうど1つだけ選んでいる時だけ意味を持つ（複数グループに同じメモを付けるのは不自然なため）
 function updateGroupModeUI() {
-  const mode = document.getElementById('d-group-mode').value;
   const existingSel = document.getElementById('d-group-existing');
+  const newLabelInput = document.getElementById('d-group-new-label');
   const noteLabel = document.getElementById('d-group-note-label');
   const noteField = document.getElementById('d-group-note');
-  existingSel.hidden = mode !== 'existing';
-  document.getElementById('d-group-new-label').hidden = mode !== 'new';
-  noteLabel.hidden = mode === 'none';
-  noteField.hidden = mode === 'none';
+  const selectedExisting = [...existingSel.selectedOptions].map(o => o.value);
+  const hasNewLabel = !!newLabelInput.value.trim();
 
-  if (mode === 'existing') {
-    if (editingWordIndex !== null) {
-      noteLabel.textContent = 'このグループの使い分け解説を編集（既存の内容を書き換えます）';
-      noteField.value = currentNoteForGroup(existingSel.value);
-    } else {
-      noteLabel.textContent = '使い分けメモ（このグループの解説に追記されます・任意）';
-    }
-  } else if (mode === 'new') {
+  if (hasNewLabel) {
+    noteLabel.hidden = false; noteField.hidden = false;
     noteLabel.textContent = 'このグループの使い分け解説（任意）';
+    if (!noteField.dataset.userTouched) noteField.value = '';
+  } else if (editingWordIndex !== null && selectedExisting.length === 1) {
+    noteLabel.hidden = false; noteField.hidden = false;
+    noteLabel.textContent = 'このグループの使い分け解説を編集（既存の内容を書き換えます）';
+    noteField.value = currentNoteForGroup(selectedExisting[0]);
+  } else if (editingWordIndex === null && selectedExisting.length === 1) {
+    noteLabel.hidden = false; noteField.hidden = false;
+    noteLabel.textContent = '使い分けメモ（このグループの解説に追記されます・任意）';
+  } else {
+    noteLabel.hidden = true; noteField.hidden = true;
   }
 }
-document.getElementById('d-group-mode').addEventListener('change', updateGroupModeUI);
 document.getElementById('d-group-existing').addEventListener('change', updateGroupModeUI);
+document.getElementById('d-group-new-label').addEventListener('input', updateGroupModeUI);
 updateGroupModeUI();
 
 function startEditWord(idx) {
@@ -1561,14 +1580,12 @@ function startEditWord(idx) {
   document.getElementById('d-ex2').value = w.ex2 || '';
   document.getElementById('d-ja2').value = w.ja2 || '';
   document.getElementById('d-note').value = w.note || '';
+  document.getElementById('d-group-new-label').value = '';
 
   populateGroupExistingSelect();
-  if (w.group) {
-    document.getElementById('d-group-mode').value = 'existing';
-    document.getElementById('d-group-existing').value = w.group;
-  } else {
-    document.getElementById('d-group-mode').value = 'none';
-  }
+  const sel = document.getElementById('d-group-existing');
+  const currentGroups = wordGroups(w);
+  [...sel.options].forEach(o => { o.selected = currentGroups.includes(o.value); });
   updateGroupModeUI();
 
   document.getElementById('dict-submit-btn').textContent = '更新する';
@@ -1578,7 +1595,8 @@ function startEditWord(idx) {
 function cancelEditWord() {
   editingWordIndex = null;
   document.getElementById('dict-form').reset();
-  document.getElementById('d-group-mode').value = 'none';
+  const sel = document.getElementById('d-group-existing');
+  [...sel.options].forEach(o => { o.selected = false; });
   updateGroupModeUI();
   document.getElementById('dict-submit-btn').textContent = '辞書に追加';
   document.getElementById('dict-cancel-edit-btn').hidden = true;
@@ -1595,49 +1613,47 @@ document.getElementById('dict-form').addEventListener('submit', e => {
   if (!w.verb || !w.meaning) return;
 
   const isEdit = editingWordIndex !== null;
-  const groupMode = document.getElementById('d-group-mode').value;
+  const existingSel = document.getElementById('d-group-existing');
+  const selectedExisting = [...existingSel.selectedOptions].map(o => o.value);
+  const newLabel = val('d-group-new-label');
   const groupNote = val('d-group-note');
-  if (groupMode === 'existing') {
-    w.group = document.getElementById('d-group-existing').value || '';
-    if (w.group) {
-      const custom = loadJSON(LS.CUSTOM_GROUPS, {});
-      if (isEdit) {
-        // 編集時：解説文は追記ではなく、手動で書き換えた内容にそのまま置き換える
-        if (custom[w.group]) {
-          custom[w.group].note = groupNote;
-          saveJSON(LS.CUSTOM_GROUPS, custom);
-          pushCustomGroupToCloud(w.group, custom[w.group].label, groupNote);
-        } else {
-          const extra = loadJSON(LS.GROUP_NOTE_EXTRA, {});
-          extra[w.group] = groupNote;
-          saveJSON(LS.GROUP_NOTE_EXTRA, extra);
-          pushGroupNoteExtraToCloud(w.group, groupNote);
-        }
-      } else if (groupNote) {
-        // 新規追加時：既存の解説文に追記する
+  const groups = selectedExisting.slice();
+  let newGroupId = null;
+
+  // 既存グループを1つだけ選んでいる場合のメモ欄の扱い（追記 or 編集時の置き換え）
+  if (selectedExisting.length === 1 && !newLabel && groupNote) {
+    const gid = selectedExisting[0];
+    const custom = loadJSON(LS.CUSTOM_GROUPS, {});
+    if (isEdit) {
+      if (custom[gid]) {
+        custom[gid].note = groupNote;
+        saveJSON(LS.CUSTOM_GROUPS, custom);
+        pushCustomGroupToCloud(gid, custom[gid].label, groupNote);
+      } else {
         const extra = loadJSON(LS.GROUP_NOTE_EXTRA, {});
-        const merged = extra[w.group] ? extra[w.group] + '\n' + groupNote : groupNote;
-        extra[w.group] = merged;
+        extra[gid] = groupNote;
         saveJSON(LS.GROUP_NOTE_EXTRA, extra);
-        pushGroupNoteExtraToCloud(w.group, merged);
+        pushGroupNoteExtraToCloud(gid, groupNote);
       }
-    }
-  } else if (groupMode === 'new') {
-    const label = val('d-group-new-label');
-    if (label) {
-      const id = 'custom_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-      const custom = loadJSON(LS.CUSTOM_GROUPS, {});
-      custom[id] = { label, note: groupNote || '' };
-      saveJSON(LS.CUSTOM_GROUPS, custom);
-      pushCustomGroupToCloud(id, label, groupNote || '');
-      w.group = id;
-      populateGroupExistingSelect();
     } else {
-      w.group = '';
+      const extra = loadJSON(LS.GROUP_NOTE_EXTRA, {});
+      const merged = extra[gid] ? extra[gid] + '\n' + groupNote : groupNote;
+      extra[gid] = merged;
+      saveJSON(LS.GROUP_NOTE_EXTRA, extra);
+      pushGroupNoteExtraToCloud(gid, merged);
     }
-  } else {
-    w.group = '';
   }
+
+  // 新しいグループの作成
+  if (newLabel) {
+    newGroupId = 'custom_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    const custom = loadJSON(LS.CUSTOM_GROUPS, {});
+    custom[newGroupId] = { label: newLabel, note: groupNote || '' };
+    saveJSON(LS.CUSTOM_GROUPS, custom);
+    pushCustomGroupToCloud(newGroupId, newLabel, groupNote || '');
+    groups.push(newGroupId);
+  }
+  w.groups = groups;
 
   const list = myWords();
   if (isEdit) {
@@ -1654,10 +1670,124 @@ document.getElementById('dict-form').addEventListener('submit', e => {
   toast(wasEdit ? '更新しました' : '辞書に追加しました');
   renderMyWordList();
   renderWordList();
+  populateGroupExistingSelect();
+  const nuanceView = document.getElementById('view-nuance');
+  if (nuanceView && nuanceView.classList.contains('active')) renderNuanceList();
+
+  // 新規グループを作った場合、既存402語＋マイ単語の中にも当てはまる語がないかAIに探させる
+  if (newGroupId) findGroupMatchesAndShowModal(newGroupId, newLabel, groupNote || '');
+});
+function val(id) { return document.getElementById(id).value.trim(); }
+
+// ===================== 新規グループ作成時：既存語からの候補検索（AI） =====================
+function findGroupMatchesAndShowModal(groupId, groupLabel, groupNote) {
+  if (typeof AI_WORKER_URL === 'undefined' || !AI_WORKER_URL) return; // Worker未設定なら何もしない
+  const modal = document.getElementById('group-match-modal');
+  modal.dataset.groupId = groupId;
+  const body = document.getElementById('group-match-body');
+  const noteSection = document.getElementById('group-match-note-section');
+  const noteField = document.getElementById('group-match-note');
+  modal.hidden = false;
+  noteSection.hidden = true;
+  body.innerHTML = '<div class="empty-note">既存の語の中に、このグループに合いそうなものがないかClaudeに確認しています…</div>';
+
+  const candidates = allWords()
+    .filter(w => !wordGroups(w).includes(groupId))
+    .map(w => ({ no: w.no, verb: baseForm(w.verb), meaning: w.meaning }));
+
+  fetch(AI_WORKER_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'find_group_matches', groupLabel, groupNote, candidates }),
+  })
+    .then(res => res.json())
+    .then(data => {
+      const matches = Array.isArray(data.matches) ? data.matches : [];
+      if (data.suggestedNote) {
+        noteField.value = data.suggestedNote;
+        noteSection.hidden = false;
+      }
+      if (!matches.length) {
+        body.innerHTML = '<div class="empty-note">このグループに合いそうな既存の語は見つかりませんでした。</div>';
+        document.getElementById('group-match-confirm').hidden = !data.suggestedNote; // 解説だけ保存できるようにする
+        return;
+      }
+      document.getElementById('group-match-confirm').hidden = false;
+      body.innerHTML = matches.map((m, i) => `
+        <div class="gm-candidate">
+          <input type="checkbox" id="gm-check-${i}" data-no="${escHtml(String(m.no))}" checked>
+          <label for="gm-check-${i}">
+            <div class="gm-candidate-verb">${escHtml(m.verb || '')}</div>
+            <div class="gm-candidate-reason">${escHtml(m.reason || '')}</div>
+          </label>
+        </div>
+      `).join('');
+    })
+    .catch(() => {
+      body.innerHTML = '<div class="empty-note">通信に失敗しました。時間をおいて再度お試しください。</div>';
+      document.getElementById('group-match-confirm').hidden = true;
+    });
+}
+function closeGroupMatchModal() { document.getElementById('group-match-modal').hidden = true; }
+document.getElementById('group-match-close').addEventListener('click', closeGroupMatchModal);
+document.getElementById('group-match-backdrop').addEventListener('click', closeGroupMatchModal);
+document.getElementById('group-match-skip').addEventListener('click', closeGroupMatchModal);
+document.getElementById('group-match-confirm').addEventListener('click', () => {
+  const groupId = document.getElementById('group-match-modal').dataset.groupId;
+  const checked = [...document.querySelectorAll('#group-match-body input[type="checkbox"]:checked')];
+  let addedToBuiltIn = 0, addedToMine = 0;
+
+  if (checked.length) {
+    const nos = checked.map(cb => cb.dataset.no);
+    const extra = loadJSON(LS.EXTRA_WORD_GROUPS, {});
+    const mine = myWords();
+    let mineChanged = false;
+    nos.forEach(noStr => {
+      if (noStr.startsWith('M')) {
+        const idx = parseInt(noStr.slice(1), 10) - 1;
+        if (mine[idx]) {
+          const g = Array.isArray(mine[idx].groups) ? mine[idx].groups.slice() : (mine[idx].group ? [mine[idx].group] : []);
+          if (!g.includes(groupId)) { g.push(groupId); mine[idx].groups = g; mineChanged = true; addedToMine++; }
+        }
+      } else {
+        const no = parseInt(noStr, 10);
+        if (!extra[no]) extra[no] = [];
+        if (!extra[no].includes(groupId)) { extra[no].push(groupId); addedToBuiltIn++; }
+        pushWordGroupExtraToCloud(no, extra[no]);
+      }
+    });
+    saveJSON(LS.EXTRA_WORD_GROUPS, extra);
+    if (mineChanged) { saveJSON(LS.MY_WORDS, mine); pushMyWordsToCloud(); }
+  }
+
+  // AIが提案した（編集済みかもしれない）解説を、グループのnoteとして保存する
+  const noteSection = document.getElementById('group-match-note-section');
+  let noteUpdated = false;
+  if (groupId && !noteSection.hidden) {
+    const newNote = document.getElementById('group-match-note').value.trim();
+    if (newNote) {
+      const custom = loadJSON(LS.CUSTOM_GROUPS, {});
+      if (custom[groupId]) {
+        custom[groupId].note = newNote;
+        saveJSON(LS.CUSTOM_GROUPS, custom);
+        pushCustomGroupToCloud(groupId, custom[groupId].label, newNote);
+        noteUpdated = true;
+      }
+    }
+  }
+
+  closeGroupMatchModal();
+  const addedTotal = addedToBuiltIn + addedToMine;
+  if (addedTotal || noteUpdated) {
+    const parts = [];
+    if (addedTotal) parts.push(`${addedTotal}語をグループに追加`);
+    if (noteUpdated) parts.push('解説を更新');
+    toast(parts.join('・') + 'しました');
+  }
+  renderWordList();
   const nuanceView = document.getElementById('view-nuance');
   if (nuanceView && nuanceView.classList.contains('active')) renderNuanceList();
 });
-function val(id) { return document.getElementById(id).value.trim(); }
 
 // ===================== UI: 使い分け =====================
 function renderNuanceList() {
@@ -1678,9 +1808,10 @@ function renderNuanceList() {
   const words = allWords();
   const byGroup = {};
   words.forEach(w => {
-    if (!w.group) return;
-    if (!byGroup[w.group]) byGroup[w.group] = [];
-    byGroup[w.group].push(w);
+    wordGroups(w).forEach(gid => {
+      if (!byGroup[gid]) byGroup[gid] = [];
+      byGroup[gid].push(w);
+    });
   });
 
   const allGroupIds = [...new Set([...Object.keys(GROUP_INFO), ...Object.keys(customGroups)])];
@@ -1954,6 +2085,11 @@ function pushGroupNoteExtraToCloud(groupId, mergedText) {
   if (!db) return;
   db.ref(`groupNoteExtra/${groupId}`).set(mergedText).catch(() => {});
 }
+function pushWordGroupExtraToCloud(no, groupIdsArray) {
+  const db = initFirebase();
+  if (!db) return;
+  db.ref(`wordGroupExtra/${no}`).set(groupIdsArray).catch(() => {});
+}
 function pullGlobalGroupDefs() {
   const db = initFirebase();
   if (!db) return;
@@ -1987,6 +2123,23 @@ function pullGlobalGroupDefs() {
     });
     if (changed) {
       saveJSON(LS.GROUP_NOTE_EXTRA, local);
+      const nuanceView = document.getElementById('view-nuance');
+      if (nuanceView && nuanceView.classList.contains('active')) renderNuanceList();
+    }
+  }).catch(() => {});
+  db.ref('wordGroupExtra').get().then(snap => {
+    const cloud = snap.val() || {};
+    const local = loadJSON(LS.EXTRA_WORD_GROUPS, {});
+    let changed = false;
+    Object.entries(cloud).forEach(([no, cloudGroups]) => {
+      if (!Array.isArray(cloudGroups)) return;
+      const localForNo = local[no] || [];
+      const merged = [...new Set([...localForNo, ...cloudGroups])];
+      if (merged.length !== localForNo.length) { local[no] = merged; changed = true; }
+    });
+    if (changed) {
+      saveJSON(LS.EXTRA_WORD_GROUPS, local);
+      renderWordList();
       const nuanceView = document.getElementById('view-nuance');
       if (nuanceView && nuanceView.classList.contains('active')) renderNuanceList();
     }

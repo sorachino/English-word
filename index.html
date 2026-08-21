@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="67">
+<meta name="build-version" content="69">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=33">
+<link rel="stylesheet" href="style.css?v=34">
 </head>
 <body>
 
@@ -49,6 +49,7 @@
           <button class="chip active" data-mode="normal">通常</button>
           <button class="chip" data-mode="listening">リスニング</button>
           <button class="chip" data-mode="reverse">逆方向</button>
+          <button class="chip" data-mode="matching">マッチング</button>
         </div>
       </div>
       <div class="setup-row">
@@ -144,6 +145,16 @@
       <div class="done-score"><span id="done-score-num">0</span> / <span id="done-score-total">10</span> 正解</div>
       <div class="done-list" id="done-list"></div>
       <button class="btn-primary" id="restart-btn">もう一度</button>
+    </div>
+
+    <div class="quiz-match card" id="quiz-match" hidden>
+      <div class="match-progress" id="match-progress">0 / 6 完了</div>
+      <div class="match-board">
+        <div class="match-col" id="match-verbs"></div>
+        <div class="match-col" id="match-meanings"></div>
+      </div>
+      <button class="btn-primary" id="match-again-btn" hidden>もう一度（新しい組み合わせ）</button>
+      <button class="btn-ghost" id="match-back-btn" hidden>設定に戻る</button>
     </div>
   </section>
 
@@ -341,6 +352,6 @@
 <script src="tts-config.js?v=2"></script>
 <script src="ai-config.js?v=1"></script>
 <script src="data.js?v=4"></script>
-<script src="app.js?v=67"></script>
+<script src="app.js?v=69"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '67'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '69'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -419,6 +419,7 @@ document.getElementById('srs-on-toggle').addEventListener('change', () => { refr
 document.getElementById('strict-only-toggle').addEventListener('change', saveQuizSettings);
 
 document.getElementById('start-quiz').addEventListener('click', () => {
+  if (quizMode === 'matching') { startMatchingGame(); return; }
   const raw = document.getElementById('quiz-stage').value;
   const stage = parseInt(raw, 10) || 0;
   const weakOn = document.getElementById('weak-on-toggle').checked;
@@ -429,8 +430,120 @@ document.getElementById('start-quiz').addEventListener('click', () => {
   quizState = { questions: qs, idx: 0, correctCount: 0, results: [], mode: quizMode };
   document.getElementById('quiz-setup').hidden = true;
   document.getElementById('quiz-done').hidden = true;
+  document.getElementById('quiz-match').hidden = true;
   document.getElementById('quiz-play').hidden = false;
   showQuestion();
+});
+
+// ===================== マッチングゲーム =====================
+let matchState = null;
+function startMatchingGame() {
+  const raw = document.getElementById('quiz-stage').value;
+  const stage = parseInt(raw, 10) || 0;
+  const words = allWords().filter(w => !stage || w.stage === stage);
+  if (words.length < 2) { toast('この範囲では作れませんでした'); return; }
+  const roundSize = Math.min(6, words.length);
+
+  const pool = words.slice();
+  shuffle(pool);
+  function segsOf(m) { return (m || '').split(/[、\/／]/).map(s => s.trim()).filter(s => s.length >= 2); }
+  function overlapCount(seedWord) {
+    const seedSegs = segsOf(seedWord.meaning);
+    return pool.filter(w => w !== seedWord && segsOf(w.meaning).some(s => seedSegs.some(ss => ss.includes(s) || s.includes(ss)))).length;
+  }
+  // 候補シードを何個か試し、一番「相方」が多く見つかるものを採用する
+  let bestSeed = pool[0], bestCount = -1;
+  for (let i = 0; i < Math.min(10, pool.length); i++) {
+    const c = overlapCount(pool[i]);
+    if (c > bestCount) { bestCount = c; bestSeed = pool[i]; }
+  }
+  const seed = bestSeed;
+  const seedSegs = segsOf(seed.meaning);
+  const scored = pool.map(w => {
+    if (w === seed) return { w, score: 999 };
+    const segs = segsOf(w.meaning);
+    const overlap = segs.some(s => seedSegs.some(ss => ss.includes(s) || s.includes(ss)));
+    return { w, score: overlap ? 2 : Math.random() };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  const chosen = scored.slice(0, roundSize).map(x => x.w);
+
+  matchState = {
+    pairs: chosen.map(w => ({ verb: baseForm(w.verb), meaning: w.meaning })),
+    verbOrder: shuffle(chosen.map(w => baseForm(w.verb))),
+    meaningOrder: shuffle(chosen.map(w => w.meaning)),
+    matched: new Set(),
+    selectedVerb: null,
+    selectedMeaning: null,
+  };
+  document.getElementById('quiz-setup').hidden = true;
+  document.getElementById('quiz-play').hidden = true;
+  document.getElementById('quiz-done').hidden = true;
+  document.getElementById('quiz-match').hidden = false;
+  renderMatchBoard();
+}
+
+function renderMatchBoard() {
+  const verbsEl = document.getElementById('match-verbs');
+  const meaningsEl = document.getElementById('match-meanings');
+  verbsEl.innerHTML = '';
+  meaningsEl.innerHTML = '';
+  document.getElementById('match-progress').textContent = `${matchState.matched.size} / ${matchState.pairs.length} 完了`;
+
+  matchState.verbOrder.forEach(v => {
+    const isMatched = matchState.matched.has(v);
+    const el = document.createElement('div');
+    el.className = 'match-card' + (isMatched ? ' matched' : '') + (matchState.selectedVerb === v ? ' selected' : '');
+    el.textContent = v;
+    if (!isMatched) el.addEventListener('click', () => onTapMatchVerb(v));
+    verbsEl.appendChild(el);
+  });
+  matchState.meaningOrder.forEach(m => {
+    const isMatched = [...matchState.matched].some(v => matchState.pairs.find(p => p.verb === v).meaning === m);
+    const el = document.createElement('div');
+    el.className = 'match-card' + (isMatched ? ' matched' : '') + (matchState.selectedMeaning === m ? ' selected' : '');
+    el.textContent = m;
+    if (!isMatched) el.addEventListener('click', () => onTapMatchMeaning(m));
+    meaningsEl.appendChild(el);
+  });
+
+  const done = matchState.matched.size === matchState.pairs.length;
+  document.getElementById('match-again-btn').hidden = !done;
+  document.getElementById('match-back-btn').hidden = !done;
+  if (done && !matchState.counted) {
+    matchState.counted = true;
+    logToday(true);
+    syncLeaderboard(null, true);
+    updateStreakPill();
+    toast('全部そろいました！');
+  }
+}
+
+function onTapMatchVerb(v) {
+  matchState.selectedVerb = matchState.selectedVerb === v ? null : v;
+  tryResolveMatch();
+  renderMatchBoard();
+}
+function onTapMatchMeaning(m) {
+  matchState.selectedMeaning = matchState.selectedMeaning === m ? null : m;
+  tryResolveMatch();
+  renderMatchBoard();
+}
+function tryResolveMatch() {
+  if (!matchState.selectedVerb || !matchState.selectedMeaning) return;
+  const pair = matchState.pairs.find(p => p.verb === matchState.selectedVerb);
+  if (pair && pair.meaning === matchState.selectedMeaning) {
+    matchState.matched.add(matchState.selectedVerb);
+  } else {
+    toast('不一致です、もう一度');
+  }
+  matchState.selectedVerb = null;
+  matchState.selectedMeaning = null;
+}
+document.getElementById('match-again-btn').addEventListener('click', startMatchingGame);
+document.getElementById('match-back-btn').addEventListener('click', () => {
+  document.getElementById('quiz-match').hidden = true;
+  document.getElementById('quiz-setup').hidden = false;
 });
 
 // ===================== UI: クイズ本体 =====================

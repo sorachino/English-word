@@ -454,3 +454,15 @@ select{
 
 #ai-fill-btn{margin-top:8px; margin-bottom:14px; color:var(--navy); border-color:var(--navy);}
 #ai-fill-status{margin-top:-8px; margin-bottom:14px;}
+
+/* ---------- マッチングゲーム ---------- */
+.match-progress{font-family:"JetBrains Mono",monospace; font-weight:700; font-size:13px; color:var(--ink-soft); text-align:center; margin-bottom:12px;}
+.match-board{display:flex; gap:10px; margin-bottom:14px;}
+.match-col{flex:1; display:flex; flex-direction:column; gap:7px;}
+.match-card{
+  padding:10px 8px; border:1.5px solid var(--line); border-radius:8px; background:#fff;
+  font-size:12.5px; text-align:center; cursor:pointer; line-height:1.4; min-height:44px;
+  display:flex; align-items:center; justify-content:center;
+}
+.match-card.selected{border-color:var(--navy); background:var(--gold-soft); font-weight:700;}
+.match-card.matched{background:var(--ok-soft); border-color:var(--ok); color:var(--ok); cursor:default; opacity:.65;}

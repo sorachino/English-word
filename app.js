@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '73'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '74'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -178,6 +178,7 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, strictOnly) {
   shuffle(rest);
   while (picks.length < count && rest.length) picks.push(rest.shift());
   shuffle(picks);
+  picks = declusterByGroup(picks);
 
   const allVerbs = [...new Set(words.map(w => baseForm(w.verb)))];
   const questions = [];
@@ -211,6 +212,26 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, strictOnly) {
     });
   }
   return questions;
+}
+// 同じ意味グループ（例: back系）の語が出題順で連続しないよう並べ替える。
+// groupの多い方から交互に配置する貪欲法（タスクスケジューラ問題と同じ考え方）。
+// 1グループが全体の半数を超える場合は数学的に完全回避できないため、その分は諦めて最善を尽くす。
+function declusterByGroup(arr) {
+  const withKey = arr.map((w, idx) => ({ w, key: w.group || ('__none_' + idx) }));
+  const buckets = {};
+  withKey.forEach(it => { (buckets[it.key] = buckets[it.key] || []).push(it); });
+  const result = [];
+  let lastKey = null;
+  while (result.length < withKey.length) {
+    const keys = Object.keys(buckets).filter(k => buckets[k].length > 0)
+      .sort((a, b) => buckets[b].length - buckets[a].length);
+    let chosenKey = keys.find(k => k !== lastKey);
+    if (!chosenKey) chosenKey = keys[0]; // 他に選択肢がなく、やむを得ず連続させる
+    const item = buckets[chosenKey].shift();
+    result.push(item.w);
+    lastKey = chosenKey;
+  }
+  return result;
 }
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {

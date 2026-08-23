@@ -326,6 +326,7 @@ select{
 }
 .dict-form textarea{resize:vertical; min-height:64px; line-height:1.6;}
 .my-words-head{font-weight:700; font-size:13.5px; color:var(--ink-soft); margin:18px 0 8px;}
+#open-dict-form-btn, #open-mydict-form-btn { margin-bottom: 14px; }
 
 /* ---------- Stats ---------- */
 .stats-summary{display:grid; grid-template-columns:repeat(4,1fr); gap:6px; text-align:center;}

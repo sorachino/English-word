@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '97'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '98'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -26,6 +26,7 @@ const LS = {
   CUSTOM_GROUPS: 'pv_custom_groups',       // { [customGroupId]: {label, note} } ユーザーが自分で作った使い分けグループ
   GROUP_NOTE_EXTRA: 'pv_group_note_extra', // { [groupId]: "追記文" } 既存グループの解説文への手動追記
   EXTRA_WORD_GROUPS: 'pv_extra_word_groups', // { [no]: [groupId, ...] } 402語の組み込みデータに後から追加されたグループ所属
+  GROUP_NOTE_BASE_OVERRIDE: 'pv_group_note_base_override', // { [groupId]: "上書きされた基本解説文" } 組み込みグループ(GROUP_INFO)の基本解説文を書き換えた場合の上書き値。全ユーザー共有(customGroups等と同様)。
   MY_DICT: 'pv_my_dict', // [{ japanese, english, example, exampleJa, note }] 句動詞とは別の日本語→英語単語帳
 };
 
@@ -1814,9 +1815,14 @@ function renderNuanceList() {
 
   const customGroups = loadJSON(LS.CUSTOM_GROUPS, {});
   const extraNotes = loadJSON(LS.GROUP_NOTE_EXTRA, {});
+  const baseOverrides = loadJSON(LS.GROUP_NOTE_BASE_OVERRIDE, {});
   function labelOf(gid) { return (GROUP_INFO[gid] && GROUP_INFO[gid].label) || (customGroups[gid] && customGroups[gid].label) || gid; }
+  function baseNoteOf(gid) {
+    if (typeof baseOverrides[gid] === 'string') return baseOverrides[gid];
+    return (GROUP_INFO[gid] && GROUP_INFO[gid].note) || (customGroups[gid] && customGroups[gid].note) || '';
+  }
   function noteOf(gid) {
-    let note = (GROUP_INFO[gid] && GROUP_INFO[gid].note) || (customGroups[gid] && customGroups[gid].note) || '';
+    let note = baseNoteOf(gid);
     if (extraNotes[gid]) note = note ? note + '\n（追記）' + extraNotes[gid] : extraNotes[gid];
     return note;
   }
@@ -1849,48 +1855,75 @@ function renderNuanceList() {
     card.className = 'nuance-card';
     const verbsHtml = members.map(w => `<span class="nuance-verb-chip">${escHtml(baseForm(w.verb))}</span>`).join('');
     const isCustom = !!customGroups[gid];
-    const editableNote = isCustom ? (customGroups[gid].note || '') : (extraNotes[gid] || '');
-    const editBtnLabel = isCustom ? '解説を編集する' : '追記メモを編集する';
+    const editableBase = baseNoteOf(gid);
+    const editableExtra = extraNotes[gid] || '';
+
+    const editAreaHtml = isCustom
+      ? `<div class="nuance-edit-area" hidden>
+          <textarea class="nuance-edit-base">${escHtml(editableBase)}</textarea>
+          <div class="nuance-edit-actions">
+            <button type="button" class="btn-ghost nuance-edit-cancel">キャンセル</button>
+            <button type="button" class="btn-primary nuance-edit-save">保存</button>
+          </div>
+        </div>`
+      : `<div class="nuance-edit-area" hidden>
+          <label class="nuance-edit-label">基本解説文</label>
+          <textarea class="nuance-edit-base">${escHtml(editableBase)}</textarea>
+          <label class="nuance-edit-label">追記メモ</label>
+          <textarea class="nuance-edit-extra">${escHtml(editableExtra)}</textarea>
+          <div class="nuance-edit-actions">
+            <button type="button" class="btn-ghost nuance-edit-cancel">キャンセル</button>
+            <button type="button" class="btn-primary nuance-edit-save">保存</button>
+          </div>
+        </div>`;
+
     card.innerHTML = `
       <div class="nuance-label">${escHtml(labelOf(gid))}</div>
       <div class="nuance-verbs">${verbsHtml}</div>
       <div class="nuance-note nuance-note-display">${escHtml(noteOf(gid))}</div>
-      <button type="button" class="btn-ghost btn-block nuance-edit-btn">${editBtnLabel}</button>
-      <div class="nuance-edit-area" hidden>
-        <textarea class="nuance-edit-textarea">${escHtml(editableNote)}</textarea>
-        <div class="nuance-edit-actions">
-          <button type="button" class="btn-ghost nuance-edit-cancel">キャンセル</button>
-          <button type="button" class="btn-primary nuance-edit-save">保存</button>
-        </div>
-      </div>
+      <button type="button" class="btn-ghost btn-block nuance-edit-btn">解説を編集する</button>
+      ${editAreaHtml}
     `;
     const editBtn = card.querySelector('.nuance-edit-btn');
     const editArea = card.querySelector('.nuance-edit-area');
-    const textarea = card.querySelector('.nuance-edit-textarea');
+    const baseTextarea = card.querySelector('.nuance-edit-base');
+    const extraTextarea = card.querySelector('.nuance-edit-extra'); // isCustomの場合はnull
     editBtn.addEventListener('click', e => {
       e.stopPropagation();
       editArea.hidden = !editArea.hidden;
     });
     card.querySelector('.nuance-edit-cancel').addEventListener('click', e => {
       e.stopPropagation();
-      textarea.value = editableNote;
+      baseTextarea.value = editableBase;
+      if (extraTextarea) extraTextarea.value = editableExtra;
       editArea.hidden = true;
     });
     card.querySelector('.nuance-edit-save').addEventListener('click', e => {
       e.stopPropagation();
-      const newText = textarea.value.trim();
+      const newBase = baseTextarea.value.trim();
       if (isCustom) {
         const custom = loadJSON(LS.CUSTOM_GROUPS, {});
         if (custom[gid]) {
-          custom[gid].note = newText;
+          custom[gid].note = newBase;
           saveJSON(LS.CUSTOM_GROUPS, custom);
-          pushCustomGroupToCloud(gid, custom[gid].label, newText);
+          pushCustomGroupToCloud(gid, custom[gid].label, newBase);
         }
       } else {
+        const originalBase = (GROUP_INFO[gid] && GROUP_INFO[gid].note) || '';
+        const overrides = loadJSON(LS.GROUP_NOTE_BASE_OVERRIDE, {});
+        if (newBase === originalBase.trim()) {
+          delete overrides[gid];
+        } else {
+          overrides[gid] = newBase;
+        }
+        saveJSON(LS.GROUP_NOTE_BASE_OVERRIDE, overrides);
+        pushGroupNoteBaseOverrideToCloud(gid, overrides[gid]);
+
+        const newExtra = extraTextarea.value.trim();
         const extra = loadJSON(LS.GROUP_NOTE_EXTRA, {});
-        if (newText) extra[gid] = newText; else delete extra[gid];
+        if (newExtra) extra[gid] = newExtra; else delete extra[gid];
         saveJSON(LS.GROUP_NOTE_EXTRA, extra);
-        pushGroupNoteExtraToCloud(gid, newText);
+        pushGroupNoteExtraToCloud(gid, newExtra);
       }
       toast('保存しました');
       renderNuanceList();
@@ -2320,6 +2353,15 @@ function pushGroupNoteExtraToCloud(groupId, mergedText) {
   if (!db) return;
   db.ref(`groupNoteExtra/${groupId}`).set(mergedText).catch(() => {});
 }
+function pushGroupNoteBaseOverrideToCloud(groupId, text) {
+  const db = initFirebase();
+  if (!db) return;
+  if (text === undefined) {
+    db.ref(`groupNoteBaseOverride/${groupId}`).remove().catch(() => {});
+  } else {
+    db.ref(`groupNoteBaseOverride/${groupId}`).set(text).catch(() => {});
+  }
+}
 function pushWordGroupExtraToCloud(no, groupIdsArray) {
   const db = initFirebase();
   if (!db) return;
@@ -2375,6 +2417,21 @@ function pullGlobalGroupDefs() {
     if (changed) {
       saveJSON(LS.EXTRA_WORD_GROUPS, local);
       renderWordList();
+      const nuanceView = document.getElementById('view-nuance');
+      if (nuanceView && nuanceView.classList.contains('active')) renderNuanceList();
+    }
+  }).catch(() => {});
+  db.ref('groupNoteBaseOverride').get().then(snap => {
+    const cloud = snap.val() || {};
+    const local = loadJSON(LS.GROUP_NOTE_BASE_OVERRIDE, {});
+    let changed = false;
+    Object.entries(cloud).forEach(([gid, text]) => {
+      if (typeof text !== 'string' || typeof local[gid] === 'string') return;
+      local[gid] = text;
+      changed = true;
+    });
+    if (changed) {
+      saveJSON(LS.GROUP_NOTE_BASE_OVERRIDE, local);
       const nuanceView = document.getElementById('view-nuance');
       if (nuanceView && nuanceView.classList.contains('active')) renderNuanceList();
     }

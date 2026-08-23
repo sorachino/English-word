@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '96'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '97'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1848,11 +1848,53 @@ function renderNuanceList() {
     const card = document.createElement('div');
     card.className = 'nuance-card';
     const verbsHtml = members.map(w => `<span class="nuance-verb-chip">${escHtml(baseForm(w.verb))}</span>`).join('');
+    const isCustom = !!customGroups[gid];
+    const editableNote = isCustom ? (customGroups[gid].note || '') : (extraNotes[gid] || '');
+    const editBtnLabel = isCustom ? '解説を編集する' : '追記メモを編集する';
     card.innerHTML = `
       <div class="nuance-label">${escHtml(labelOf(gid))}</div>
       <div class="nuance-verbs">${verbsHtml}</div>
-      <div class="nuance-note">${escHtml(noteOf(gid))}</div>
+      <div class="nuance-note nuance-note-display">${escHtml(noteOf(gid))}</div>
+      <button type="button" class="btn-ghost btn-block nuance-edit-btn">${editBtnLabel}</button>
+      <div class="nuance-edit-area" hidden>
+        <textarea class="nuance-edit-textarea">${escHtml(editableNote)}</textarea>
+        <div class="nuance-edit-actions">
+          <button type="button" class="btn-ghost nuance-edit-cancel">キャンセル</button>
+          <button type="button" class="btn-primary nuance-edit-save">保存</button>
+        </div>
+      </div>
     `;
+    const editBtn = card.querySelector('.nuance-edit-btn');
+    const editArea = card.querySelector('.nuance-edit-area');
+    const textarea = card.querySelector('.nuance-edit-textarea');
+    editBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      editArea.hidden = !editArea.hidden;
+    });
+    card.querySelector('.nuance-edit-cancel').addEventListener('click', e => {
+      e.stopPropagation();
+      textarea.value = editableNote;
+      editArea.hidden = true;
+    });
+    card.querySelector('.nuance-edit-save').addEventListener('click', e => {
+      e.stopPropagation();
+      const newText = textarea.value.trim();
+      if (isCustom) {
+        const custom = loadJSON(LS.CUSTOM_GROUPS, {});
+        if (custom[gid]) {
+          custom[gid].note = newText;
+          saveJSON(LS.CUSTOM_GROUPS, custom);
+          pushCustomGroupToCloud(gid, custom[gid].label, newText);
+        }
+      } else {
+        const extra = loadJSON(LS.GROUP_NOTE_EXTRA, {});
+        if (newText) extra[gid] = newText; else delete extra[gid];
+        saveJSON(LS.GROUP_NOTE_EXTRA, extra);
+        pushGroupNoteExtraToCloud(gid, newText);
+      }
+      toast('保存しました');
+      renderNuanceList();
+    });
     listEl.appendChild(card);
   });
 }

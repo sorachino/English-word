@@ -500,3 +500,7 @@ select{
   background:var(--gold-soft); border:1px solid var(--gold); border-radius:12px; padding:3px 10px;
 }
 .nuance-note{font-size:13px; color:var(--ink); line-height:1.7;}
+.nuance-edit-area{margin-top:10px;}
+.nuance-edit-textarea{width:100%; min-height:80px; padding:10px 12px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:13.5px; line-height:1.6; resize:vertical; box-sizing:border-box;}
+.nuance-edit-actions{display:flex; gap:8px; margin-top:8px;}
+.nuance-edit-actions .btn-ghost, .nuance-edit-actions .btn-primary{flex:1; margin-top:0;}

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '95'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '96'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -26,6 +26,7 @@ const LS = {
   CUSTOM_GROUPS: 'pv_custom_groups',       // { [customGroupId]: {label, note} } ユーザーが自分で作った使い分けグループ
   GROUP_NOTE_EXTRA: 'pv_group_note_extra', // { [groupId]: "追記文" } 既存グループの解説文への手動追記
   EXTRA_WORD_GROUPS: 'pv_extra_word_groups', // { [no]: [groupId, ...] } 402語の組み込みデータに後から追加されたグループ所属
+  MY_DICT: 'pv_my_dict', // [{ japanese, english, example, exampleJa, note }] 句動詞とは別の日本語→英語単語帳
 };
 
 // Firebase接続の使い回し用（宣言はファイル先頭で行う。
@@ -369,8 +370,8 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
-    if (btn.dataset.tab === 'list') renderWordList();
-    if (btn.dataset.tab === 'dict') { renderMyWordList(); renderSharedWordList(); pullGlobalGroupDefs(); }
+    if (btn.dataset.tab === 'list') { renderWordList(); renderMyWordList(); renderSharedWordList(); pullGlobalGroupDefs(); }
+    if (btn.dataset.tab === 'mydict') renderMyDictList();
     if (btn.dataset.tab === 'stats') { renderStats(); renderLeaderboard(); updateLbNameDisplay(); renderChampionCalendar(); }
     if (btn.dataset.tab === 'nuance') { pullGlobalGroupDefs(); renderNuanceList(); }
   });
@@ -1430,14 +1431,30 @@ document.getElementById('marked-only-toggle').addEventListener('change', renderW
 // ===================== UI: 辞書に追加 =====================
 function goToAddDict(verb) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelector('.tab[data-tab="dict"]').classList.add('active');
+  document.querySelector('.tab[data-tab="list"]').classList.add('active');
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.getElementById('view-dict').classList.add('active');
-  document.getElementById('d-verb').value = verb;
+  document.getElementById('view-list').classList.add('active');
+  renderWordList();
   renderMyWordList();
   renderSharedWordList();
+  openDictFormModal();
+  document.getElementById('d-verb').value = verb;
   refreshAiFillBtn();
 }
+function openDictFormModal() {
+  document.getElementById('dict-form-modal').hidden = false;
+}
+function closeDictFormModal() {
+  document.getElementById('dict-form-modal').hidden = true;
+  cancelEditWord();
+}
+document.getElementById('open-dict-form-btn').addEventListener('click', () => {
+  cancelEditWord();
+  openDictFormModal();
+  refreshAiFillBtn();
+});
+document.getElementById('dict-form-close').addEventListener('click', closeDictFormModal);
+document.getElementById('dict-form-backdrop').addEventListener('click', closeDictFormModal);
 
 function refreshAiFillBtn() {
   const btn = document.getElementById('ai-fill-btn');
@@ -1566,10 +1583,8 @@ function startEditWord(idx) {
   const list = myWords();
   const w = list[idx];
   if (!w) return;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelector('.tab[data-tab="dict"]').classList.add('active');
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.getElementById('view-dict').classList.add('active');
+  openDictFormModal();
+  refreshAiFillBtn();
 
   editingWordIndex = idx;
   document.getElementById('d-verb').value = w.verb || '';
@@ -1667,6 +1682,7 @@ document.getElementById('dict-form').addEventListener('submit', e => {
 
   const wasEdit = isEdit;
   cancelEditWord(); // フォームのリセット・編集状態の解除をまとめて行う
+  document.getElementById('dict-form-modal').hidden = true;
   toast(wasEdit ? '更新しました' : '辞書に追加しました');
   renderMyWordList();
   renderWordList();
@@ -1841,6 +1857,183 @@ function renderNuanceList() {
   });
 }
 document.getElementById('nuance-search').addEventListener('input', renderNuanceList);
+
+// ===================== MY辞書（日本語→英語、句動詞とは別データ） =====================
+function myDictWords() { return loadJSON(LS.MY_DICT, []); }
+
+function myDictItemEl(w) {
+  const div = document.createElement('div');
+  div.className = 'word-item';
+  div.innerHTML = `
+    <div class="wi-head">
+      <div><span class="wi-verb">${escHtml(w.japanese)}</span></div>
+      <div class="wi-right"><span class="wi-stage">MY</span></div>
+    </div>
+    <div class="wi-meaning">${escHtml(w.english || '')} <button class="speak-btn" data-text="${escAttr(w.english || '')}">🔊</button></div>
+    <div class="wi-detail">
+      ${w.example ? `<div class="ex">${escHtml(w.example)} <button class="speak-btn" data-text="${escAttr(w.example)}">🔊</button></div><div class="ja">${escHtml(w.exampleJa || '')}</div>` : ''}
+      ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
+      <button type="button" class="btn-ghost btn-block mydict-edit-btn">編集する</button>
+      <button type="button" class="btn-ghost btn-block mydict-delete-btn">削除</button>
+    </div>`;
+  div.addEventListener('click', () => div.classList.toggle('open'));
+  return div;
+}
+
+function renderMyDictList() {
+  const list = myDictWords();
+  const el = document.getElementById('mydict-word-list');
+  if (!el) return;
+  const q = (document.getElementById('mydict-search').value || '').trim().toLowerCase();
+  el.innerHTML = '';
+  const filtered = list
+    .map((w, i) => ({ w, i }))
+    .filter(({ w }) => !q || (w.japanese || '').toLowerCase().includes(q) || (w.english || '').toLowerCase().includes(q))
+    .reverse();
+  if (!filtered.length) { el.innerHTML = '<div class="empty-note">まだ追加した単語はありません</div>'; return; }
+  filtered.forEach(({ w, i }) => {
+    const item = myDictItemEl(w);
+    item.querySelector('.mydict-edit-btn').addEventListener('click', ev => {
+      ev.stopPropagation();
+      startEditMyDictWord(i);
+    });
+    item.querySelector('.mydict-delete-btn').addEventListener('click', ev => {
+      ev.stopPropagation();
+      const cur = myDictWords();
+      cur.splice(i, 1);
+      saveJSON(LS.MY_DICT, cur);
+      pushMyDictToCloud();
+      renderMyDictList();
+      toast('削除しました');
+    });
+    el.appendChild(item);
+  });
+}
+document.getElementById('mydict-search').addEventListener('input', renderMyDictList);
+
+let editingMyDictIndex = null; // nullなら新規追加、数値ならmyDictWords()内のそのindexを編集中
+
+function openMyDictFormModal() {
+  document.getElementById('mydict-form-modal').hidden = false;
+}
+function closeMyDictFormModal() {
+  document.getElementById('mydict-form-modal').hidden = true;
+  cancelEditMyDictWord();
+}
+document.getElementById('open-mydict-form-btn').addEventListener('click', () => {
+  cancelEditMyDictWord();
+  openMyDictFormModal();
+  refreshMyDictAiFillBtn();
+});
+document.getElementById('mydict-form-close').addEventListener('click', closeMyDictFormModal);
+document.getElementById('mydict-form-backdrop').addEventListener('click', closeMyDictFormModal);
+
+function startEditMyDictWord(idx) {
+  const list = myDictWords();
+  const w = list[idx];
+  if (!w) return;
+  openMyDictFormModal();
+  refreshMyDictAiFillBtn();
+
+  editingMyDictIndex = idx;
+  document.getElementById('md-japanese').value = w.japanese || '';
+  document.getElementById('md-english').value = w.english || '';
+  document.getElementById('md-example').value = w.example || '';
+  document.getElementById('md-example-ja').value = w.exampleJa || '';
+  document.getElementById('md-note').value = w.note || '';
+
+  document.getElementById('mydict-submit-btn').textContent = '更新する';
+  document.getElementById('mydict-cancel-edit-btn').hidden = false;
+}
+function cancelEditMyDictWord() {
+  editingMyDictIndex = null;
+  document.getElementById('mydict-form').reset();
+  document.getElementById('mydict-submit-btn').textContent = 'MY辞書に追加';
+  document.getElementById('mydict-cancel-edit-btn').hidden = true;
+  const statusEl = document.getElementById('mydict-ai-fill-status');
+  if (statusEl) { statusEl.hidden = true; statusEl.textContent = ''; }
+}
+document.getElementById('mydict-cancel-edit-btn').addEventListener('click', cancelEditMyDictWord);
+
+document.getElementById('mydict-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const w = {
+    japanese: val('md-japanese'), english: val('md-english'),
+    example: val('md-example'), exampleJa: val('md-example-ja'),
+    note: val('md-note'),
+  };
+  if (!w.japanese || !w.english) return;
+
+  const isEdit = editingMyDictIndex !== null;
+  const list = myDictWords();
+  if (isEdit) {
+    if (!list[editingMyDictIndex]) { toast('編集対象が見つかりませんでした'); return; }
+    list[editingMyDictIndex] = w;
+  } else {
+    list.push(w);
+  }
+  saveJSON(LS.MY_DICT, list);
+  pushMyDictToCloud();
+
+  const wasEdit = isEdit;
+  cancelEditMyDictWord();
+  document.getElementById('mydict-form-modal').hidden = true;
+  toast(wasEdit ? '更新しました' : 'MY辞書に追加しました');
+  renderMyDictList();
+});
+
+function refreshMyDictAiFillBtn() {
+  const btn = document.getElementById('mydict-ai-fill-btn');
+  if (!btn) return;
+  btn.hidden = !(typeof AI_WORKER_URL !== 'undefined' && AI_WORKER_URL);
+}
+refreshMyDictAiFillBtn();
+
+document.getElementById('mydict-ai-fill-btn').addEventListener('click', async () => {
+  const japanese = val('md-japanese');
+  const statusEl = document.getElementById('mydict-ai-fill-status');
+  if (!japanese) { toast('先に日本語を入力してください'); return; }
+  const btn = document.getElementById('mydict-ai-fill-btn');
+  btn.disabled = true;
+  statusEl.hidden = false;
+  statusEl.textContent = 'Claudeに問い合わせ中…';
+  try {
+    const res = await fetch(AI_WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'my_dict_fill',
+        japanese,
+        english: val('md-english'),
+        example: val('md-example'),
+        exampleJa: val('md-example-ja'),
+        note: val('md-note'),
+      }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      statusEl.textContent = '自動入力に失敗しました：' + data.error;
+    } else {
+      document.getElementById('md-english').value = data.english || '';
+      document.getElementById('md-example').value = data.example || '';
+      document.getElementById('md-example-ja').value = data.exampleJa || '';
+      document.getElementById('md-note').value = data.note || '';
+      statusEl.textContent = '自動入力しました。内容を確認してから追加してください。';
+    }
+  } catch (e) {
+    statusEl.textContent = '通信に失敗しました。時間をおいて再度お試しください。';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function pushMyDictToCloud() {
+  const db = initFirebase();
+  if (!db) return;
+  const nickname = getNickname();
+  if (!nickname) return;
+  db.ref(`users/${nickname}/myDict`).set(myDictWords()).catch(() => {});
+}
 
 function renderMyWordList() {
   const list = myWords();
@@ -2230,15 +2423,27 @@ function pullAndMergeCloud(nickname) {
       if (sub) { saveJSON(LS.MY_WORDS, [...map.values()]); changed = true; }
     }
 
+    if (Array.isArray(cloud.myDict) && cloud.myDict.length) {
+      const map = new Map();
+      myDictWords().forEach(w => { if (w && w.japanese) map.set(w.japanese.trim().toLowerCase(), w); });
+      let sub = false;
+      cloud.myDict.forEach(w => {
+        if (!w || !w.japanese) return;
+        const key = w.japanese.trim().toLowerCase();
+        if (!map.has(key)) { map.set(key, w); sub = true; }
+      });
+      if (sub) { saveJSON(LS.MY_DICT, [...map.values()]); changed = true; }
+    }
+
     if (changed) {
       refreshWeakRow();
       updateStreakPill();
       const statsView = document.getElementById('view-stats');
       if (statsView && statsView.classList.contains('active')) renderStats();
-      const dictView = document.getElementById('view-dict');
-      if (dictView && dictView.classList.contains('active')) renderMyWordList();
       const listView = document.getElementById('view-list');
-      if (listView && listView.classList.contains('active')) renderWordList();
+      if (listView && listView.classList.contains('active')) { renderWordList(); renderMyWordList(); }
+      const mydictView = document.getElementById('view-mydict');
+      if (mydictView && mydictView.classList.contains('active')) renderMyDictList();
       toast('前回までの記録を引き継ぎました');
       maybeShowStreakCelebration();
     }

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="95">
+<meta name="build-version" content="96">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=38">
+<link rel="stylesheet" href="style.css?v=39">
 </head>
 <body>
 
@@ -34,7 +34,7 @@
 <nav class="tabs" id="tabs">
   <button class="tab active" data-tab="quiz"><span class="tab-idx">01</span>クイズ</button>
   <button class="tab" data-tab="list"><span class="tab-idx">02</span>辞書</button>
-  <button class="tab" data-tab="dict"><span class="tab-idx">03</span>登録</button>
+  <button class="tab" data-tab="mydict"><span class="tab-idx">03</span>MY辞書</button>
   <button class="tab" data-tab="nuance"><span class="tab-idx">04</span>使い分け</button>
   <button class="tab" data-tab="stats"><span class="tab-idx">05</span>記録</button>
 </nav>
@@ -182,11 +182,25 @@
       <button class="chip" data-status="ng">苦手な語</button>
       <button class="chip" data-status="ok">得意な語</button>
     </div>
+    <button type="button" class="btn-primary btn-block" id="open-dict-form-btn">＋ 新規登録</button>
     <div class="word-list" id="word-list"></div>
+
+    <div class="my-words-head">追加した単語（<span id="my-count">0</span>）</div>
+    <div class="word-list" id="my-word-list"></div>
+
+    <div class="my-words-head">みんなのマイ単語</div>
+    <div class="word-list" id="shared-word-list"></div>
+    <div class="empty-note" id="shared-word-empty" hidden>まだ他の人が追加した単語はありません。</div>
   </section>
 
-  <!-- ============ 辞書に追加 ============ -->
-  <section class="view" id="view-dict">
+  <!-- ============ 辞書に追加（モーダル） ============ -->
+  <div class="dd-modal" id="dict-form-modal" hidden>
+    <div class="dd-backdrop" id="dict-form-backdrop"></div>
+    <div class="dd-card">
+    <div class="dd-head">
+      <div class="dd-pos">句動詞を登録</div>
+      <button class="dd-close" id="dict-form-close" aria-label="閉じる">×</button>
+    </div>
     <form class="card dict-form" id="dict-form">
       <div class="form-title">マイ単語を追加</div>
       <label>句動詞 <span class="req">必須</span></label>
@@ -218,6 +232,8 @@
       <button type="submit" class="btn-primary" id="dict-submit-btn">辞書に追加</button>
       <button type="button" class="btn-ghost" id="dict-cancel-edit-btn" hidden>編集をキャンセル</button>
     </form>
+    </div>
+  </div>
 
     <div class="dd-modal" id="group-match-modal" hidden>
       <div class="dd-backdrop" id="group-match-backdrop"></div>
@@ -238,13 +254,43 @@
       </div>
     </div>
 
-    <div class="my-words-head">追加した単語（<span id="my-count">0</span>）</div>
-    <div class="word-list" id="my-word-list"></div>
-
-    <div class="my-words-head">みんなのマイ単語</div>
-    <div class="word-list" id="shared-word-list"></div>
-    <div class="empty-note" id="shared-word-empty" hidden>まだ他の人が追加した単語はありません。</div>
+  <!-- ============ MY辞書（日本語→英語） ============ -->
+  <section class="view" id="view-mydict">
+    <div class="list-controls">
+      <input type="search" id="mydict-search" placeholder="日本語・英語で検索">
+    </div>
+    <button type="button" class="btn-primary btn-block" id="open-mydict-form-btn">＋ 新規登録</button>
+    <div class="word-list" id="mydict-word-list"></div>
   </section>
+
+  <!-- ============ MY辞書に追加（モーダル） ============ -->
+  <div class="dd-modal" id="mydict-form-modal" hidden>
+    <div class="dd-backdrop" id="mydict-form-backdrop"></div>
+    <div class="dd-card">
+    <div class="dd-head">
+      <div class="dd-pos">MY辞書に登録</div>
+      <button class="dd-close" id="mydict-form-close" aria-label="閉じる">×</button>
+    </div>
+    <form class="card dict-form" id="mydict-form">
+      <div class="form-title">日本語→英語 単語を追加</div>
+      <label>日本語 <span class="req">必須</span></label>
+      <input type="text" id="md-japanese" required placeholder="例: 妥協する">
+      <button type="button" class="btn-ghost btn-block" id="mydict-ai-fill-btn" hidden>✨ Claudeで自動入力</button>
+      <div class="empty-note" id="mydict-ai-fill-status" hidden></div>
+      <label>英語訳 <span class="req">必須</span></label>
+      <input type="text" id="md-english" required placeholder="例: compromise">
+      <label>例文（英語）</label>
+      <input type="text" id="md-example" placeholder="We need to compromise on the price.">
+      <label>例文 和訳</label>
+      <input type="text" id="md-example-ja" placeholder="価格について妥協する必要がある。">
+      <label>メモ・ニュアンス</label>
+      <textarea id="md-note" placeholder="例：ビジネスでよく使う。互いに譲り合うニュアンス。"></textarea>
+
+      <button type="submit" class="btn-primary" id="mydict-submit-btn">MY辞書に追加</button>
+      <button type="button" class="btn-ghost" id="mydict-cancel-edit-btn" hidden>編集をキャンセル</button>
+    </form>
+    </div>
+  </div>
 
   <!-- ============ 記録 ============ -->
   <section class="view" id="view-stats">
@@ -390,6 +436,6 @@
 <script src="tts-config.js?v=2"></script>
 <script src="ai-config.js?v=1"></script>
 <script src="data.js?v=10"></script>
-<script src="app.js?v=95"></script>
+<script src="app.js?v=96"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '100'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '101'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -337,7 +337,7 @@ const LS_ANSWERED = 'pv_answered';
 function recordAnswered(verb, ok) {
   const data = loadJSON(LS_ANSWERED, {});
   if (!data[verb]) data[verb] = { ok: 0, ng: 0, totalNg: 0 };
-  if (typeof data[verb].totalNg !== 'number') data[verb].totalNg = 0; // 旧データ互換
+  if (typeof data[verb].totalNg !== 'number') data[verb].totalNg = data[verb].ng || 0; // 旧データ互換：現在の連続誤答分だけは救済
   if (ok) { data[verb].ok++; data[verb].ng = 0; } else { data[verb].ng++; data[verb].totalNg++; }
   saveJSON(LS_ANSWERED, data);
 }
@@ -346,7 +346,8 @@ function answerCountsOf(verb) {
   const data = loadJSON(LS_ANSWERED, {});
   const rec = data[verb];
   if (!rec) return { ok: 0, ng: 0 };
-  return { ok: rec.ok || 0, ng: rec.totalNg || 0 };
+  const ng = typeof rec.totalNg === 'number' ? rec.totalNg : (rec.ng || 0); // totalNg未生成の語は現在の連続誤答数で代用
+  return { ok: rec.ok || 0, ng };
 }
 function answerStatsHtml(verb) {
   const c = answerCountsOf(verb);
@@ -2514,10 +2515,11 @@ function pullAndMergeCloud(nickname) {
         if (!ca) return;
         const curOk = (localAnswered[verb] && localAnswered[verb].ok) || 0;
         const curNg = (localAnswered[verb] && localAnswered[verb].ng) || 0;
-        const curTotalNg = (localAnswered[verb] && localAnswered[verb].totalNg) || 0;
+        const curTotalNg = (localAnswered[verb] && typeof localAnswered[verb].totalNg === 'number') ? localAnswered[verb].totalNg : ((localAnswered[verb] && localAnswered[verb].ng) || 0);
         const newOk = Math.max(curOk, ca.ok || 0);
         const newNg = Math.max(curNg, ca.ng || 0);
-        const newTotalNg = Math.max(curTotalNg, ca.totalNg || 0);
+        const caTotalNg = typeof ca.totalNg === 'number' ? ca.totalNg : (ca.ng || 0);
+        const newTotalNg = Math.max(curTotalNg, caTotalNg);
         if (!localAnswered[verb] || newOk !== curOk || newNg !== curNg || newTotalNg !== curTotalNg) {
           localAnswered[verb] = { ok: newOk, ng: newNg, totalNg: newTotalNg };
           sub = true;

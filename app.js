@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '99'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '100'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -347,6 +347,10 @@ function answerCountsOf(verb) {
   const rec = data[verb];
   if (!rec) return { ok: 0, ng: 0 };
   return { ok: rec.ok || 0, ng: rec.totalNg || 0 };
+}
+function answerStatsHtml(verb) {
+  const c = answerCountsOf(verb);
+  return `これまで<span class="stat-ok">○${c.ok}回</span>／<span class="stat-ng">×${c.ng}回</span>`;
 }
 function wordStatusClass(verb) {
   const data = loadJSON(LS_ANSWERED, {});
@@ -1148,8 +1152,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
 
   const reveal = document.getElementById('reveal-box');
   document.getElementById('reveal-verb').textContent = q.answer;
-  const counts = answerCountsOf(q.answer);
-  document.getElementById('reveal-answer-stats').textContent = `これまで 正答${counts.ok}回 ／ 誤答${counts.ng}回`;
+  document.getElementById('reveal-answer-stats').innerHTML = answerStatsHtml(q.answer);
   document.getElementById('reveal-sentence').textContent = q.full;
   document.getElementById('reveal-speak-btn').dataset.text = q.full || '';
   document.getElementById('reveal-ja').textContent = q.ja;
@@ -1408,7 +1411,7 @@ function wordItemEl(w) {
     </div>
     <div class="wi-meaning">${escHtml(w.meaning || '')}</div>
     <div class="wi-detail">
-      <div class="wi-answer-stats">これまで 正答${answerCountsOf(verbKey).ok}回 ／ 誤答${answerCountsOf(verbKey).ng}回</div>
+      <div class="wi-answer-stats">${answerStatsHtml(verbKey)}</div>
       ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}</div>` : ''}
       ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
       ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}

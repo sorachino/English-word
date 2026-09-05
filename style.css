@@ -235,6 +235,8 @@ select{
 }
 .reveal-verb{font-weight:900; font-size:19px; color:var(--navy); margin-bottom:6px;}
 .reveal-answer-stats{font-size:12px; color:var(--ink-soft); margin-bottom:8px;}
+.stat-ok{color:var(--ok); font-weight:700;}
+.stat-ng{color:var(--hanko); font-weight:700;}
 .reveal-sentence-row{display:flex; align-items:flex-start; gap:6px; margin-bottom:4px;}
 .reveal-sentence{font-size:14.5px; color:var(--ink); line-height:1.5; flex:1;}
 .speak-btn{

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '102'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '103'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -353,9 +353,10 @@ function answerStatsHtml(verb) {
   const c = answerCountsOf(verb);
   return `これまで<span class="stat-ok">○${c.ok}回</span>／<span class="stat-ng">×${c.ng}回</span>`;
 }
-function etymHtml(etymology) {
+function etymHtml(etymology, illustration) {
   const lines = String(etymology).split('\n').map(l => escHtml(l)).join('<br>');
-  return `<div class="etym-title"><i>💡</i>語源でおぼえる</div><div class="etym-body">${lines}</div>`;
+  const iconHtml = illustration ? `<div class="etym-icon">${illustration}</div>` : '';
+  return `<div class="etym-title"><i>💡</i>語源でおぼえる</div><div class="etym-row">${iconHtml}<div class="etym-body">${lines}</div></div>`;
 }
 function wordStatusClass(verb) {
   const data = loadJSON(LS_ANSWERED, {});
@@ -1168,7 +1169,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
   const noteEl = document.getElementById('reveal-note');
   if (q.note) { noteEl.hidden = false; noteEl.textContent = '※ ' + q.note; } else { noteEl.hidden = true; }
   const etymEl = document.getElementById('reveal-etym');
-  if (q.word.etymology) { etymEl.hidden = false; etymEl.innerHTML = etymHtml(q.word.etymology); } else { etymEl.hidden = true; }
+  if (q.word.etymology) { etymEl.hidden = false; etymEl.innerHTML = etymHtml(q.word.etymology, q.word.illustration); } else { etymEl.hidden = true; }
 
   const wrongInfoEl = document.getElementById('reveal-wrong-info');
   const cleanedInput = (userAnswer || '').trim();
@@ -1424,7 +1425,7 @@ function wordItemEl(w) {
       ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
       ${w.def ? `<div class="def">${escHtml(w.def)}</div>` : ''}
       ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
-      ${w.etymology ? `<div class="etym-box">${etymHtml(w.etymology)}</div>` : ''}
+      ${w.etymology ? `<div class="etym-box">${etymHtml(w.etymology, w.illustration)}</div>` : ''}
       ${(w.mine && typeof w.no === 'string' && w.no.startsWith('M')) ? '<button type="button" class="btn-ghost btn-block wi-edit-btn">編集する</button>' : ''}
     </div>`;
   div.querySelector('.wi-mark').addEventListener('click', (e) => {

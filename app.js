@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '103'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '104'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1184,6 +1184,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
         ${hit.def ? `<div class="wrong-info-def">${escHtml(hit.def)}</div>` : ''}
         ${hit.ex1 ? `<div class="ex">${escHtml(hit.ex1)} <button class="speak-btn" data-text="${escAttr(hit.ex1)}">🔊</button></div><div class="ja">${escHtml(hit.ja1 || '')}</div>` : ''}
         ${hit.ex2 ? `<div class="ex">${escHtml(hit.ex2)} <button class="speak-btn" data-text="${escAttr(hit.ex2)}">🔊</button></div><div class="ja">${escHtml(hit.ja2 || '')}</div>` : ''}
+        ${hit.etymology ? `<div class="etym-box">${etymHtml(hit.etymology, hit.illustration)}</div>` : ''}
       `;
     } else {
       wrongInfoEl.innerHTML = `<div class="wrong-info-title">あなたの回答「${escHtml(cleanedInput)}」</div><div class="wrong-info-meaning">この単語帳にありません。</div><button class="btn-ghost btn-block" id="wrong-add-dict-btn">辞書に追加する</button>`;

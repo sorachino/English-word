@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '113'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '114'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -392,11 +392,11 @@ function logToday(correct) {
   saveJSON(LS.LOG, log);
 }
 // 個別の問題履歴（いつ・どのモードで・どの語を・正解したか）を記録する
-function recordAnswerLog(mode, word, ok) {
+function recordAnswerLog(mode, word, ok, sessionId) {
   const log = loadJSON(LS.ANSWER_LOG, {});
   const dateKey = todayKey();
   if (!log[dateKey]) log[dateKey] = [];
-  log[dateKey].push({ m: mode, v: baseForm(word.verb), k: wordKey(word), ok: !!ok });
+  log[dateKey].push({ m: mode, v: baseForm(word.verb), k: wordKey(word), ok: !!ok, s: sessionId });
   saveJSON(LS.ANSWER_LOG, log);
   pushAnswerLogToCloud(dateKey, log[dateKey]);
 }
@@ -525,7 +525,7 @@ document.getElementById('start-quiz').addEventListener('click', () => {
   const newOn = document.getElementById('new-on-toggle').checked;
   const qs = buildQuiz(stage, quizCount, weakOn, srsOn, newOn);
   if (!qs.length) { toast('この条件では問題が作れませんでした'); return; }
-  quizState = { questions: qs, idx: 0, correctCount: 0, results: [], mode: quizMode };
+  quizState = { questions: qs, idx: 0, correctCount: 0, results: [], mode: quizMode, sessionId: Date.now() };
   document.getElementById('quiz-setup').hidden = true;
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-match').hidden = true;
@@ -611,6 +611,7 @@ function startMatchingGame() {
     selectedVerb: null,
     selectedMeaning: null,
     lastMatchedPair: null,
+    sessionId: Date.now(),
   };
   document.getElementById('quiz-setup').hidden = true;
   document.getElementById('quiz-play').hidden = true;
@@ -700,7 +701,7 @@ function renderMatchBoard() {
       updateSrs(p.key, ok, false);
       recordAnswered(p.key, ok);
       logToday(ok);
-      recordAnswerLog('match', p.word, ok);
+      recordAnswerLog('match', p.word, ok, matchState.sessionId);
       syncLeaderboard(p.word, ok);
     });
     updateStreakPill();
@@ -1192,7 +1193,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
   updateSrs(key, ok, method === 'hint' || method === 'choice');
   recordAnswered(key, ok);
   logToday(ok);
-  recordAnswerLog('quiz', q.word, ok);
+  recordAnswerLog('quiz', q.word, ok, quizState.sessionId);
   playResultSound(ok);
   syncLeaderboard(q.word, ok);
   if (ok) quizState.correctCount++;
@@ -2927,21 +2928,42 @@ document.getElementById('day-detail-backdrop').addEventListener('click', () => {
 // ===================== 問題履歴：ラウンド（5問単位）でのドリルダウン表示 =====================
 // 一覧（モード＋5単語名、結果は見せない）→ タップでその回の結果一覧 → タップで解説
 function chunkIntoRounds(entriesAscending) {
+  // セッションID(s)が同じ連続エントリを1回のプレイとしてまとめる。
+  // セッションIDが無い旧データは、従来通り5件区切りにフォールバックする。
   const rounds = [];
-  for (let i = 0; i < entriesAscending.length; i += 5) {
-    rounds.push(entriesAscending.slice(i, i + 5));
-  }
+  let current = [];
+  let currentSession;
+  entriesAscending.forEach(e => {
+    const sid = e.s;
+    if (current.length === 0) {
+      current = [e];
+      currentSession = sid;
+    } else if (sid !== undefined && sid === currentSession) {
+      current.push(e);
+    } else if (sid === undefined && currentSession === undefined && current.length < 5) {
+      current.push(e);
+    } else {
+      rounds.push(current);
+      current = [e];
+      currentSession = sid;
+    }
+  });
+  if (current.length) rounds.push(current);
   return rounds;
 }
 function modeLabelOf(m) { return m === 'match' ? 'マッチングゲーム' : '通常クイズ'; }
 
 function roundListHtml(rounds) {
   if (!rounds.length) return '<div class="empty-note">まだ問題履歴がありません。</div>';
-  return rounds.map((round, i) => `
+  return rounds.map((round, i) => {
+    const names = round.slice(0, 5).map(e => baseForm(e.v || '')).join('、');
+    const more = round.length > 5 ? `　他${round.length - 5}語` : '';
+    return `
     <div class="word-item round-row" data-round-idx="${i}">
-      <div class="wi-head"><span class="wi-verb">${escHtml(modeLabelOf(round[0].m))}</span></div>
-      <div class="wi-meaning">${escHtml(round.map(e => baseForm(e.v || '')).join('、'))}</div>
-    </div>`).join('');
+      <div class="wi-head"><span class="wi-verb">${escHtml(modeLabelOf(round[0].m))}</span><span class="wi-stage">${round.length}問</span></div>
+      <div class="wi-meaning">${escHtml(names)}${escHtml(more)}</div>
+    </div>`;
+  }).join('');
 }
 function bindRoundRows(containerEl, rounds) {
   containerEl.querySelectorAll('.round-row').forEach(row => {

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '109'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '110'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -2979,30 +2979,6 @@ document.getElementById('person-day-close').addEventListener('click', () => {
 });
 document.getElementById('person-day-backdrop').addEventListener('click', () => {
   document.getElementById('person-day-modal').hidden = true;
-});
-
-function openMyHistoryList() {
-  const log = loadJSON(LS.ANSWER_LOG, {});
-  const dates = Object.keys(log).sort().reverse();
-  const bodyEl = document.getElementById('my-history-body');
-  bodyEl.innerHTML = dates.length
-    ? dates.map(d => `<div class="lb-row" data-date="${d}"><span class="lb-name">${d}</span><span class="lb-count">${log[d].length}問</span></div>`).join('')
-    : '<div class="empty-note">まだ問題履歴がありません。クイズかマッチングゲームを解くと記録されます。</div>';
-  bodyEl.querySelectorAll('.lb-row').forEach(row => {
-    row.style.cursor = 'pointer';
-    row.addEventListener('click', () => {
-      document.getElementById('my-history-modal').hidden = true;
-      openPersonDayDetail(getNickname() || 'あなた', row.dataset.date);
-    });
-  });
-  document.getElementById('my-history-modal').hidden = false;
-}
-document.getElementById('open-my-history-btn').addEventListener('click', openMyHistoryList);
-document.getElementById('my-history-close').addEventListener('click', () => {
-  document.getElementById('my-history-modal').hidden = true;
-});
-document.getElementById('my-history-backdrop').addEventListener('click', () => {
-  document.getElementById('my-history-modal').hidden = true;
 });
 
 // ===================== 最近の学習（直近のラウンドを新しい順に表示） =====================

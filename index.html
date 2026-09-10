@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="109">
+<meta name="build-version" content="110">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -369,13 +369,8 @@
     </div>
 
     <div class="card" id="recent-session-card" hidden>
-      <div class="section-label">最近の学習</div>
+      <div class="section-label">学習履歴</div>
       <div class="word-list" id="recent-session-list"></div>
-    </div>
-
-    <div class="card">
-      <div class="section-label">問題履歴</div>
-      <button type="button" class="btn-ghost btn-block" id="open-my-history-btn">自分の問題履歴を見る</button>
     </div>
 
     <div class="card" id="voice-legacy-card" hidden>
@@ -448,17 +443,6 @@
   </div>
 </div>
 
-<div class="dd-modal" id="my-history-modal" hidden>
-  <div class="dd-backdrop" id="my-history-backdrop"></div>
-  <div class="dd-card">
-    <div class="dd-head">
-      <div class="dd-pos">自分の問題履歴（日付を選択）</div>
-      <button class="dd-close" id="my-history-close" aria-label="閉じる">×</button>
-    </div>
-    <div class="dd-body" id="my-history-body">読み込み中…</div>
-  </div>
-</div>
-
 <div class="dd-modal" id="recent-session-modal" hidden>
   <div class="dd-backdrop" id="recent-session-backdrop"></div>
   <div class="dd-card">
@@ -495,6 +479,6 @@
 <script src="tts-config.js?v=2"></script>
 <script src="ai-config.js?v=1"></script>
 <script src="data.js?v=24"></script>
-<script src="app.js?v=109"></script>
+<script src="app.js?v=110"></script>
 </body>
 </html>

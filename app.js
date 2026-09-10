@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '115'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '116'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -362,6 +362,36 @@ function migrateToWordKeys() {
   localStorage.setItem(FLAG, '1');
 }
 migrateToWordKeys();
+
+// ===================== 苦手語(WEAK)と正答/誤答(ANSWERED)の整合性を一度だけ揃える =====================
+// 本来この2つは常にセットで更新されるが、過去のデータや直前のキー移行で片方だけ記録が
+// 残っている（＝苦手語リストと辞書タブの「要復習」件数がズレる）ケースがあるため、一度だけ統一する。
+function reconcileWeakAndAnswered() {
+  const FLAG = 'pv_reconciled_weak_answered_v1';
+  if (localStorage.getItem(FLAG) === '1') return;
+  const weak = loadJSON(LS.WEAK, {});
+  const answered = loadJSON(LS_ANSWERED, {});
+  const allKeys = new Set([...Object.keys(weak), ...Object.keys(answered)]);
+  let weakChanged = false, answeredChanged = false;
+  allKeys.forEach(key => {
+    const inWeak = !!weak[key];
+    const ngPositive = !!(answered[key] && answered[key].ng > 0);
+    if (inWeak && !ngPositive) {
+      if (!answered[key]) answered[key] = { ok: 0, ng: 0, totalNg: 0 };
+      const n = Math.max(1, weak[key].wrong || 1);
+      answered[key].ng = n;
+      answered[key].totalNg = (answered[key].totalNg || 0) + n;
+      answeredChanged = true;
+    } else if (!inWeak && ngPositive) {
+      weak[key] = { hint: 0, choice: 0, wrong: answered[key].ng, okStreak: 0 };
+      weakChanged = true;
+    }
+  });
+  if (weakChanged) saveJSON(LS.WEAK, weak);
+  if (answeredChanged) saveJSON(LS_ANSWERED, answered);
+  localStorage.setItem(FLAG, '1');
+}
+reconcileWeakAndAnswered();
 // 正答数・通算誤答数（苦手判定用の直近ngとは別に、累積で保持）
 function answerCountsOf(verb) {
   const data = loadJSON(LS_ANSWERED, {});

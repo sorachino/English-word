@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '123'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '124'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1447,7 +1447,6 @@ function renderWordList() {
   const sortMode = document.getElementById('list-sort').value;
   const markedOnly = document.getElementById('marked-only-toggle').checked;
   const marked = loadMarked();
-  const answered = loadJSON(LS_ANSWERED, {});
 
   let words = allWords();
   if (stage) words = words.filter(w => w.stage === stage);
@@ -1458,11 +1457,10 @@ function renderWordList() {
     words = words.filter(w => {
       const key = wordKey(w);
       if (statusFilter === 'ng') return !!weak[key]; // クイズ側の「苦手語」と同じ基準（今も苦手かどうか）に統一
-      const rec = answered[key];
-      // 「習得済語」＝今は苦手リストに入っておらず、かつ一度でも正解したことがある語。
-      // 以前は「一度でも間違えたら永久に対象外」だったため、直近で正解して苦手を脱した語が
-      // 反映されなかった。苦手リストの判定と揃えることで、直近の正解がすぐ反映されるようにする。
-      return !weak[key] && !!rec && rec.ok > 0;
+      // 「習得済語」＝未学習でなく、かつ今は苦手リストに入っていない語。
+      // 円グラフ(renderDictProgress)の集計と全く同じ基準（isNewWordベース）に揃えることで、
+      // 円グラフの件数とフィルター結果の件数が必ず一致するようにする。
+      return !weak[key] && !isNewWord(key);
     });
   }
 

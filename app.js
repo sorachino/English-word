@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '108'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '109'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1307,6 +1307,7 @@ function renderDoneDetail() {
     ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
     <div class="def">${escHtml(w.meaning || '')}${w.def ? '／' + escHtml(w.def) : ''}</div>
     ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
+    ${w.etymology ? `<div class="etym-box">${etymHtml(w.etymology, w.illustration)}</div>` : ''}
   `;
 }
 function ddGo(delta) {
@@ -2890,38 +2891,85 @@ document.getElementById('day-detail-backdrop').addEventListener('click', () => {
 });
 
 // ===================== 個別の問題履歴（誰の・いつの分でも表示可能） =====================
-function personDayEntriesHtml(entries) {
-  if (!Array.isArray(entries) || !entries.length) {
-    return '<div class="empty-note">この日の問題履歴はありません。</div>';
+// ===================== 問題履歴：ラウンド（5問単位）でのドリルダウン表示 =====================
+// 一覧（モード＋5単語名、結果は見せない）→ タップでその回の結果一覧 → タップで解説
+function chunkIntoRounds(entriesAscending) {
+  const rounds = [];
+  for (let i = 0; i < entriesAscending.length; i += 5) {
+    rounds.push(entriesAscending.slice(i, i + 5));
   }
-  const modeLabel = m => (m === 'match' ? 'マッチングゲーム' : '通常クイズ');
-  return entries.slice().reverse().map((e, i) => `
-    <div class="word-item">
+  return rounds;
+}
+function modeLabelOf(m) { return m === 'match' ? 'マッチングゲーム' : '通常クイズ'; }
+
+function roundListHtml(rounds) {
+  if (!rounds.length) return '<div class="empty-note">まだ問題履歴がありません。</div>';
+  return rounds.map((round, i) => `
+    <div class="word-item round-row" data-round-idx="${i}">
+      <div class="wi-head"><span class="wi-verb">${escHtml(modeLabelOf(round[0].m))}</span></div>
+      <div class="wi-meaning">${escHtml(round.map(e => baseForm(e.v || '')).join('、'))}</div>
+    </div>`).join('');
+}
+function bindRoundRows(containerEl, rounds) {
+  containerEl.querySelectorAll('.round-row').forEach(row => {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => openRoundResultDetail(rounds[Number(row.dataset.roundIdx)]));
+  });
+}
+
+function openRoundResultDetail(round) {
+  const bodyEl = document.getElementById('recent-session-detail-body');
+  bodyEl.innerHTML = round.map((e, i) => `
+    <div class="word-item round-result-row" data-idx="${i}">
       <div class="wi-head">
         <span class="wi-verb">${i + 1}. ${escHtml(baseForm(e.v || ''))}</span>
         <span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○' : '×'}</span>
       </div>
-      <div class="wi-meaning">${escHtml(modeLabel(e.m))}</div>
+      <div class="wi-meaning">${escHtml(modeLabelOf(e.m))}</div>
     </div>`).join('');
+  bodyEl.querySelectorAll('.round-result-row').forEach(row => {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => {
+      const items = round.map(e => {
+        const verb = baseForm(e.v || '');
+        return { verb, ok: e.ok, sub: '', word: findWordByVerb(verb) };
+      }).filter(it => it.word);
+      const tappedVerb = baseForm(round[Number(row.dataset.idx)].v || '');
+      const idx = items.findIndex(it => it.verb === tappedVerb);
+      if (idx === -1) { toast('この語の例文データが見つかりませんでした'); return; }
+      openDetailModal(items, idx);
+    });
+  });
+  document.getElementById('recent-session-modal').hidden = false;
 }
+document.getElementById('recent-session-close').addEventListener('click', () => {
+  document.getElementById('recent-session-modal').hidden = true;
+});
+document.getElementById('recent-session-backdrop').addEventListener('click', () => {
+  document.getElementById('recent-session-modal').hidden = true;
+});
+
 function openPersonDayDetail(name, dateStr) {
   document.getElementById('person-day-title').textContent = `${name} ・ ${dateStr}`;
   const bodyEl = document.getElementById('person-day-body');
   bodyEl.innerHTML = '読み込み中…';
   document.getElementById('person-day-modal').hidden = false;
 
+  const render = entries => {
+    const rounds = chunkIntoRounds(Array.isArray(entries) ? entries : []).reverse(); // 新しい回が先
+    bodyEl.innerHTML = roundListHtml(rounds);
+    bindRoundRows(bodyEl, rounds);
+  };
+
   const myName = getNickname();
   if (name === myName) {
     const localLog = loadJSON(LS.ANSWER_LOG, {});
-    if (localLog[dateStr]) {
-      bodyEl.innerHTML = personDayEntriesHtml(localLog[dateStr]);
-      return;
-    }
+    if (localLog[dateStr]) { render(localLog[dateStr]); return; }
   }
   const db = initFirebase();
   if (!db) { bodyEl.innerHTML = '<div class="empty-note">取得できませんでした。</div>'; return; }
   db.ref(`users/${name}/answerLog/${dateStr}`).get().then(snap => {
-    bodyEl.innerHTML = personDayEntriesHtml(snap.val());
+    render(snap.val());
   }).catch(() => {
     bodyEl.innerHTML = '<div class="empty-note">取得に失敗しました。</div>';
   });
@@ -2957,74 +3005,26 @@ document.getElementById('my-history-backdrop').addEventListener('click', () => {
   document.getElementById('my-history-modal').hidden = true;
 });
 
-// ===================== 最近の学習（直近の問題形式＋直近5問） =====================
-function getRecentAnswerEntries(limit) {
+// ===================== 最近の学習（直近のラウンドを新しい順に表示） =====================
+function getRecentRounds(limit) {
   const log = loadJSON(LS.ANSWER_LOG, {});
   const dates = Object.keys(log).sort(); // 昇順（古い→新しい）
   const flat = [];
-  dates.forEach(d => {
-    (log[d] || []).forEach(e => flat.push(e));
-  });
-  return flat.slice(-limit).reverse(); // 直近N件を新しい順で
+  dates.forEach(d => (log[d] || []).forEach(e => flat.push(e)));
+  const rounds = chunkIntoRounds(flat);
+  return rounds.slice(-limit).reverse(); // 新しい回が先
 }
 function renderRecentSession() {
   const card = document.getElementById('recent-session-card');
   if (!card) return;
-  const entries = getRecentAnswerEntries(5);
-  if (!entries.length) { card.hidden = true; return; }
+  const rounds = getRecentRounds(5);
+  if (!rounds.length) { card.hidden = true; return; }
   card.hidden = false;
-  const modeLabel = m => (m === 'match' ? 'マッチングゲーム' : '通常クイズ');
-  document.getElementById('recent-session-mode').textContent = `直近の形式：${modeLabel(entries[0].m)}`;
   const listEl = document.getElementById('recent-session-list');
-  listEl.innerHTML = '';
-  entries.forEach(e => {
-    const item = document.createElement('div');
-    item.className = 'word-item';
-    item.style.cursor = 'pointer';
-    item.innerHTML = `
-      <div class="wi-head">
-        <span class="wi-verb">${escHtml(baseForm(e.v || ''))}</span>
-        <span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○' : '×'}</span>
-      </div>
-      <div class="wi-meaning">${modeLabel(e.m)}</div>`;
-    item.addEventListener('click', () => openRecentSessionDetail(entries));
-    listEl.appendChild(item);
-  });
+  listEl.innerHTML = roundListHtml(rounds);
+  bindRoundRows(listEl, rounds);
 }
-function openRecentSessionDetail(entries) {
-  const modeLabel = m => (m === 'match' ? 'マッチングゲーム' : '通常クイズ');
-  const bodyEl = document.getElementById('recent-session-detail-body');
-  bodyEl.innerHTML = entries.map((e, i) => {
-    const verb = baseForm(e.v || '');
-    const w = findWordByVerb(verb);
-    if (!w) {
-      return `<div class="word-item">
-        <div class="wi-head"><span class="wi-verb">${i + 1}. ${escHtml(verb)}</span><span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○ 正解' : '× 不正解'}</span></div>
-        <div class="wi-meaning">${modeLabel(e.m)}／データが見つかりませんでした</div>
-      </div>`;
-    }
-    return `<div class="word-item">
-      <div class="wi-head">
-        <span class="wi-verb">${i + 1}. ${escHtml(verb)}</span>
-        <span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○ 正解' : '× 不正解'}</span>
-      </div>
-      <div class="wi-meaning">${modeLabel(e.m)}</div>
-      <div class="wi-detail" style="display:block; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line);">
-        ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
-        <div class="def">${escHtml(w.meaning || '')}${w.def ? '／' + escHtml(w.def) : ''}</div>
-        ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
-        ${w.etymology ? `<div class="etym-box">${etymHtml(w.etymology, w.illustration)}</div>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-  document.getElementById('recent-session-modal').hidden = false;
-}
-document.getElementById('recent-session-close').addEventListener('click', () => {
-  document.getElementById('recent-session-modal').hidden = true;
-});
-document.getElementById('recent-session-backdrop').addEventListener('click', () => {
-  document.getElementById('recent-session-modal').hidden = true;
-});
+
 
 document.getElementById('cc-prev').addEventListener('click', () => {
   initChampionCalState();

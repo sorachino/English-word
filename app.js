@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '106'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '107'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1381,7 +1381,27 @@ document.querySelectorAll('#status-filter-group .chip').forEach(chip => {
   });
 });
 
+function renderDictProgress() {
+  const words = allWords();
+  let okCount = 0, ngCount = 0, unlearnedCount = 0;
+  words.forEach(w => {
+    const verb = baseForm(w.verb);
+    const cls = wordStatusClass(verb);
+    if (cls.includes('status-ng')) ngCount++;
+    else if (cls.includes('status-ok')) okCount++;
+    else unlearnedCount++;
+  });
+  const total = words.length || 1;
+  document.getElementById('dp-ok-num').textContent = okCount;
+  document.getElementById('dp-ng-num').textContent = ngCount;
+  document.getElementById('dp-unlearned-num').textContent = unlearnedCount;
+  document.getElementById('dp-seg-ok').style.width = (100 * okCount / total) + '%';
+  document.getElementById('dp-seg-ng').style.width = (100 * ngCount / total) + '%';
+  document.getElementById('dp-seg-unlearned').style.width = (100 * unlearnedCount / total) + '%';
+}
+
 function renderWordList() {
+  renderDictProgress();
   const q = document.getElementById('list-search').value.trim().toLowerCase();
   const stage = parseInt(document.getElementById('list-stage-filter').value, 10);
   const sortMode = document.getElementById('list-sort').value;

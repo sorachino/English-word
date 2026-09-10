@@ -340,6 +340,19 @@ select{
 
 /* ---------- Stats ---------- */
 .stats-summary{display:grid; grid-template-columns:repeat(4,1fr); gap:6px; text-align:center;}
+.dict-progress-card{margin-bottom:12px;}
+.dict-progress-nums{display:flex; justify-content:space-between; margin:10px 0 8px;}
+.dict-progress-nums .n{font-size:22px; font-weight:900; color:var(--navy);}
+.dict-progress-nums .l{font-size:12px; color:var(--ink-soft); display:flex; align-items:center; gap:5px; margin-top:2px;}
+.dp-dot{display:inline-block; width:9px; height:9px; border-radius:50%;}
+.dp-dot-ok{background:var(--ok);}
+.dp-dot-ng{background:var(--hanko);}
+.dp-dot-unlearned{background:var(--line);}
+.dict-progress-bar{display:flex; height:10px; border-radius:5px; overflow:hidden; background:var(--line);}
+.dp-seg{height:100%;}
+.dp-seg-ok{background:var(--ok);}
+.dp-seg-ng{background:var(--hanko);}
+.dp-seg-unlearned{background:var(--line);}
 .stat-num{font-family:"JetBrains Mono",monospace; font-weight:800; font-size:22px; color:var(--navy);}
 .stat-label{font-size:10.5px; color:var(--ink-soft); margin-top:2px;}
 .section-label{font-weight:700; font-size:13px; color:var(--ink-soft); margin-bottom:10px;}

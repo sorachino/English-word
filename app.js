@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '112'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '113'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -66,6 +66,16 @@ function wordGroups(w) {
 }
 function baseForm(verb) {
   return verb.replace(/\s*\*\d+.*$/, '').replace(/\s*\(\d+\)\s*$/, '').trim();
+}
+// 同じ表記で意味違いの語（例: put on / put on*2）を正しく区別するための一意キー。
+// 組み込み402語は一意な no を使う。マイ単語（no が不安定なので）は表記ベースにフォールバック。
+function wordKey(w) {
+  if (!w) return '';
+  return (typeof w.no === 'number') ? 'n' + w.no : 'v' + baseForm(w.verb);
+}
+function findWordByKey(key) {
+  if (!key) return null;
+  return allWords().find(w => wordKey(w) === key) || null;
 }
 
 // ===================== 活用対応の穴埋め =====================
@@ -156,10 +166,10 @@ let quizState = null;
 function buildQuiz(stageFilter, count, weakOn, srsOn, newOn) {
   const words = allWords();
   const weak = loadJSON(LS.WEAK, {});
-  const weakVerbs = Object.keys(weak);
-  const isWeak = w => weakVerbs.includes(baseForm(w.verb));
-  const isDue = w => { const s = srsScore(baseForm(w.verb)); return s !== null && s <= 0; };
-  const isNew = w => isNewWord(baseForm(w.verb));
+  const weakKeys = Object.keys(weak);
+  const isWeak = w => weakKeys.includes(wordKey(w));
+  const isDue = w => { const s = srsScore(wordKey(w)); return s !== null && s <= 0; };
+  const isNew = w => isNewWord(wordKey(w));
 
   let pool = stageFilter ? words.filter(w => w.stage === stageFilter) : words.slice();
 
@@ -256,9 +266,8 @@ function daysBetween(dateStrA, dateStrB) {
   const a = new Date(ay, am - 1, ad), b = new Date(by, bm - 1, bd);
   return Math.round((a - b) / 86400000);
 }
-function updateSrs(verb, ok, usedHelp) {
+function updateSrs(key, ok, usedHelp) {
   const srs = loadSrs();
-  const key = baseForm(verb);
   const today = todayKey();
   const entry = srs[key] || { interval: 1, dueDate: today, reps: 0 };
   if (ok && !usedHelp) {
@@ -276,26 +285,26 @@ function updateSrs(verb, ok, usedHelp) {
   srs[key] = entry;
   saveSrs(srs);
 }
-function srsScore(verb) {
+function srsScore(key) {
   // 数値が小さいほど優先度が高い。復習対象（一度でも解いたことがある語）だけを対象とし、期限切れが長いほど優先。
   // 未実施（一度も解いていない）語はここでは扱わない（別枠の「未実施語」機能で扱う）。
   const srs = loadSrs();
-  const entry = srs[baseForm(verb)];
+  const entry = srs[key];
   if (!entry) return null;
   return -daysBetween(todayKey(), entry.dueDate);
 }
-function isNewWord(verb) {
+function isNewWord(key) {
   const srs = loadSrs();
-  return !srs[baseForm(verb)];
+  return !srs[key];
 }
 function srsDuePool(words) {
   return words.filter(w => {
-    const s = srsScore(baseForm(w.verb));
+    const s = srsScore(wordKey(w));
     return s !== null && s <= 0;
   });
 }
 function srsNewPool(words) {
-  return words.filter(w => isNewWord(baseForm(w.verb)));
+  return words.filter(w => isNewWord(wordKey(w)));
 }
 
 function recordResult(verb, method) {
@@ -320,6 +329,36 @@ function recordAnswered(verb, ok) {
   if (ok) { data[verb].ok++; data[verb].ng = 0; } else { data[verb].ng++; data[verb].totalNg++; }
   saveJSON(LS_ANSWERED, data);
 }
+
+// ===================== 一意キー移行（同表記・別意味の語の記録混同を解消） =====================
+// 以前は表記(baseForm)をキーに正答/誤答・苦手・復習を記録していたため、
+// put on / put on*2 のような「同じ表記で意味違い」の語同士で記録が混ざっていた。
+// 一意に対応語が特定できるものだけ新キー(wordKey)に引き継ぎ、あいまいなものは事故を避けるため破棄する。
+function migrateToWordKeys() {
+  const FLAG = 'pv_migrated_wordkey_v1';
+  if (localStorage.getItem(FLAG) === '1') return;
+  const byBase = {};
+  allWords().forEach(w => {
+    const b = baseForm(w.verb);
+    (byBase[b] = byBase[b] || []).push(w);
+  });
+  function migrateStore(storageKey) {
+    const old = loadJSON(storageKey, {});
+    const next = {};
+    Object.entries(old).forEach(([k, v]) => {
+      const matches = byBase[k];
+      if (!matches) { next[k] = v; return; } // 該当なし＝すでに新形式か、削除済みの語。そのまま保持
+      if (matches.length === 1) { next[wordKey(matches[0])] = v; } // 一意に特定できる場合だけ引き継ぐ
+      // matches.length >= 2（あいまいな同表記語）は引き継がない
+    });
+    saveJSON(storageKey, next);
+  }
+  migrateStore(LS_ANSWERED);
+  migrateStore(LS.WEAK);
+  migrateStore(LS.SRS);
+  localStorage.setItem(FLAG, '1');
+}
+migrateToWordKeys();
 // 正答数・通算誤答数（苦手判定用の直近ngとは別に、累積で保持）
 function answerCountsOf(verb) {
   const data = loadJSON(LS_ANSWERED, {});
@@ -353,13 +392,13 @@ function logToday(correct) {
   saveJSON(LS.LOG, log);
 }
 // 個別の問題履歴（いつ・どのモードで・どの語を・正解したか）を記録する
-function recordAnswerLog(mode, verb, ok) {
+function recordAnswerLog(mode, word, ok) {
   const log = loadJSON(LS.ANSWER_LOG, {});
-  const key = todayKey();
-  if (!log[key]) log[key] = [];
-  log[key].push({ m: mode, v: verb, ok: !!ok });
+  const dateKey = todayKey();
+  if (!log[dateKey]) log[dateKey] = [];
+  log[dateKey].push({ m: mode, v: baseForm(word.verb), k: wordKey(word), ok: !!ok });
   saveJSON(LS.ANSWER_LOG, log);
-  pushAnswerLogToCloud(key, log[key]);
+  pushAnswerLogToCloud(dateKey, log[dateKey]);
 }
 function pushAnswerLogToCloud(dateKey, entries) {
   const db = initFirebase();
@@ -565,7 +604,7 @@ function startMatchingGame() {
   }
 
   matchState = {
-    pairs: chosen.map(w => ({ verb: baseForm(w.verb), meaning: w.meaning, groups: wordGroups(w), nuance: w.nuance || '', hadMistake: false })),
+    pairs: chosen.map(w => ({ verb: baseForm(w.verb), key: wordKey(w), word: w, meaning: w.meaning, groups: wordGroups(w), nuance: w.nuance || '', hadMistake: false })),
     verbOrder: shuffle(chosen.map(w => baseForm(w.verb))),
     meaningOrder: shuffle(chosen.map(w => w.meaning)),
     matched: new Set(),
@@ -657,12 +696,12 @@ function renderMatchBoard() {
     matchState.counted = true;
     matchState.pairs.forEach(p => {
       const ok = !p.hadMistake;
-      if (ok) recordResult(p.verb, 'first'); // 間違いなく正解＝苦手リストから外す（間違えた分は既に'wrong'で登録済みなので二重処理しない）
-      updateSrs(p.verb, ok, false);
-      recordAnswered(p.verb, ok);
+      if (ok) recordResult(p.key, 'first'); // 間違いなく正解＝苦手リストから外す（間違えた分は既に'wrong'で登録済みなので二重処理しない）
+      updateSrs(p.key, ok, false);
+      recordAnswered(p.key, ok);
       logToday(ok);
-      recordAnswerLog('match', p.verb, ok);
-      syncLeaderboard(p.verb, ok);
+      recordAnswerLog('match', p.word, ok);
+      syncLeaderboard(p.word, ok);
     });
     updateStreakPill();
     toast('全部そろいました！');
@@ -690,7 +729,7 @@ function tryResolveMatch() {
     toast('不一致です、もう一度');
     if (pair) {
       pair.hadMistake = true;
-      recordResult(pair.verb, 'wrong'); // 日本語訳を間違えたので、この句動詞を苦手単語に登録する
+      recordResult(pair.key, 'wrong'); // 日本語訳を間違えたので、この句動詞を苦手単語に登録する
     }
   }
   matchState.selectedVerb = null;
@@ -1148,13 +1187,14 @@ refreshSoundToggle();
 function finishQuestion(ok, method, delay, userAnswer) {
   const q = quizState.questions[quizState.idx];
   q.resolved = true; q.method = method;
-  recordResult(q.answer, ok ? method : 'wrong');
-  updateSrs(q.answer, ok, method === 'hint' || method === 'choice');
-  recordAnswered(q.answer, ok);
+  const key = wordKey(q.word);
+  recordResult(key, ok ? method : 'wrong');
+  updateSrs(key, ok, method === 'hint' || method === 'choice');
+  recordAnswered(key, ok);
   logToday(ok);
-  recordAnswerLog('quiz', q.answer, ok);
+  recordAnswerLog('quiz', q.word, ok);
   playResultSound(ok);
-  syncLeaderboard(q.answer, ok);
+  syncLeaderboard(q.word, ok);
   if (ok) quizState.correctCount++;
   quizState.results.push({ verb: q.answer, ok, q });
 
@@ -1164,7 +1204,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
 
   const reveal = document.getElementById('reveal-box');
   document.getElementById('reveal-verb').textContent = q.answer;
-  document.getElementById('reveal-answer-stats').innerHTML = answerStatsHtml(q.answer);
+  document.getElementById('reveal-answer-stats').innerHTML = answerStatsHtml(key);
   document.getElementById('reveal-sentence').textContent = q.full;
   document.getElementById('reveal-speak-btn').dataset.text = q.full || '';
   document.getElementById('reveal-ja').textContent = q.ja;
@@ -1373,8 +1413,7 @@ function renderDictProgress() {
   const words = allWords();
   let okCount = 0, ngCount = 0, unlearnedCount = 0;
   words.forEach(w => {
-    const verb = baseForm(w.verb);
-    const cls = wordStatusClass(verb);
+    const cls = wordStatusClass(wordKey(w));
     if (cls.includes('status-ng')) ngCount++;
     else if (cls.includes('status-ok')) okCount++;
     else unlearnedCount++;
@@ -1434,12 +1473,13 @@ function renderWordList() {
 }
 function wordItemEl(w) {
   const div = document.createElement('div');
-  const verbKey = baseForm(w.verb);
-  div.className = 'word-item' + wordStatusClass(verbKey);
+  const verbKey = baseForm(w.verb); // マーク機能は従来通り表記ベース（マイ単語含め安定IDが無いため）
+  const trackKey = wordKey(w); // 正答/誤答・苦手・復習は一意キーで区別
+  div.className = 'word-item' + wordStatusClass(trackKey);
   const marked = loadMarked().has(verbKey);
   div.innerHTML = `
     <div class="wi-head">
-      <div><span class="wi-verb">${escHtml(w.verb)}</span>${w.mine ? '<span class="wi-badge-mine">マイ単語</span>' : ''}</div>
+      <div><span class="wi-verb">${escHtml(baseForm(w.verb))}</span>${w.mine ? '<span class="wi-badge-mine">マイ単語</span>' : ''}</div>
       <div class="wi-right">
         <button class="wi-mark${marked ? ' on' : ''}" type="button" aria-label="マーク">${marked ? '★' : '☆'}</button>
         <span class="wi-stage">${w.mine ? 'MY' : 'ST.' + w.stage}</span>
@@ -1447,7 +1487,7 @@ function wordItemEl(w) {
     </div>
     <div class="wi-meaning">${escHtml(w.meaning || '')}</div>
     <div class="wi-detail">
-      <div class="wi-answer-stats">${answerStatsHtml(verbKey)}</div>
+      <div class="wi-answer-stats">${answerStatsHtml(trackKey)}</div>
       ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}</div>` : ''}
       ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
       ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
@@ -2298,6 +2338,8 @@ function renderStats() {
     return sb - sa;
   });
   function buildWeakChip(k) {
+    const word = findWordByKey(k);
+    const verbText = word ? baseForm(word.verb) : k;
     const w = weak[k];
     const heavy = (w.wrong + w.choice) > 0;
     const chip = document.createElement('span');
@@ -2307,7 +2349,7 @@ function renderStats() {
     if (w.choice) parts.push('4択' + w.choice);
     if (w.hint) parts.push('ヒント' + w.hint);
     const sub = parts.join(' ');
-    chip.textContent = k + ' ×' + sub;
+    chip.textContent = verbText + ' ×' + sub;
     chip.addEventListener('click', () => {
       const items = sortedKeys.map(kk => {
         const ww = weak[kk];
@@ -2315,9 +2357,10 @@ function renderStats() {
         if (ww.wrong) p.push('誤答' + ww.wrong);
         if (ww.choice) p.push('4択' + ww.choice);
         if (ww.hint) p.push('ヒント' + ww.hint);
-        return { verb: kk, ok: null, sub: p.join(' '), word: findWordByVerb(kk) };
+        const word2 = findWordByKey(kk);
+        return { key: kk, verb: word2 ? baseForm(word2.verb) : kk, ok: null, sub: p.join(' '), word: word2 };
       }).filter(it => it.word);
-      const idx = items.findIndex(it => it.verb === k);
+      const idx = items.findIndex(it => it.key === k);
       if (idx === -1) { toast('この語の例文データが見つかりませんでした'); return; }
       openDetailModal(items, idx);
     });
@@ -2627,7 +2670,7 @@ function monthKey(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function syncLeaderboard(verb, ok) {
+function syncLeaderboard(word, ok) {
   const db = initFirebase();
   if (!db) return;
   const nickname = ensureNickname();
@@ -2638,19 +2681,20 @@ function syncLeaderboard(verb, ok) {
   // すべてこのログを都度集計して求めるので、別カウンターとのズレが起きない。
   updates[`users/${nickname}/log/${today}/solved`] = firebase.database.ServerValue.increment(1);
   if (ok) updates[`users/${nickname}/log/${today}/correct`] = firebase.database.ServerValue.increment(1);
-  if (verb) {
-    const safeVerb = sanitizeKey(verb);
+  if (word) {
+    const key = wordKey(word);
+    const safeVerb = sanitizeKey(key);
     const field = ok ? 'ok' : 'ng';
     updates[`answers/${nickname}/${safeVerb}/${field}`] = firebase.database.ServerValue.increment(1);
     // 苦手語・回答履歴は「今回の単語だけ」を書き込み、他の単語のデータを巻き込まない
     const weak = loadJSON(LS.WEAK, {});
-    updates[`users/${nickname}/weak/${safeVerb}`] = weak[verb] || null;
+    updates[`users/${nickname}/weak/${safeVerb}`] = weak[key] || null;
     const answered = loadJSON(LS_ANSWERED, {});
-    updates[`users/${nickname}/answered/${safeVerb}`] = answered[verb] || null;
+    updates[`users/${nickname}/answered/${safeVerb}`] = answered[key] || null;
     // 復習（SRS）データもクラウドに保存。ローカルのキャッシュだけに依存すると
     // 端末やブラウザのキャッシュを消した時に復習間隔がリセットされてしまうため。
     const srs = loadJSON(LS.SRS, {});
-    updates[`users/${nickname}/srs/${safeVerb}`] = srs[verb] || null;
+    updates[`users/${nickname}/srs/${safeVerb}`] = srs[key] || null;
   }
   updates[`users/${nickname}/myWords`] = myWords();
   db.ref().update(updates).catch(() => {});
@@ -2664,17 +2708,18 @@ function isDateInCurrentWeek(dateStr) {
   return weekKey(new Date(y, m - 1, d)) === weekKey();
 }
 
-function pushWordStateToCloud(verb) {
+function pushWordStateToCloud(word) {
   const db = initFirebase();
   if (!db) return;
   const nickname = getNickname();
   if (!nickname) return;
-  const safeVerb = sanitizeKey(verb);
+  const key = wordKey(word);
+  const safeVerb = sanitizeKey(key);
   const weak = loadJSON(LS.WEAK, {});
   const answered = loadJSON(LS_ANSWERED, {});
   const updates = {};
-  updates[`users/${nickname}/weak/${safeVerb}`] = weak[verb] || null;
-  updates[`users/${nickname}/answered/${safeVerb}`] = answered[verb] || null;
+  updates[`users/${nickname}/weak/${safeVerb}`] = weak[key] || null;
+  updates[`users/${nickname}/answered/${safeVerb}`] = answered[key] || null;
   db.ref().update(updates).catch(() => {});
 }
 
@@ -2683,16 +2728,17 @@ function markCurrentAsWrong() {
   const q = quizState.questions[quizState.idx];
   if (!q || !q.resolved) return;
   const verb = q.answer;
+  const key = wordKey(q.word);
 
   const weak = loadJSON(LS.WEAK, {});
-  if (!weak[verb]) weak[verb] = { hint: 0, choice: 0, wrong: 0, okStreak: 0 };
-  weak[verb].wrong = (weak[verb].wrong || 0) + 1;
+  if (!weak[key]) weak[key] = { hint: 0, choice: 0, wrong: 0, okStreak: 0 };
+  weak[key].wrong = (weak[key].wrong || 0) + 1;
   saveJSON(LS.WEAK, weak);
 
   const answered = loadJSON(LS_ANSWERED, {});
-  if (!answered[verb]) answered[verb] = { ok: 0, ng: 0, totalNg: 0 };
-  answered[verb].ng = (answered[verb].ng || 0) + 1;
-  answered[verb].totalNg = (answered[verb].totalNg || 0) + 1;
+  if (!answered[key]) answered[key] = { ok: 0, ng: 0, totalNg: 0 };
+  answered[key].ng = (answered[key].ng || 0) + 1;
+  answered[key].totalNg = (answered[key].totalNg || 0) + 1;
   saveJSON(LS_ANSWERED, answered);
 
   const last = quizState.results[quizState.results.length - 1];
@@ -2715,7 +2761,7 @@ function markCurrentAsWrong() {
   }
 
   refreshWeakRow();
-  pushWordStateToCloud(verb);
+  pushWordStateToCloud(q.word);
   const statsView = document.getElementById('view-stats');
   if (statsView && statsView.classList.contains('active')) renderStats();
   const btn = document.getElementById('mark-wrong-btn');
@@ -2908,7 +2954,7 @@ function openRoundResultDetail(round) {
   const bodyEl = document.getElementById('recent-session-detail-body');
   bodyEl.innerHTML = round.map((e, i) => {
     const verb = baseForm(e.v || '');
-    const w = findWordByVerb(verb);
+    const w = e.k ? findWordByKey(e.k) : findWordByVerb(verb); // 旧ログ(kなし)は表記から推測（複数意味の語は先頭のものになる可能性あり）
     if (!w) {
       return `<div class="word-item">
         <div class="wi-head"><span class="wi-verb">${i + 1}. ${escHtml(verb)}</span><span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○ 正解' : '× 不正解'}</span></div>
@@ -3022,9 +3068,12 @@ function openLbDetail(name) {
 
     const data = ansSnap.val() || {};
     const weakList = [];
-    Object.entries(data).forEach(([verb, rec]) => {
+    Object.entries(data).forEach(([key, rec]) => {
       const n = (rec && rec.ng) || 0;
-      if (n > 0) weakList.push({ verb, ng: n });
+      if (n <= 0) return;
+      const w = findWordByKey(key);
+      const label = w ? baseForm(w.verb) : key; // 旧形式のキー（本フィックス以前の記録）はそのまま表示
+      weakList.push({ verb: label, ng: n });
     });
     weakList.sort((a, b) => b.ng - a.ng);
 

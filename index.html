@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="111">
+<meta name="build-version" content="112">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -69,16 +69,17 @@
       </div>
       <div class="setup-row">
         <label>苦手語</label>
-        <label class="switch"><input type="checkbox" id="weak-on-toggle"><span>優先する（<span id="weak-count">0</span>語）</span></label>
+        <label class="switch"><input type="checkbox" id="weak-on-toggle"><span>対象にする（<span id="weak-count">0</span>語）</span></label>
       </div>
       <div class="setup-row">
         <label>復習</label>
-        <label class="switch"><input type="checkbox" id="srs-on-toggle"><span>優先する（<span id="srs-count">0</span>語）</span></label>
+        <label class="switch"><input type="checkbox" id="srs-on-toggle"><span>対象にする（<span id="srs-count">0</span>語）</span></label>
       </div>
-      <div class="setup-row" id="strict-only-row" style="display:none">
-        <label></label>
-        <label class="switch"><input type="checkbox" id="strict-only-toggle"><span>優先した語だけに絞る</span></label>
+      <div class="setup-row">
+        <label>未実施語</label>
+        <label class="switch"><input type="checkbox" id="new-on-toggle"><span>対象にする（<span id="new-count">0</span>語）</span></label>
       </div>
+      <div class="empty-note" id="filter-note" hidden>チェックした条件の語だけから出題します（複数チェックで合算）。</div>
       <button class="btn-primary" id="start-quiz">はじめる</button>
     </div>
 
@@ -479,6 +480,6 @@
 <script src="tts-config.js?v=2"></script>
 <script src="ai-config.js?v=1"></script>
 <script src="data.js?v=24"></script>
-<script src="app.js?v=111"></script>
+<script src="app.js?v=112"></script>
 </body>
 </html>

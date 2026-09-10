@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '111'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '112'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -153,57 +153,24 @@ function blankSentence(sentence, verb) {
 // ===================== クイズエンジン =====================
 let quizState = null;
 
-function buildQuiz(stageFilter, count, weakOn, srsOn, strictOnly) {
+function buildQuiz(stageFilter, count, weakOn, srsOn, newOn) {
   const words = allWords();
   const weak = loadJSON(LS.WEAK, {});
   const weakVerbs = Object.keys(weak);
   const isWeak = w => weakVerbs.includes(baseForm(w.verb));
-  const isDue = w => srsScore(baseForm(w.verb)) <= 0;
+  const isDue = w => { const s = srsScore(baseForm(w.verb)); return s !== null && s <= 0; };
+  const isNew = w => isNewWord(baseForm(w.verb));
 
   let pool = stageFilter ? words.filter(w => w.stage === stageFilter) : words.slice();
-  if (strictOnly && weakOn) pool = pool.filter(isWeak);
-  if (strictOnly && srsOn) pool = pool.filter(isDue);
 
-  // 優先度スコア：小さいほど優先。苦手語は一律で優先度を大きく上げ、復習は期限切れが長いほど優先。
-  function priority(w) {
-    let score = srsOn ? srsScore(baseForm(w.verb)) : 0;
-    if (weakOn && isWeak(w)) score -= 50000;
-    return score;
+  // 苦手語・復習・未実施語のいずれかがONなら、チェックした条件の語だけから100%出題する（優先度の概念なし）
+  const anyFilterOn = weakOn || srsOn || newOn;
+  if (anyFilterOn) {
+    pool = pool.filter(w => (weakOn && isWeak(w)) || (srsOn && isDue(w)) || (newOn && isNew(w)));
   }
 
-  let picks = [];
-  if (strictOnly && (weakOn || srsOn)) {
-    // 優先条件を満たす語だけのプールから、優先度順にそのまま採用。
-    // 同点（苦手語は一律同スコア）だと安定ソートで元のデータ順になり、データ上近い位置に
-    // 固まっている似た語ばかり選ばれてしまうため、ソート前に必ずシャッフルしておく。
-    shuffle(pool);
-    pool.sort((a, b) => priority(a) - priority(b));
-    picks = pool.slice(0, count);
-  } else if (weakOn || srsOn) {
-    // 優先条件を満たす語を最大30%確保し、残りはランダム
-    const priorityPool = pool.filter(w => (weakOn && isWeak(w)) || (srsOn && isDue(w)));
-    shuffle(priorityPool); // 同点時の並びが常にデータ順に偏らないように
-    priorityPool.sort((a, b) => priority(a) - priority(b));
-    const n = Math.min(Math.ceil(count * 0.3), priorityPool.length, count);
-    picks = priorityPool.slice(0, n);
-  }
-  // 得意な語（復習間隔が十分伸びた語）を、たまに1問だけ静かに紛れ込ませる（完全に忘れるのを防ぐ）
-  if (picks.length < count) {
-    const srsAll = loadSrs();
-    const masteredPool = pool.filter(w => {
-      if (picks.includes(w)) return false;
-      const entry = srsAll[baseForm(w.verb)];
-      return entry && entry.interval >= 30;
-    });
-    if (masteredPool.length && Math.random() < 0.2) {
-      picks.push(masteredPool[Math.floor(Math.random() * masteredPool.length)]);
-    }
-  }
-
-  const rest = pool.filter(w => !picks.includes(w));
-  shuffle(rest);
-  while (picks.length < count && rest.length) picks.push(rest.shift());
-  shuffle(picks);
+  shuffle(pool);
+  let picks = pool.slice(0, count);
   picks = declusterByGroup(picks);
 
   const allVerbs = [...new Set(words.map(w => baseForm(w.verb)))];
@@ -310,14 +277,25 @@ function updateSrs(verb, ok, usedHelp) {
   saveSrs(srs);
 }
 function srsScore(verb) {
-  // 数値が小さいほど優先度が高い。未出題は最優先、期限切れが長いほど優先。
+  // 数値が小さいほど優先度が高い。復習対象（一度でも解いたことがある語）だけを対象とし、期限切れが長いほど優先。
+  // 未実施（一度も解いていない）語はここでは扱わない（別枠の「未実施語」機能で扱う）。
   const srs = loadSrs();
   const entry = srs[baseForm(verb)];
-  if (!entry) return -100000;
+  if (!entry) return null;
   return -daysBetween(todayKey(), entry.dueDate);
 }
+function isNewWord(verb) {
+  const srs = loadSrs();
+  return !srs[baseForm(verb)];
+}
 function srsDuePool(words) {
-  return words.filter(w => srsScore(baseForm(w.verb)) <= 0);
+  return words.filter(w => {
+    const s = srsScore(baseForm(w.verb));
+    return s !== null && s <= 0;
+  });
+}
+function srsNewPool(words) {
+  return words.filter(w => isNewWord(baseForm(w.verb)));
 }
 
 function recordResult(verb, method) {
@@ -443,14 +421,14 @@ let quizMode = localStorage.getItem('pv_quiz_mode') || 'normal'; // 'normal' | '
 function saveQuizSettings() {
   localStorage.setItem('pv_quiz_weak_on', document.getElementById('weak-on-toggle').checked ? '1' : '0');
   localStorage.setItem('pv_quiz_srs_on', document.getElementById('srs-on-toggle').checked ? '1' : '0');
-  localStorage.setItem('pv_quiz_strict_only', document.getElementById('strict-only-toggle').checked ? '1' : '0');
+  localStorage.setItem('pv_quiz_new_on', document.getElementById('new-on-toggle').checked ? '1' : '0');
   localStorage.setItem('pv_quiz_stage', document.getElementById('quiz-stage').value);
   localStorage.setItem('pv_quiz_count', String(quizCount));
   localStorage.setItem('pv_quiz_mode', quizMode);
 }
 document.getElementById('weak-on-toggle').checked = localStorage.getItem('pv_quiz_weak_on') === '1';
 document.getElementById('srs-on-toggle').checked = localStorage.getItem('pv_quiz_srs_on') === '1';
-document.getElementById('strict-only-toggle').checked = localStorage.getItem('pv_quiz_strict_only') === '1';
+document.getElementById('new-on-toggle').checked = localStorage.getItem('pv_quiz_new_on') === '1';
 
 document.querySelectorAll('#quiz-mode-group .chip').forEach(chip => {
   chip.classList.toggle('active', chip.dataset.mode === quizMode);
@@ -461,11 +439,11 @@ document.querySelectorAll('#quiz-mode-group .chip').forEach(chip => {
   });
 });
 
-function refreshStrictRow() {
+function refreshFilterNote() {
   const weakOn = document.getElementById('weak-on-toggle').checked;
   const srsOn = document.getElementById('srs-on-toggle').checked;
-  document.getElementById('strict-only-row').style.display = (weakOn || srsOn) ? 'flex' : 'none';
-  if (!weakOn && !srsOn) document.getElementById('strict-only-toggle').checked = false;
+  const newOn = document.getElementById('new-on-toggle').checked;
+  document.getElementById('filter-note').hidden = !(weakOn || srsOn || newOn);
 }
 
 function refreshWeakRow() {
@@ -473,7 +451,7 @@ function refreshWeakRow() {
   document.getElementById('weak-count').textContent = n;
   document.getElementById('weak-on-toggle').disabled = n === 0;
   if (n === 0) document.getElementById('weak-on-toggle').checked = false;
-  refreshStrictRow();
+  refreshFilterNote();
 }
 refreshWeakRow();
 
@@ -482,13 +460,22 @@ function refreshSrsRow() {
   document.getElementById('srs-count').textContent = n;
   document.getElementById('srs-on-toggle').disabled = n === 0;
   if (n === 0) document.getElementById('srs-on-toggle').checked = false;
-  refreshStrictRow();
+  refreshFilterNote();
 }
 refreshSrsRow();
 
-document.getElementById('weak-on-toggle').addEventListener('change', () => { refreshStrictRow(); saveQuizSettings(); });
-document.getElementById('srs-on-toggle').addEventListener('change', () => { refreshStrictRow(); saveQuizSettings(); });
-document.getElementById('strict-only-toggle').addEventListener('change', saveQuizSettings);
+function refreshNewRow() {
+  const n = srsNewPool(allWords()).length;
+  document.getElementById('new-count').textContent = n;
+  document.getElementById('new-on-toggle').disabled = n === 0;
+  if (n === 0) document.getElementById('new-on-toggle').checked = false;
+  refreshFilterNote();
+}
+refreshNewRow();
+
+document.getElementById('weak-on-toggle').addEventListener('change', () => { refreshFilterNote(); saveQuizSettings(); });
+document.getElementById('srs-on-toggle').addEventListener('change', () => { refreshFilterNote(); saveQuizSettings(); });
+document.getElementById('new-on-toggle').addEventListener('change', () => { refreshFilterNote(); saveQuizSettings(); });
 
 document.getElementById('start-quiz').addEventListener('click', () => {
   if (quizMode === 'matching') { startMatchingGame(); return; }
@@ -496,9 +483,9 @@ document.getElementById('start-quiz').addEventListener('click', () => {
   const stage = parseInt(raw, 10) || 0;
   const weakOn = document.getElementById('weak-on-toggle').checked;
   const srsOn = document.getElementById('srs-on-toggle').checked;
-  const strictOnly = document.getElementById('strict-only-toggle').checked;
-  const qs = buildQuiz(stage, quizCount, weakOn, srsOn, strictOnly);
-  if (!qs.length) { toast('この範囲では問題が作れませんでした'); return; }
+  const newOn = document.getElementById('new-on-toggle').checked;
+  const qs = buildQuiz(stage, quizCount, weakOn, srsOn, newOn);
+  if (!qs.length) { toast('この条件では問題が作れませんでした'); return; }
   quizState = { questions: qs, idx: 0, correctCount: 0, results: [], mode: quizMode };
   document.getElementById('quiz-setup').hidden = true;
   document.getElementById('quiz-done').hidden = true;

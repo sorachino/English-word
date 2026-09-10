@@ -355,7 +355,7 @@ select{
 .dp-quick-actions .btn-ghost{
   flex:1; margin-top:0; font-size:12.5px; padding:8px 4px;
   font-family:"JetBrains Mono",monospace; font-weight:700;
-  border:1px solid var(--line); background:#fff; color:var(--ink-soft);
+  border:1px solid var(--navy); background:var(--navy); color:#fff;
   border-radius:16px; text-align:center;
 }
 .stat-num{font-family:"JetBrains Mono",monospace; font-weight:800; font-size:22px; color:var(--navy);}

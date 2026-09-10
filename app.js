@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '117'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '118'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -458,6 +458,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'quiz') renderDictProgress();
     if (btn.dataset.tab === 'list') { renderWordList(); renderMyWordList(); renderSharedWordList(); pullGlobalGroupDefs(); }
     if (btn.dataset.tab === 'mydict') renderMyDictList();
     if (btn.dataset.tab === 'stats') { renderStats(); renderLeaderboard(); updateLbNameDisplay(); renderChampionCalendar(); renderRecentSession(); }
@@ -546,6 +547,7 @@ function refreshNewRow() {
   refreshFilterNote();
 }
 refreshNewRow();
+renderDictProgress();
 
 document.getElementById('weak-on-toggle').addEventListener('change', () => { refreshFilterNote(); saveQuizSettings(); });
 document.getElementById('srs-on-toggle').addEventListener('change', () => { refreshFilterNote(); saveQuizSettings(); });
@@ -562,6 +564,7 @@ document.getElementById('start-quiz').addEventListener('click', () => {
   if (!qs.length) { toast('この条件では問題が作れませんでした'); return; }
   quizState = { questions: qs, idx: 0, correctCount: 0, results: [], mode: quizMode, sessionId: Date.now() };
   document.getElementById('quiz-setup').hidden = true;
+  document.getElementById('dp-quick-actions-card').hidden = true;
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-match').hidden = true;
   document.getElementById('quiz-play').hidden = false;
@@ -649,6 +652,7 @@ function startMatchingGame() {
     sessionId: Date.now(),
   };
   document.getElementById('quiz-setup').hidden = true;
+  document.getElementById('dp-quick-actions-card').hidden = true;
   document.getElementById('quiz-play').hidden = true;
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-match').hidden = false;
@@ -775,6 +779,7 @@ document.getElementById('match-again-btn').addEventListener('click', startMatchi
 document.getElementById('match-back-btn').addEventListener('click', () => {
   document.getElementById('quiz-match').hidden = true;
   document.getElementById('quiz-setup').hidden = false;
+  document.getElementById('dp-quick-actions-card').hidden = false;
 });
 
 // ===================== UI: クイズ本体 =====================
@@ -1405,6 +1410,7 @@ document.getElementById('dd-backdrop').addEventListener('click', closeDoneDetail
 document.getElementById('restart-btn').addEventListener('click', () => {
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-setup').hidden = false;
+  document.getElementById('dp-quick-actions-card').hidden = false;
   refreshWeakRow();
   refreshSrsRow();
 });
@@ -1484,6 +1490,7 @@ function quickStartQuiz(kind) {
   document.getElementById('view-quiz').classList.add('active');
   quizState = { questions: qs, idx: 0, correctCount: 0, results: [], mode: 'normal', sessionId: Date.now() };
   document.getElementById('quiz-setup').hidden = true;
+  document.getElementById('dp-quick-actions-card').hidden = true;
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-match').hidden = true;
   document.getElementById('quiz-play').hidden = false;

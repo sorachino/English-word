@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '104'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '105'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -28,6 +28,7 @@ const LS = {
   EXTRA_WORD_GROUPS: 'pv_extra_word_groups', // { [no]: [groupId, ...] } 402語の組み込みデータに後から追加されたグループ所属
   GROUP_NOTE_BASE_OVERRIDE: 'pv_group_note_base_override', // { [groupId]: "上書きされた基本解説文" } 組み込みグループ(GROUP_INFO)の基本解説文を書き換えた場合の上書き値。全ユーザー共有(customGroups等と同様)。
   MY_DICT: 'pv_my_dict', // [{ japanese, english, example, exampleJa, note }] 句動詞とは別の日本語→英語単語帳
+  ANSWER_LOG: 'pv_answer_log', // { "2026-08-15": [{m:'quiz'|'match', v:verb, ok:bool}, ...] } 日別の個別問題履歴
 };
 
 // Firebase接続の使い回し用（宣言はファイル先頭で行う。
@@ -373,6 +374,22 @@ function logToday(correct) {
   if (correct) log[key].correct++;
   saveJSON(LS.LOG, log);
 }
+// 個別の問題履歴（いつ・どのモードで・どの語を・正解したか）を記録する
+function recordAnswerLog(mode, verb, ok) {
+  const log = loadJSON(LS.ANSWER_LOG, {});
+  const key = todayKey();
+  if (!log[key]) log[key] = [];
+  log[key].push({ m: mode, v: verb, ok: !!ok });
+  saveJSON(LS.ANSWER_LOG, log);
+  pushAnswerLogToCloud(key, log[key]);
+}
+function pushAnswerLogToCloud(dateKey, entries) {
+  const db = initFirebase();
+  if (!db) return;
+  const nickname = getNickname();
+  if (!nickname) return;
+  db.ref(`users/${nickname}/answerLog/${dateKey}`).set(entries).catch(() => {});
+}
 function todayKey(offset = 0) {
   const d = new Date();
   d.setDate(d.getDate() - offset);
@@ -657,6 +674,7 @@ function renderMatchBoard() {
       updateSrs(p.verb, ok, false);
       recordAnswered(p.verb, ok);
       logToday(ok);
+      recordAnswerLog('match', p.verb, ok);
       syncLeaderboard(p.verb, ok);
     });
     updateStreakPill();
@@ -1147,6 +1165,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
   updateSrs(q.answer, ok, method === 'hint' || method === 'choice');
   recordAnswered(q.answer, ok);
   logToday(ok);
+  recordAnswerLog('quiz', q.answer, ok);
   playResultSound(ok);
   syncLeaderboard(q.answer, ok);
   if (ok) quizState.correctCount++;
@@ -2823,8 +2842,12 @@ function openDayDetail(dateStr) {
   rows.sort((a, b) => b[1] - a[1]);
   const me = getNickname();
   bodyEl.innerHTML = rows.length
-    ? rows.map(([name, count], i) => `<div class="lb-row${name === me ? ' me' : ''}"><span class="lb-rank">${i + 1}</span><span class="lb-name">${escHtml(name)}</span><span class="lb-count">${count}</span></div>`).join('')
+    ? rows.map(([name, count], i) => `<div class="lb-row${name === me ? ' me' : ''}" data-name="${escAttr(name)}"><span class="lb-rank">${i + 1}</span><span class="lb-name">${escHtml(name)}</span><span class="lb-count">${count}</span></div>`).join('')
     : '<div class="empty-note">この日の記録はありません。</div>';
+  bodyEl.querySelectorAll('.lb-row').forEach(row => {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => openPersonDayDetail(row.dataset.name, dateStr));
+  });
   modal.hidden = false;
 }
 document.getElementById('day-detail-close').addEventListener('click', () => {
@@ -2833,6 +2856,75 @@ document.getElementById('day-detail-close').addEventListener('click', () => {
 document.getElementById('day-detail-backdrop').addEventListener('click', () => {
   document.getElementById('day-detail-modal').hidden = true;
 });
+
+// ===================== 個別の問題履歴（誰の・いつの分でも表示可能） =====================
+function personDayEntriesHtml(entries) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return '<div class="empty-note">この日の問題履歴はありません。</div>';
+  }
+  const modeLabel = m => (m === 'match' ? 'マッチングゲーム' : '通常クイズ');
+  return entries.map((e, i) => `
+    <div class="word-item">
+      <div class="wi-head">
+        <span class="wi-verb">${i + 1}. ${escHtml(baseForm(e.v || ''))}</span>
+        <span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○' : '×'}</span>
+      </div>
+      <div class="wi-meaning">${escHtml(modeLabel(e.m))}</div>
+    </div>`).join('');
+}
+function openPersonDayDetail(name, dateStr) {
+  document.getElementById('person-day-title').textContent = `${name} ・ ${dateStr}`;
+  const bodyEl = document.getElementById('person-day-body');
+  bodyEl.innerHTML = '読み込み中…';
+  document.getElementById('person-day-modal').hidden = false;
+
+  const myName = getNickname();
+  if (name === myName) {
+    const localLog = loadJSON(LS.ANSWER_LOG, {});
+    if (localLog[dateStr]) {
+      bodyEl.innerHTML = personDayEntriesHtml(localLog[dateStr]);
+      return;
+    }
+  }
+  const db = initFirebase();
+  if (!db) { bodyEl.innerHTML = '<div class="empty-note">取得できませんでした。</div>'; return; }
+  db.ref(`users/${name}/answerLog/${dateStr}`).get().then(snap => {
+    bodyEl.innerHTML = personDayEntriesHtml(snap.val());
+  }).catch(() => {
+    bodyEl.innerHTML = '<div class="empty-note">取得に失敗しました。</div>';
+  });
+}
+document.getElementById('person-day-close').addEventListener('click', () => {
+  document.getElementById('person-day-modal').hidden = true;
+});
+document.getElementById('person-day-backdrop').addEventListener('click', () => {
+  document.getElementById('person-day-modal').hidden = true;
+});
+
+function openMyHistoryList() {
+  const log = loadJSON(LS.ANSWER_LOG, {});
+  const dates = Object.keys(log).sort().reverse();
+  const bodyEl = document.getElementById('my-history-body');
+  bodyEl.innerHTML = dates.length
+    ? dates.map(d => `<div class="lb-row" data-date="${d}"><span class="lb-name">${d}</span><span class="lb-count">${log[d].length}問</span></div>`).join('')
+    : '<div class="empty-note">まだ問題履歴がありません。クイズかマッチングゲームを解くと記録されます。</div>';
+  bodyEl.querySelectorAll('.lb-row').forEach(row => {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => {
+      document.getElementById('my-history-modal').hidden = true;
+      openPersonDayDetail(getNickname() || 'あなた', row.dataset.date);
+    });
+  });
+  document.getElementById('my-history-modal').hidden = false;
+}
+document.getElementById('open-my-history-btn').addEventListener('click', openMyHistoryList);
+document.getElementById('my-history-close').addEventListener('click', () => {
+  document.getElementById('my-history-modal').hidden = true;
+});
+document.getElementById('my-history-backdrop').addEventListener('click', () => {
+  document.getElementById('my-history-modal').hidden = true;
+});
+
 document.getElementById('cc-prev').addEventListener('click', () => {
   initChampionCalState();
   ccMonth--;

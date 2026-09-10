@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '116'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '117'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1449,10 +1449,13 @@ function renderDictProgress() {
   const words = allWords();
   let okCount = 0, ngCount = 0, unlearnedCount = 0;
   words.forEach(w => {
-    const cls = wordStatusClass(wordKey(w));
-    if (cls.includes('status-ng')) ngCount++;
-    else if (cls.includes('status-ok')) okCount++;
-    else unlearnedCount++;
+    const key = wordKey(w);
+    if (isNewWord(key)) unlearnedCount++;
+    else {
+      const s = srsScore(key);
+      if (s !== null && s <= 0) ngCount++; // 復習期限が来ている＝要復習（クイズの「復習」フィルタと同じ基準）
+      else okCount++;
+    }
   });
   const total = words.length || 1;
   document.getElementById('dp-ok-num').textContent = okCount;
@@ -1461,7 +1464,34 @@ function renderDictProgress() {
   document.getElementById('dp-seg-ok').style.width = (100 * okCount / total) + '%';
   document.getElementById('dp-seg-ng').style.width = (100 * ngCount / total) + '%';
   document.getElementById('dp-seg-unlearned').style.width = (100 * unlearnedCount / total) + '%';
+
+  const weakN = Object.keys(loadJSON(LS.WEAK, {})).length;
+  document.getElementById('dp-weak-num').textContent = weakN;
+  document.getElementById('dp-review-num').textContent = ngCount;
+  document.getElementById('dp-unlearned-num2').textContent = unlearnedCount;
 }
+
+// 辞書タブの苦手語／復習／未学習ボタンから、設定画面を経由せず即座にクイズを開始する
+function quickStartQuiz(kind) {
+  const weakOn = kind === 'weak';
+  const srsOn = kind === 'review';
+  const newOn = kind === 'unlearned';
+  const qs = buildQuiz(0, quizCount, weakOn, srsOn, newOn);
+  if (!qs.length) { toast('該当する語がありませんでした'); return; }
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.tab[data-tab="quiz"]').classList.add('active');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-quiz').classList.add('active');
+  quizState = { questions: qs, idx: 0, correctCount: 0, results: [], mode: 'normal', sessionId: Date.now() };
+  document.getElementById('quiz-setup').hidden = true;
+  document.getElementById('quiz-done').hidden = true;
+  document.getElementById('quiz-match').hidden = true;
+  document.getElementById('quiz-play').hidden = false;
+  showQuestion();
+}
+document.getElementById('dp-start-weak').addEventListener('click', () => quickStartQuiz('weak'));
+document.getElementById('dp-start-review').addEventListener('click', () => quickStartQuiz('review'));
+document.getElementById('dp-start-unlearned').addEventListener('click', () => quickStartQuiz('unlearned'));
 
 function renderWordList() {
   renderDictProgress();

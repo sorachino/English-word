@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '105'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '106'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -2284,11 +2284,12 @@ function renderStats() {
   const wl = document.getElementById('weak-list');
   wl.innerHTML = '';
   document.getElementById('weak-empty').hidden = keys.length > 0;
-  keys.sort((a, b) => {
+  const sortedKeys = keys.slice().sort((a, b) => {
     const sa = weak[a].wrong * 3 + weak[a].choice * 2 + weak[a].hint;
     const sb = weak[b].wrong * 3 + weak[b].choice * 2 + weak[b].hint;
     return sb - sa;
-  }).forEach(k => {
+  });
+  function buildWeakChip(k) {
     const w = weak[k];
     const heavy = (w.wrong + w.choice) > 0;
     const chip = document.createElement('span');
@@ -2300,7 +2301,6 @@ function renderStats() {
     const sub = parts.join(' ');
     chip.textContent = k + ' ×' + sub;
     chip.addEventListener('click', () => {
-      const sortedKeys = keys.slice();
       const items = sortedKeys.map(kk => {
         const ww = weak[kk];
         const p = [];
@@ -2313,8 +2313,20 @@ function renderStats() {
       if (idx === -1) { toast('この語の例文データが見つかりませんでした'); return; }
       openDetailModal(items, idx);
     });
-    wl.appendChild(chip);
-  });
+    return chip;
+  }
+  const WEAK_LIMIT = 20;
+  sortedKeys.slice(0, WEAK_LIMIT).forEach(k => wl.appendChild(buildWeakChip(k)));
+  if (sortedKeys.length > WEAK_LIMIT) {
+    const moreChip = document.createElement('span');
+    moreChip.className = 'weak-chip weak-chip-more';
+    moreChip.textContent = `他${sortedKeys.length - WEAK_LIMIT}語を表示 ▾`;
+    moreChip.addEventListener('click', () => {
+      sortedKeys.slice(WEAK_LIMIT).forEach(k => wl.insertBefore(buildWeakChip(k), moreChip));
+      moreChip.remove();
+    });
+    wl.appendChild(moreChip);
+  }
 }
 function calcStreak(log) {
   let streak = 0;

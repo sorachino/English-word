@@ -360,6 +360,7 @@ select{
   cursor:pointer;
 }
 .weak-chip.hint{border-color:var(--gold); color:#8A6A1E; background:var(--gold-soft);}
+.weak-chip.weak-chip-more{border-style:dashed; color:var(--ink-soft); background:transparent; cursor:pointer;}
 .empty-note{font-size:12.5px; color:var(--ink-soft); line-height:1.6;}
 .card .empty-note{margin-top:10px;}
 

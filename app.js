@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '107'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '108'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -408,7 +408,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'list') { renderWordList(); renderMyWordList(); renderSharedWordList(); pullGlobalGroupDefs(); }
     if (btn.dataset.tab === 'mydict') renderMyDictList();
-    if (btn.dataset.tab === 'stats') { renderStats(); renderLeaderboard(); updateLbNameDisplay(); renderChampionCalendar(); }
+    if (btn.dataset.tab === 'stats') { renderStats(); renderLeaderboard(); updateLbNameDisplay(); renderChampionCalendar(); renderRecentSession(); }
     if (btn.dataset.tab === 'nuance') { pullGlobalGroupDefs(); renderNuanceList(); }
   });
 });
@@ -2895,7 +2895,7 @@ function personDayEntriesHtml(entries) {
     return '<div class="empty-note">この日の問題履歴はありません。</div>';
   }
   const modeLabel = m => (m === 'match' ? 'マッチングゲーム' : '通常クイズ');
-  return entries.map((e, i) => `
+  return entries.slice().reverse().map((e, i) => `
     <div class="word-item">
       <div class="wi-head">
         <span class="wi-verb">${i + 1}. ${escHtml(baseForm(e.v || ''))}</span>
@@ -2955,6 +2955,75 @@ document.getElementById('my-history-close').addEventListener('click', () => {
 });
 document.getElementById('my-history-backdrop').addEventListener('click', () => {
   document.getElementById('my-history-modal').hidden = true;
+});
+
+// ===================== 最近の学習（直近の問題形式＋直近5問） =====================
+function getRecentAnswerEntries(limit) {
+  const log = loadJSON(LS.ANSWER_LOG, {});
+  const dates = Object.keys(log).sort(); // 昇順（古い→新しい）
+  const flat = [];
+  dates.forEach(d => {
+    (log[d] || []).forEach(e => flat.push(e));
+  });
+  return flat.slice(-limit).reverse(); // 直近N件を新しい順で
+}
+function renderRecentSession() {
+  const card = document.getElementById('recent-session-card');
+  if (!card) return;
+  const entries = getRecentAnswerEntries(5);
+  if (!entries.length) { card.hidden = true; return; }
+  card.hidden = false;
+  const modeLabel = m => (m === 'match' ? 'マッチングゲーム' : '通常クイズ');
+  document.getElementById('recent-session-mode').textContent = `直近の形式：${modeLabel(entries[0].m)}`;
+  const listEl = document.getElementById('recent-session-list');
+  listEl.innerHTML = '';
+  entries.forEach(e => {
+    const item = document.createElement('div');
+    item.className = 'word-item';
+    item.style.cursor = 'pointer';
+    item.innerHTML = `
+      <div class="wi-head">
+        <span class="wi-verb">${escHtml(baseForm(e.v || ''))}</span>
+        <span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○' : '×'}</span>
+      </div>
+      <div class="wi-meaning">${modeLabel(e.m)}</div>`;
+    item.addEventListener('click', () => openRecentSessionDetail(entries));
+    listEl.appendChild(item);
+  });
+}
+function openRecentSessionDetail(entries) {
+  const modeLabel = m => (m === 'match' ? 'マッチングゲーム' : '通常クイズ');
+  const bodyEl = document.getElementById('recent-session-detail-body');
+  bodyEl.innerHTML = entries.map((e, i) => {
+    const verb = baseForm(e.v || '');
+    const w = findWordByVerb(verb);
+    if (!w) {
+      return `<div class="word-item">
+        <div class="wi-head"><span class="wi-verb">${i + 1}. ${escHtml(verb)}</span><span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○ 正解' : '× 不正解'}</span></div>
+        <div class="wi-meaning">${modeLabel(e.m)}／データが見つかりませんでした</div>
+      </div>`;
+    }
+    return `<div class="word-item">
+      <div class="wi-head">
+        <span class="wi-verb">${i + 1}. ${escHtml(verb)}</span>
+        <span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○ 正解' : '× 不正解'}</span>
+      </div>
+      <div class="wi-meaning">${modeLabel(e.m)}</div>
+      <div class="wi-detail" style="display:block; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line);">
+        ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
+        <div class="def">${escHtml(w.meaning || '')}${w.def ? '／' + escHtml(w.def) : ''}</div>
+        ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
+        ${w.etymology ? `<div class="etym-box">${etymHtml(w.etymology, w.illustration)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('recent-session-modal').hidden = false;
+}
+document.getElementById('recent-session-close').addEventListener('click', () => {
+  document.getElementById('recent-session-modal').hidden = true;
+});
+document.getElementById('recent-session-backdrop').addEventListener('click', () => {
+  document.getElementById('recent-session-modal').hidden = true;
 });
 
 document.getElementById('cc-prev').addEventListener('click', () => {

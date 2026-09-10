@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="107">
+<meta name="build-version" content="108">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -368,6 +368,12 @@
       <div class="empty-note">その日、最も多く問題を解いた人にスタンプが押されます。</div>
     </div>
 
+    <div class="card" id="recent-session-card" hidden>
+      <div class="section-label">最近の学習</div>
+      <div class="recent-session-mode" id="recent-session-mode"></div>
+      <div class="word-list" id="recent-session-list"></div>
+    </div>
+
     <div class="card">
       <div class="section-label">問題履歴</div>
       <button type="button" class="btn-ghost btn-block" id="open-my-history-btn">自分の問題履歴を見る</button>
@@ -454,6 +460,17 @@
   </div>
 </div>
 
+<div class="dd-modal" id="recent-session-modal" hidden>
+  <div class="dd-backdrop" id="recent-session-backdrop"></div>
+  <div class="dd-card">
+    <div class="dd-head">
+      <div class="dd-pos">最近解いた問題</div>
+      <button class="dd-close" id="recent-session-close" aria-label="閉じる">×</button>
+    </div>
+    <div class="dd-body" id="recent-session-detail-body"></div>
+  </div>
+</div>
+
 
 
 <div class="dd-modal" id="dd-modal" hidden>
@@ -479,6 +496,6 @@
 <script src="tts-config.js?v=2"></script>
 <script src="ai-config.js?v=1"></script>
 <script src="data.js?v=24"></script>
-<script src="app.js?v=107"></script>
+<script src="app.js?v=108"></script>
 </body>
 </html>

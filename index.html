@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="118">
+<meta name="build-version" content="119">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -43,13 +43,6 @@
 
   <!-- ============ クイズ ============ -->
   <section class="view active" id="view-quiz">
-    <div class="card dp-quick-actions-card" id="dp-quick-actions-card">
-      <div class="dp-quick-actions">
-        <button type="button" class="btn-ghost" id="dp-start-weak">苦手語（<span id="dp-weak-num">0</span>）</button>
-        <button type="button" class="btn-ghost" id="dp-start-review">復習（<span id="dp-review-num">0</span>）</button>
-        <button type="button" class="btn-ghost" id="dp-start-unlearned">未学習（<span id="dp-unlearned-num2">0</span>）</button>
-      </div>
-    </div>
     <div class="quiz-setup card" id="quiz-setup">
       <div class="setup-row">
         <label>出題モード</label>
@@ -74,20 +67,11 @@
           <button class="chip" data-count="20">20</button>
         </div>
       </div>
-      <div class="setup-row">
-        <label>苦手語</label>
-        <label class="switch"><input type="checkbox" id="weak-on-toggle"><span>対象にする（<span id="weak-count">0</span>語）</span></label>
+      <div class="dp-quick-actions">
+        <button type="button" class="btn-ghost" id="dp-start-weak">苦手語（<span id="dp-weak-num">0</span>）</button>
+        <button type="button" class="btn-ghost" id="dp-start-review">復習（<span id="dp-review-num">0</span>）</button>
+        <button type="button" class="btn-ghost" id="dp-start-unlearned">未学習（<span id="dp-unlearned-num2">0</span>）</button>
       </div>
-      <div class="setup-row">
-        <label>復習</label>
-        <label class="switch"><input type="checkbox" id="srs-on-toggle"><span>対象にする（<span id="srs-count">0</span>語）</span></label>
-      </div>
-      <div class="setup-row">
-        <label>未学習</label>
-        <label class="switch"><input type="checkbox" id="new-on-toggle"><span>対象にする（<span id="new-count">0</span>語）</span></label>
-      </div>
-      <div class="empty-note" id="filter-note" hidden>チェックした条件の語だけから出題します（複数チェックで合算）。</div>
-      <button class="btn-primary" id="start-quiz">はじめる</button>
     </div>
 
     <div class="quiz-play" id="quiz-play" hidden>
@@ -487,6 +471,6 @@
 <script src="tts-config.js?v=2"></script>
 <script src="ai-config.js?v=1"></script>
 <script src="data.js?v=24"></script>
-<script src="app.js?v=118"></script>
+<script src="app.js?v=119"></script>
 </body>
 </html>

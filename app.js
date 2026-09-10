@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '118'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '119'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -494,17 +494,10 @@ document.querySelectorAll('#quiz-count-group .chip').forEach(chip => {
 
 let quizMode = localStorage.getItem('pv_quiz_mode') || 'normal'; // 'normal' | 'listening' | 'reverse'
 function saveQuizSettings() {
-  localStorage.setItem('pv_quiz_weak_on', document.getElementById('weak-on-toggle').checked ? '1' : '0');
-  localStorage.setItem('pv_quiz_srs_on', document.getElementById('srs-on-toggle').checked ? '1' : '0');
-  localStorage.setItem('pv_quiz_new_on', document.getElementById('new-on-toggle').checked ? '1' : '0');
   localStorage.setItem('pv_quiz_stage', document.getElementById('quiz-stage').value);
   localStorage.setItem('pv_quiz_count', String(quizCount));
   localStorage.setItem('pv_quiz_mode', quizMode);
 }
-document.getElementById('weak-on-toggle').checked = localStorage.getItem('pv_quiz_weak_on') === '1';
-document.getElementById('srs-on-toggle').checked = localStorage.getItem('pv_quiz_srs_on') === '1';
-document.getElementById('new-on-toggle').checked = localStorage.getItem('pv_quiz_new_on') === '1';
-
 document.querySelectorAll('#quiz-mode-group .chip').forEach(chip => {
   chip.classList.toggle('active', chip.dataset.mode === quizMode);
   chip.addEventListener('click', () => {
@@ -514,62 +507,7 @@ document.querySelectorAll('#quiz-mode-group .chip').forEach(chip => {
   });
 });
 
-function refreshFilterNote() {
-  const weakOn = document.getElementById('weak-on-toggle').checked;
-  const srsOn = document.getElementById('srs-on-toggle').checked;
-  const newOn = document.getElementById('new-on-toggle').checked;
-  document.getElementById('filter-note').hidden = !(weakOn || srsOn || newOn);
-}
-
-function refreshWeakRow() {
-  const n = Object.keys(loadJSON(LS.WEAK, {})).length;
-  document.getElementById('weak-count').textContent = n;
-  document.getElementById('weak-on-toggle').disabled = n === 0;
-  if (n === 0) document.getElementById('weak-on-toggle').checked = false;
-  refreshFilterNote();
-}
-refreshWeakRow();
-
-function refreshSrsRow() {
-  const n = srsDuePool(allWords()).length;
-  document.getElementById('srs-count').textContent = n;
-  document.getElementById('srs-on-toggle').disabled = n === 0;
-  if (n === 0) document.getElementById('srs-on-toggle').checked = false;
-  refreshFilterNote();
-}
-refreshSrsRow();
-
-function refreshNewRow() {
-  const n = srsNewPool(allWords()).length;
-  document.getElementById('new-count').textContent = n;
-  document.getElementById('new-on-toggle').disabled = n === 0;
-  if (n === 0) document.getElementById('new-on-toggle').checked = false;
-  refreshFilterNote();
-}
-refreshNewRow();
 renderDictProgress();
-
-document.getElementById('weak-on-toggle').addEventListener('change', () => { refreshFilterNote(); saveQuizSettings(); });
-document.getElementById('srs-on-toggle').addEventListener('change', () => { refreshFilterNote(); saveQuizSettings(); });
-document.getElementById('new-on-toggle').addEventListener('change', () => { refreshFilterNote(); saveQuizSettings(); });
-
-document.getElementById('start-quiz').addEventListener('click', () => {
-  if (quizMode === 'matching') { startMatchingGame(); return; }
-  const raw = document.getElementById('quiz-stage').value;
-  const stage = parseInt(raw, 10) || 0;
-  const weakOn = document.getElementById('weak-on-toggle').checked;
-  const srsOn = document.getElementById('srs-on-toggle').checked;
-  const newOn = document.getElementById('new-on-toggle').checked;
-  const qs = buildQuiz(stage, quizCount, weakOn, srsOn, newOn);
-  if (!qs.length) { toast('この条件では問題が作れませんでした'); return; }
-  quizState = { questions: qs, idx: 0, correctCount: 0, results: [], mode: quizMode, sessionId: Date.now() };
-  document.getElementById('quiz-setup').hidden = true;
-  document.getElementById('dp-quick-actions-card').hidden = true;
-  document.getElementById('quiz-done').hidden = true;
-  document.getElementById('quiz-match').hidden = true;
-  document.getElementById('quiz-play').hidden = false;
-  showQuestion();
-});
 
 // ===================== マッチングゲーム =====================
 let matchState = null;
@@ -1322,7 +1260,7 @@ function finishQuiz() {
   const list = document.getElementById('done-list');
   list.innerHTML = '';
   quizState.results.forEach((r, i) => list.appendChild(doneItemEl(r, i)));
-  refreshWeakRow();
+  renderDictProgress();
   updateStreakPill();
 }
 function doneItemEl(r, idx) {
@@ -1411,8 +1349,7 @@ document.getElementById('restart-btn').addEventListener('click', () => {
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-setup').hidden = false;
   document.getElementById('dp-quick-actions-card').hidden = false;
-  refreshWeakRow();
-  refreshSrsRow();
+  renderDictProgress();
 });
 
 // ===================== UI: 単語帳 =====================
@@ -1479,16 +1416,18 @@ function renderDictProgress() {
 
 // 辞書タブの苦手語／復習／未学習ボタンから、設定画面を経由せず即座にクイズを開始する
 function quickStartQuiz(kind) {
+  if (quizMode === 'matching') { toast('マッチングモードでは苦手語/復習/未学習の絞り込みは使えません。別のモードを選んでください'); return; }
   const weakOn = kind === 'weak';
   const srsOn = kind === 'review';
   const newOn = kind === 'unlearned';
-  const qs = buildQuiz(0, quizCount, weakOn, srsOn, newOn);
+  const stage = parseInt(document.getElementById('quiz-stage').value, 10) || 0;
+  const qs = buildQuiz(stage, quizCount, weakOn, srsOn, newOn);
   if (!qs.length) { toast('該当する語がありませんでした'); return; }
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelector('.tab[data-tab="quiz"]').classList.add('active');
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-quiz').classList.add('active');
-  quizState = { questions: qs, idx: 0, correctCount: 0, results: [], mode: 'normal', sessionId: Date.now() };
+  quizState = { questions: qs, idx: 0, correctCount: 0, results: [], mode: quizMode, sessionId: Date.now() };
   document.getElementById('quiz-setup').hidden = true;
   document.getElementById('dp-quick-actions-card').hidden = true;
   document.getElementById('quiz-done').hidden = true;
@@ -2717,7 +2656,7 @@ function pullAndMergeCloud(nickname) {
     }
 
     if (changed) {
-      refreshWeakRow();
+      renderDictProgress();
       updateStreakPill();
       const statsView = document.getElementById('view-stats');
       if (statsView && statsView.classList.contains('active')) renderStats();
@@ -2833,7 +2772,7 @@ function markCurrentAsWrong() {
     db.ref(`users/${nickname}/log/${today}/correct`).set(firebase.database.ServerValue.increment(-1)).catch(() => {});
   }
 
-  refreshWeakRow();
+  renderDictProgress();
   pushWordStateToCloud(q.word);
   const statsView = document.getElementById('view-stats');
   if (statsView && statsView.classList.contains('active')) renderStats();

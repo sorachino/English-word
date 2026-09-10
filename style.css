@@ -352,7 +352,12 @@ select{
 .dp-seg-ng{background:var(--hanko);}
 .dp-seg-unlearned{background:var(--line);}
 .dp-quick-actions{display:flex; gap:8px; margin-top:12px;}
-.dp-quick-actions .btn-ghost{flex:1; margin-top:0; font-size:12.5px; padding:9px 4px;}
+.dp-quick-actions .btn-ghost{
+  flex:1; margin-top:0; font-size:12.5px; padding:8px 4px;
+  font-family:"JetBrains Mono",monospace; font-weight:700;
+  border:1px solid var(--line); background:#fff; color:var(--ink-soft);
+  border-radius:16px; text-align:center;
+}
 .stat-num{font-family:"JetBrains Mono",monospace; font-weight:800; font-size:22px; color:var(--navy);}
 .stat-label{font-size:10.5px; color:var(--ink-soft); margin-top:2px;}
 .section-label{font-weight:700; font-size:13px; color:var(--ink-soft); margin-bottom:10px;}

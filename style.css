@@ -153,8 +153,6 @@ select{
   padding:22px 18px 20px;
   box-shadow:var(--shadow-2);
   margin-bottom:14px;
-  background-image: repeating-linear-gradient(var(--paper-raised) 0 27px, var(--line) 27px 28px);
-  background-position: 0 46px;
 }
 .card-tape{
   position:absolute; top:-8px; left:50%; transform:translateX(-50%) rotate(-1.5deg);

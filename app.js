@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '120'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '121'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -598,7 +598,6 @@ function startMatchingGame() {
     sessionId: Date.now(),
   };
   document.getElementById('quiz-setup').hidden = true;
-  document.getElementById('dp-quick-actions-card').hidden = true;
   document.getElementById('quiz-play').hidden = true;
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-match').hidden = false;
@@ -725,7 +724,6 @@ document.getElementById('match-again-btn').addEventListener('click', startMatchi
 document.getElementById('match-back-btn').addEventListener('click', () => {
   document.getElementById('quiz-match').hidden = true;
   document.getElementById('quiz-setup').hidden = false;
-  document.getElementById('dp-quick-actions-card').hidden = false;
 });
 
 // ===================== UI: クイズ本体 =====================
@@ -1356,7 +1354,6 @@ document.getElementById('dd-backdrop').addEventListener('click', closeDoneDetail
 document.getElementById('restart-btn').addEventListener('click', () => {
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-setup').hidden = false;
-  document.getElementById('dp-quick-actions-card').hidden = false;
   renderDictProgress();
 });
 
@@ -1437,7 +1434,6 @@ function quickStartQuiz(kind) {
   document.getElementById('view-quiz').classList.add('active');
   quizState = { questions: qs, idx: 0, correctCount: 0, results: [], mode: quizMode, sessionId: Date.now() };
   document.getElementById('quiz-setup').hidden = true;
-  document.getElementById('dp-quick-actions-card').hidden = true;
   document.getElementById('quiz-done').hidden = true;
   document.getElementById('quiz-match').hidden = true;
   document.getElementById('quiz-play').hidden = false;

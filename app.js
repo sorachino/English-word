@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '119'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '120'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -498,14 +498,22 @@ function saveQuizSettings() {
   localStorage.setItem('pv_quiz_count', String(quizCount));
   localStorage.setItem('pv_quiz_mode', quizMode);
 }
+function refreshQuizActionVisibility() {
+  const isMatching = quizMode === 'matching';
+  document.getElementById('dp-quick-actions').hidden = isMatching;
+  document.getElementById('start-matching-btn').hidden = !isMatching;
+}
 document.querySelectorAll('#quiz-mode-group .chip').forEach(chip => {
   chip.classList.toggle('active', chip.dataset.mode === quizMode);
   chip.addEventListener('click', () => {
     quizMode = chip.dataset.mode;
     document.querySelectorAll('#quiz-mode-group .chip').forEach(c => c.classList.toggle('active', c.dataset.mode === quizMode));
+    refreshQuizActionVisibility();
     saveQuizSettings();
   });
 });
+refreshQuizActionVisibility();
+document.getElementById('start-matching-btn').addEventListener('click', startMatchingGame);
 
 renderDictProgress();
 

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '110'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '111'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -2919,27 +2919,30 @@ function bindRoundRows(containerEl, rounds) {
 
 function openRoundResultDetail(round) {
   const bodyEl = document.getElementById('recent-session-detail-body');
-  bodyEl.innerHTML = round.map((e, i) => `
-    <div class="word-item round-result-row" data-idx="${i}">
+  bodyEl.innerHTML = round.map((e, i) => {
+    const verb = baseForm(e.v || '');
+    const w = findWordByVerb(verb);
+    if (!w) {
+      return `<div class="word-item">
+        <div class="wi-head"><span class="wi-verb">${i + 1}. ${escHtml(verb)}</span><span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○ 正解' : '× 不正解'}</span></div>
+        <div class="wi-meaning">${escHtml(modeLabelOf(e.m))}／データが見つかりませんでした</div>
+      </div>`;
+    }
+    return `<div class="word-item">
       <div class="wi-head">
-        <span class="wi-verb">${i + 1}. ${escHtml(baseForm(e.v || ''))}</span>
-        <span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○' : '×'}</span>
+        <span class="wi-verb">${i + 1}. ${escHtml(verb)}</span>
+        <span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○ 正解' : '× 不正解'}</span>
       </div>
       <div class="wi-meaning">${escHtml(modeLabelOf(e.m))}</div>
-    </div>`).join('');
-  bodyEl.querySelectorAll('.round-result-row').forEach(row => {
-    row.style.cursor = 'pointer';
-    row.addEventListener('click', () => {
-      const items = round.map(e => {
-        const verb = baseForm(e.v || '');
-        return { verb, ok: e.ok, sub: '', word: findWordByVerb(verb) };
-      }).filter(it => it.word);
-      const tappedVerb = baseForm(round[Number(row.dataset.idx)].v || '');
-      const idx = items.findIndex(it => it.verb === tappedVerb);
-      if (idx === -1) { toast('この語の例文データが見つかりませんでした'); return; }
-      openDetailModal(items, idx);
-    });
-  });
+      <div class="wi-detail" style="display:block; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line);">
+        ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
+        ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
+        <div class="def">${escHtml(w.meaning || '')}${w.def ? '／' + escHtml(w.def) : ''}</div>
+        ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
+        ${w.etymology ? `<div class="etym-box">${etymHtml(w.etymology, w.illustration)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
   document.getElementById('recent-session-modal').hidden = false;
 }
 document.getElementById('recent-session-close').addEventListener('click', () => {

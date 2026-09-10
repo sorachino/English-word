@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '121'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '122'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1459,10 +1459,10 @@ function renderWordList() {
   if (statusFilter !== 'all') {
     const weak = loadJSON(LS.WEAK, {});
     words = words.filter(w => {
-      const key = baseForm(w.verb);
+      const key = wordKey(w);
       if (statusFilter === 'ng') return !!weak[key]; // クイズ側の「苦手語」と同じ基準（今も苦手かどうか）に統一
       const rec = answered[key];
-      // 「得意な語」＝今は苦手リストに入っておらず、かつ一度でも正解したことがある語。
+      // 「習得済語」＝今は苦手リストに入っておらず、かつ一度でも正解したことがある語。
       // 以前は「一度でも間違えたら永久に対象外」だったため、直近で正解して苦手を脱した語が
       // 反映されなかった。苦手リストの判定と揃えることで、直近の正解がすぐ反映されるようにする。
       return !weak[key] && !!rec && rec.ok > 0;

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '114'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '115'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -173,7 +173,7 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn) {
 
   let pool = stageFilter ? words.filter(w => w.stage === stageFilter) : words.slice();
 
-  // 苦手語・復習・未実施語のいずれかがONなら、チェックした条件の語だけから100%出題する（優先度の概念なし）
+  // 苦手語・復習・未学習のいずれかがONなら、チェックした条件の語だけから100%出題する（優先度の概念なし）
   const anyFilterOn = weakOn || srsOn || newOn;
   if (anyFilterOn) {
     pool = pool.filter(w => (weakOn && isWeak(w)) || (srsOn && isDue(w)) || (newOn && isNew(w)));
@@ -287,15 +287,18 @@ function updateSrs(key, ok, usedHelp) {
 }
 function srsScore(key) {
   // 数値が小さいほど優先度が高い。復習対象（一度でも解いたことがある語）だけを対象とし、期限切れが長いほど優先。
-  // 未実施（一度も解いていない）語はここでは扱わない（別枠の「未実施語」機能で扱う）。
+  // 未学習（一度も解いていない）語はここでは扱わない（別枠の「未学習」機能で扱う）。
   const srs = loadSrs();
   const entry = srs[key];
   if (!entry) return null;
   return -daysBetween(todayKey(), entry.dueDate);
 }
 function isNewWord(key) {
+  // 「未学習」= SRS(復習)にもANSWERED(正答/誤答)にも記録が無い語。
+  // 過去の仕様変更等でどちらか片方にしか記録が無いケースがあるため、両方を見て判定する。
   const srs = loadSrs();
-  return !srs[key];
+  const answered = loadJSON(LS_ANSWERED, {});
+  return !srs[key] && !answered[key];
 }
 function srsDuePool(words) {
   return words.filter(w => {
@@ -376,11 +379,13 @@ function etymHtml(etymology, illustration) {
   const iconHtml = illustration ? `<div class="etym-icon">${illustration}</div>` : '';
   return `<div class="etym-title"><i>💡</i>語源でおぼえる</div><div class="etym-row">${iconHtml}<div class="etym-body">${lines}</div></div>`;
 }
-function wordStatusClass(verb) {
-  const data = loadJSON(LS_ANSWERED, {});
-  const rec = data[verb];
-  if (!rec) return '';
-  return rec.ng > 0 ? ' status-ng' : ' status-ok';
+function wordStatusClass(key) {
+  const answered = loadJSON(LS_ANSWERED, {});
+  const rec = answered[key];
+  if (rec) return rec.ng > 0 ? ' status-ng' : ' status-ok';
+  // ANSWEREDに記録が無くてもSRS側に記録があれば「学習済み」扱いにする（isNewWordと判定基準を統一）
+  if (loadSrs()[key]) return ' status-ok';
+  return '';
 }
 
 function logToday(correct) {

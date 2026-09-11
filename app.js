@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '124'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '125'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -337,14 +337,26 @@ function recordAnswered(verb, ok) {
 // 以前は表記(baseForm)をキーに正答/誤答・苦手・復習を記録していたため、
 // put on / put on*2 のような「同じ表記で意味違い」の語同士で記録が混ざっていた。
 // 一意に対応語が特定できるものだけ新キー(wordKey)に引き継ぎ、あいまいなものは事故を避けるため破棄する。
-function migrateToWordKeys() {
-  const FLAG = 'pv_migrated_wordkey_v1';
-  if (localStorage.getItem(FLAG) === '1') return;
+function buildBaseFormIndex() {
   const byBase = {};
   allWords().forEach(w => {
     const b = baseForm(w.verb);
     (byBase[b] = byBase[b] || []).push(w);
   });
+  return byBase;
+}
+// 表記ベースの古いキーを新しいwordKeyに解決する。すでに新形式なら（該当語が見つかるので）そのまま返す。
+// あいまい（同表記で複数語）または該当なしの場合は null。
+function resolveLegacyKey(key, byBase) {
+  if (findWordByKey(key)) return key;
+  const matches = byBase[key];
+  if (matches && matches.length === 1) return wordKey(matches[0]);
+  return null;
+}
+function migrateToWordKeys() {
+  const FLAG = 'pv_migrated_wordkey_v1';
+  if (localStorage.getItem(FLAG) === '1') return;
+  const byBase = buildBaseFormIndex();
   function migrateStore(storageKey) {
     const old = loadJSON(storageKey, {});
     const next = {};
@@ -392,6 +404,34 @@ function reconcileWeakAndAnswered() {
   localStorage.setItem(FLAG, '1');
 }
 reconcileWeakAndAnswered();
+
+// ===================== クラウド経由で再混入した旧形式キーの重複を一度だけ掃除する =====================
+// クラウド上のデータ(users/{name}/weak・srs・answered)が新形式キーへの移行前のまま残っていたため、
+// 同期のたびに旧形式キー(例: "go up to")が新形式キー("n42")と共存し、同じ語が二重に表示されていた。
+// pullAndMergeCloud側は修正済みだが、既にローカルに紛れ込んでしまった重複はここで一度だけ片付ける。
+function cleanupDuplicateLegacyKeys() {
+  const FLAG = 'pv_cleaned_legacy_dup_v1';
+  if (localStorage.getItem(FLAG) === '1') return;
+  const byBase = buildBaseFormIndex();
+  function cleanStore(storageKey) {
+    const old = loadJSON(storageKey, {});
+    const next = {};
+    Object.entries(old).forEach(([k, v]) => {
+      if (findWordByKey(k)) { next[k] = v; return; } // すでに新形式の正しいキー
+      const matches = byBase[k];
+      if (!matches || matches.length !== 1) return; // あいまい・該当なしの旧形式キーは破棄
+      const resolved = wordKey(matches[0]);
+      if (next[resolved]) return; // 新形式側に既にエントリがあるので、旧形式の重複は破棄
+      next[resolved] = v; // 新形式側に無ければ、旧形式の記録を正しいキーへ移す
+    });
+    saveJSON(storageKey, next);
+  }
+  cleanStore(LS_ANSWERED);
+  cleanStore(LS.WEAK);
+  cleanStore(LS.SRS);
+  localStorage.setItem(FLAG, '1');
+}
+cleanupDuplicateLegacyKeys();
 // 正答数・通算誤答数（苦手判定用の直近ngとは別に、累積で保持）
 function answerCountsOf(verb) {
   const data = loadJSON(LS_ANSWERED, {});
@@ -2573,10 +2613,13 @@ function pullAndMergeCloud(nickname) {
 
     if (cloud.weak && typeof cloud.weak === 'object') {
       const localWeak = loadJSON(LS.WEAK, {});
+      const byBase = buildBaseFormIndex();
       let sub = false;
-      Object.entries(cloud.weak).forEach(([verb, cw]) => {
-        if (!cw || localWeak[verb]) return;
-        localWeak[verb] = { hint: cw.hint || 0, choice: cw.choice || 0, wrong: cw.wrong || 0, okStreak: cw.okStreak || 0 };
+      Object.entries(cloud.weak).forEach(([rawKey, cw]) => {
+        if (!cw) return;
+        const key = resolveLegacyKey(rawKey, byBase);
+        if (!key || localWeak[key]) return; // あいまい・該当なし、またはローカルに既にあるならスキップ
+        localWeak[key] = { hint: cw.hint || 0, choice: cw.choice || 0, wrong: cw.wrong || 0, okStreak: cw.okStreak || 0 };
         sub = true;
       });
       if (sub) { saveJSON(LS.WEAK, localWeak); changed = true; }
@@ -2584,10 +2627,13 @@ function pullAndMergeCloud(nickname) {
 
     if (cloud.srs && typeof cloud.srs === 'object') {
       const localSrs = loadJSON(LS.SRS, {});
+      const byBase = buildBaseFormIndex();
       let sub = false;
-      Object.entries(cloud.srs).forEach(([verb, cs]) => {
-        if (!cs || localSrs[verb]) return;
-        localSrs[verb] = { interval: cs.interval || 1, dueDate: cs.dueDate || todayKey(), reps: cs.reps || 0 };
+      Object.entries(cloud.srs).forEach(([rawKey, cs]) => {
+        if (!cs) return;
+        const key = resolveLegacyKey(rawKey, byBase);
+        if (!key || localSrs[key]) return;
+        localSrs[key] = { interval: cs.interval || 1, dueDate: cs.dueDate || todayKey(), reps: cs.reps || 0 };
         sub = true;
       });
       if (sub) { saveJSON(LS.SRS, localSrs); changed = true; }
@@ -2612,18 +2658,21 @@ function pullAndMergeCloud(nickname) {
 
     if (cloud.answered && typeof cloud.answered === 'object') {
       const localAnswered = loadJSON(LS_ANSWERED, {});
+      const byBase = buildBaseFormIndex();
       let sub = false;
-      Object.entries(cloud.answered).forEach(([verb, ca]) => {
+      Object.entries(cloud.answered).forEach(([rawKey, ca]) => {
         if (!ca) return;
-        const curOk = (localAnswered[verb] && localAnswered[verb].ok) || 0;
-        const curNg = (localAnswered[verb] && localAnswered[verb].ng) || 0;
-        const curTotalNg = (localAnswered[verb] && typeof localAnswered[verb].totalNg === 'number') ? localAnswered[verb].totalNg : ((localAnswered[verb] && localAnswered[verb].ng) || 0);
+        const key = resolveLegacyKey(rawKey, byBase);
+        if (!key) return;
+        const curOk = (localAnswered[key] && localAnswered[key].ok) || 0;
+        const curNg = (localAnswered[key] && localAnswered[key].ng) || 0;
+        const curTotalNg = (localAnswered[key] && typeof localAnswered[key].totalNg === 'number') ? localAnswered[key].totalNg : ((localAnswered[key] && localAnswered[key].ng) || 0);
         const newOk = Math.max(curOk, ca.ok || 0);
         const newNg = Math.max(curNg, ca.ng || 0);
         const caTotalNg = typeof ca.totalNg === 'number' ? ca.totalNg : (ca.ng || 0);
         const newTotalNg = Math.max(curTotalNg, caTotalNg);
-        if (!localAnswered[verb] || newOk !== curOk || newNg !== curNg || newTotalNg !== curTotalNg) {
-          localAnswered[verb] = { ok: newOk, ng: newNg, totalNg: newTotalNg };
+        if (!localAnswered[key] || newOk !== curOk || newNg !== curNg || newTotalNg !== curTotalNg) {
+          localAnswered[key] = { ok: newOk, ng: newNg, totalNg: newTotalNg };
           sub = true;
         }
       });

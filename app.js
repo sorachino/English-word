@@ -1229,6 +1229,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
 
   const reveal = document.getElementById('reveal-box');
   document.getElementById('reveal-verb').textContent = q.answer;
+  document.getElementById('reveal-meaning').textContent = q.meaning || '';
   document.getElementById('reveal-answer-stats').innerHTML = answerStatsHtml(key);
   document.getElementById('reveal-sentence').textContent = q.full;
   document.getElementById('reveal-speak-btn').dataset.text = q.full || '';

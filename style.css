@@ -232,6 +232,7 @@ select{
   padding:16px; box-shadow:var(--shadow-1);
 }
 .reveal-verb{font-weight:900; font-size:19px; color:var(--navy); margin-bottom:6px;}
+.reveal-meaning{font-size:14px; color:var(--ink); margin-bottom:6px;}
 .reveal-answer-stats{font-size:12px; color:var(--ink-soft); margin-bottom:8px;}
 .stat-ok{color:var(--ok); font-weight:700;}
 .stat-ng{color:var(--hanko); font-weight:700;}

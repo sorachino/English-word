@@ -244,6 +244,7 @@ select{
 .speak-btn:active{background:var(--gold-soft);}
 .reveal-ja{font-size:13px; color:var(--ink-soft); margin-bottom:10px;}
 .reveal-def{font-size:12.5px; color:var(--ink-soft); border-top:1px dashed var(--line); padding-top:8px;}
+.reveal-extra-ex-row{margin-top:8px; padding-top:8px; border-top:1px dashed var(--line);}
 .reveal-nuance{
   margin-top:8px; padding:8px 10px; background:#F0F5FA; border-left:3px solid var(--navy);
   border-radius:4px; font-size:12.5px; color:var(--ink); line-height:1.6;

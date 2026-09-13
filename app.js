@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '125'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '126'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -187,8 +187,8 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn) {
   const questions = [];
   for (const w of picks) {
     const verb = baseForm(w.verb);
-    let blanked = blankSentence(w.ex2, w.verb) ? { html: blankSentence(w.ex2, w.verb), full: w.ex2, ja: w.ja2 } : null;
-    if (!blanked && blankSentence(w.ex1, w.verb)) blanked = { html: blankSentence(w.ex1, w.verb), full: w.ex1, ja: w.ja1 };
+    let blanked = blankSentence(w.ex1, w.verb) ? { html: blankSentence(w.ex1, w.verb), full: w.ex1, ja: w.ja1, usedEx: 1 } : null;
+    if (!blanked && blankSentence(w.ex2, w.verb)) blanked = { html: blankSentence(w.ex2, w.verb), full: w.ex2, ja: w.ja2, usedEx: 2 };
     if (!blanked) continue;
 
     const head = verb.split(' ')[0].toLowerCase();
@@ -208,7 +208,7 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn) {
     const meaningChoices = shuffle(meaningDistractors.concat([w.meaning]));
 
     questions.push({
-      word: w, answer: verb, questionHtml: blanked.html, full: blanked.full, ja: blanked.ja,
+      word: w, answer: verb, questionHtml: blanked.html, full: blanked.full, ja: blanked.ja, usedEx: blanked.usedEx,
       meaning: w.meaning, def: w.def, note: w.note, choices, meaningChoices,
       resolved: false, method: null, // 'first' | 'hint' | 'choice' | 'wrong'
       hintShown: false,
@@ -1234,6 +1234,17 @@ function finishQuestion(ok, method, delay, userAnswer) {
   document.getElementById('reveal-speak-btn').dataset.text = q.full || '';
   document.getElementById('reveal-ja').textContent = q.ja;
   document.getElementById('reveal-def').textContent = q.def || '';
+  const extraRow = document.getElementById('reveal-extra-ex-row');
+  const extraEx = q.usedEx === 1 ? q.word.ex2 : q.word.ex1;
+  const extraJa = q.usedEx === 1 ? q.word.ja2 : q.word.ja1;
+  if (extraEx) {
+    extraRow.hidden = false;
+    document.getElementById('reveal-extra-ex').textContent = extraEx;
+    document.getElementById('reveal-extra-speak-btn').dataset.text = extraEx;
+    document.getElementById('reveal-extra-ja').textContent = extraJa || '';
+  } else {
+    extraRow.hidden = true;
+  }
   const nuanceEl = document.getElementById('reveal-nuance');
   if (q.word.nuance) { nuanceEl.hidden = false; nuanceEl.textContent = '💡 ' + q.word.nuance; } else { nuanceEl.hidden = true; }
   document.getElementById('reveal-structure').innerHTML = structureHtml(q.answer, q.word.ex1, q.word.ex2);

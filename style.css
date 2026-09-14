@@ -231,7 +231,7 @@ select{
   background:var(--paper-raised); border:1px solid var(--line); border-radius:8px;
   padding:16px; box-shadow:var(--shadow-1);
 }
-.reveal-title-row{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:6px;}
+.reveal-title-row{display:flex; align-items:baseline; justify-content:flex-start; gap:0; margin-bottom:6px;}
 .reveal-title-row .reveal-verb{margin-bottom:0;}
 .reveal-title-row .reveal-answer-stats{margin-bottom:0; white-space:nowrap;}
 .reveal-verb{font-weight:900; font-size:19px; color:var(--navy); margin-bottom:6px;}

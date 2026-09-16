@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '126'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '127'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1642,6 +1642,7 @@ document.getElementById('ai-fill-btn').addEventListener('click', async () => {
       document.getElementById('d-ja1').value = data.ja1 || '';
       document.getElementById('d-ex2').value = data.ex2 || '';
       document.getElementById('d-ja2').value = data.ja2 || '';
+      document.getElementById('d-nuance').value = data.nuance || '';
 
       let groupLine = '';
       const existingId = data.suggestedGroupId || '';
@@ -1749,6 +1750,7 @@ function startEditWord(idx) {
   document.getElementById('d-ja1').value = w.ja1 || '';
   document.getElementById('d-ex2').value = w.ex2 || '';
   document.getElementById('d-ja2').value = w.ja2 || '';
+  document.getElementById('d-nuance').value = w.nuance || '';
   document.getElementById('d-note').value = w.note || '';
   document.getElementById('d-group-new-label').value = '';
 
@@ -1778,7 +1780,7 @@ document.getElementById('dict-form').addEventListener('submit', e => {
   const w = {
     verb: val('d-verb'), meaning: val('d-meaning'), def: val('d-def'),
     ex1: val('d-ex1'), ja1: val('d-ja1'), ex2: val('d-ex2'), ja2: val('d-ja2'),
-    note: val('d-note'),
+    nuance: val('d-nuance'), note: val('d-note'),
   };
   if (!w.verb || !w.meaning) return;
 

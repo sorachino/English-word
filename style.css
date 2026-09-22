@@ -553,7 +553,8 @@ select{
 
 /* 熟語：並び替えクイズ */
 .idiom-order-hint{font-size:13.5px; color:var(--ink); margin-bottom:14px; padding-bottom:10px; border-bottom:1px dashed var(--line);}
-.idiom-order-hint .ja{color:var(--ink); font-size:18px; font-weight:700; margin-top:4px; line-height:1.5;}
+.idiom-order-hint .ja{color:var(--ink-soft); font-size:14px; font-weight:400; margin-top:4px; line-height:1.5;}
+.idiom-order-correct-en{color:var(--navy); font-size:17px; font-weight:700; line-height:1.5;}
 .idiom-order-answer{min-height:52px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:10px; background:#F5F3EC; border:1px dashed var(--line); border-radius:8px; margin-bottom:12px;}
 .order-placeholder{font-size:12.5px; color:var(--ink-soft);}
 .idiom-order-bank{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;}

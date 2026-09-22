@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '133'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '134'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3569,7 +3569,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     const tokens = tokenize(q.item.ex);
     q.orderTokens = tokens;
     q.orderPicked = [];
-    document.getElementById('idiom-order-hint').innerHTML = `${escHtml(q.item.meaning)}<div class="ja">${escHtml(q.item.ja)}</div>`;
+    document.getElementById('idiom-order-hint').innerHTML = '';
+    document.getElementById('idiom-order-hint').hidden = true;
     document.getElementById('idiom-order-result').hidden = true;
     document.getElementById('idiom-order-result').textContent = '';
     const bank = shuffle(tokens.map((t, i) => ({ t, i })).slice());

@@ -573,3 +573,10 @@ select{
 .idiom-order-actions{display:flex; gap:8px; margin-bottom:8px;}
 .idiom-order-actions #idiom-order-submit-btn,
 .idiom-order-actions #idiom-order-giveup-btn{flex:1; margin:0;}
+.content-toggle-wrap{display:flex; align-items:center; gap:10px;}
+.content-toggle-label{font-size:14px; color:var(--ink-soft); font-weight:600; cursor:pointer; transition:color .15s; user-select:none;}
+.content-toggle-label.active{color:var(--navy); font-weight:700;}
+.content-toggle-switch{position:relative; width:46px; height:26px; border-radius:13px; background:var(--line); border:none; padding:0; cursor:pointer; flex:none; transition:background .2s;}
+.content-toggle-switch.on{background:var(--navy);}
+.content-toggle-knob{position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s;}
+.content-toggle-switch.on .content-toggle-knob{transform:translateX(20px);}

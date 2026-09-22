@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="147">
+<meta name="build-version" content="148">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=68">
+<link rel="stylesheet" href="style.css?v=69">
 </head>
 <body>
 
@@ -251,9 +251,10 @@
   <section class="view" id="view-list">
     <div class="setup-row">
       <label>表示内容</label>
-      <div class="chip-group" id="list-content-group">
-        <button class="chip active" data-content="pv">句動詞</button>
-        <button class="chip" data-content="idiom">熟語</button>
+      <div class="content-toggle-wrap" id="list-content-toggle-wrap">
+        <span class="content-toggle-label active" data-content="pv">句動詞</span>
+        <button type="button" class="content-toggle-switch" id="list-content-switch" role="switch" aria-checked="false"><span class="content-toggle-knob"></span></button>
+        <span class="content-toggle-label" data-content="idiom">熟語</span>
       </div>
     </div>
     <div id="pv-list-wrap">
@@ -608,6 +609,6 @@
 <script src="ai-config.js?v=1"></script>
 <script src="data.js?v=28"></script>
 <script src="idioms.js?v=6"></script>
-<script src="app.js?v=147"></script>
+<script src="app.js?v=148"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '147'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '148'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3527,15 +3527,20 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   document.getElementById('idiom-marked-only-toggle').addEventListener('change', renderIdiomList);
   document.getElementById('idiom-category-filter').addEventListener('change', renderIdiomList);
 
-  document.querySelectorAll('#list-content-group .chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('#list-content-group .chip').forEach(c => c.classList.toggle('active', c === chip));
-      const showIdiom = chip.dataset.content === 'idiom';
+  (function() {
+    const sw = document.getElementById('list-content-switch');
+    const labels = document.querySelectorAll('.content-toggle-label');
+    function setListContent(showIdiom) {
+      sw.classList.toggle('on', showIdiom);
+      sw.setAttribute('aria-checked', showIdiom ? 'true' : 'false');
+      labels.forEach(l => l.classList.toggle('active', (l.dataset.content === 'idiom') === showIdiom));
       document.getElementById('pv-list-wrap').hidden = showIdiom;
       document.getElementById('idiom-list-wrap').hidden = !showIdiom;
       if (showIdiom) renderIdiomList();
-    });
-  });
+    }
+    sw.addEventListener('click', () => setListContent(!sw.classList.contains('on')));
+    labels.forEach(l => l.addEventListener('click', () => setListContent(l.dataset.content === 'idiom')));
+  })();
 
   // ---------- 4択クイズ本体（クイズタブから起動） ----------
   let idiomQuizState = null;

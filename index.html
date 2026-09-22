@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="130">
+<meta name="build-version" content="131">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=59">
+<link rel="stylesheet" href="style.css?v=60">
 </head>
 <body>
 
@@ -85,6 +85,13 @@
       </div>
       <div id="idiom-quiz-options" hidden>
         <div class="setup-row">
+          <label>出題形式</label>
+          <div class="chip-group" id="idiom-mode-group">
+            <button class="chip active" data-mode="choice">4択</button>
+            <button class="chip" data-mode="order">並び替え</button>
+          </div>
+        </div>
+        <div class="setup-row">
           <label>問題数</label>
           <div class="chip-group" id="idiom-count-group">
             <button class="chip" data-count="5">5</button>
@@ -92,7 +99,7 @@
             <button class="chip" data-count="20">20</button>
           </div>
         </div>
-        <button class="btn-primary btn-block" id="idiom-start-quiz">4択クイズをはじめる</button>
+        <button class="btn-primary btn-block" id="idiom-start-quiz">クイズをはじめる</button>
         <div class="dp-quick-actions" id="idiom-dp-quick-actions">
           <button type="button" class="btn-ghost" id="idiom-dp-start-weak">苦手語（<span id="idiom-dp-weak-num">0</span>）</button>
           <button type="button" class="btn-ghost" id="idiom-dp-start-review">復習（<span id="idiom-dp-review-num">0</span>）</button>
@@ -197,8 +204,17 @@
       <div class="card idiom-question-card" id="idiom-question-card">
         <div class="idiom-category-tag" id="idiom-q-category"></div>
         <div class="idiom-phrase" id="idiom-q-phrase"></div>
-        <div class="idiom-example" id="idiom-q-example"></div>
-        <div class="choice-group" id="idiom-choice-group"></div>
+        <div id="idiom-choice-mode-block">
+          <div class="idiom-example" id="idiom-q-example"></div>
+          <div class="choice-group" id="idiom-choice-group"></div>
+        </div>
+        <div id="idiom-order-mode-block" hidden>
+          <div class="idiom-order-hint" id="idiom-order-hint"></div>
+          <div class="idiom-order-answer" id="idiom-order-answer"></div>
+          <div class="idiom-order-bank" id="idiom-order-bank"></div>
+          <div class="idiom-order-result" id="idiom-order-result" hidden></div>
+          <button type="button" class="btn-ghost" id="idiom-order-reset-btn">選び直す</button>
+        </div>
       </div>
     </div>
 
@@ -570,6 +586,6 @@
 <script src="ai-config.js?v=1"></script>
 <script src="data.js?v=28"></script>
 <script src="idioms.js?v=1"></script>
-<script src="app.js?v=130"></script>
+<script src="app.js?v=131"></script>
 </body>
 </html>

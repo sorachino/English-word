@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '131'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '132'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3028,7 +3028,12 @@ function chunkIntoRounds(entriesAscending) {
   if (current.length) rounds.push(current);
   return rounds;
 }
-function modeLabelOf(m) { return m === 'match' ? 'マッチングゲーム' : '通常クイズ'; }
+function modeLabelOf(m) {
+  if (m === 'match') return 'マッチングゲーム';
+  if (m === 'idiom-choice') return '熟語（4択）';
+  if (m === 'idiom-order') return '熟語（並び替え）';
+  return '通常クイズ';
+}
 
 function roundListHtml(rounds) {
   if (!rounds.length) return '<div class="empty-note">まだ問題履歴がありません。</div>';
@@ -3052,6 +3057,28 @@ function bindRoundRows(containerEl, rounds) {
 function openRoundResultDetail(round) {
   const bodyEl = document.getElementById('recent-session-detail-body');
   bodyEl.innerHTML = round.map((e, i) => {
+    const isIdiom = !!(e.k && e.k.charAt(0) === 'i' && /^i\d+$/.test(e.k));
+    if (isIdiom) {
+      const it = IDIOM_DATA.find(x => idiomKey(x) === e.k);
+      const label = it ? it.phrase : (e.v || '');
+      if (!it) {
+        return `<div class="word-item">
+          <div class="wi-head"><span class="wi-verb">${i + 1}. ${escHtml(label)}</span><span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○ 正解' : '× 不正解'}</span></div>
+          <div class="wi-meaning">${escHtml(modeLabelOf(e.m))}／データが見つかりませんでした</div>
+        </div>`;
+      }
+      return `<div class="word-item">
+        <div class="wi-head">
+          <span class="wi-verb">${i + 1}. ${escHtml(it.phrase)}</span>
+          <span class="${e.ok ? 'stat-ok' : 'stat-ng'}">${e.ok ? '○ 正解' : '× 不正解'}</span>
+        </div>
+        <div class="wi-meaning">${escHtml(modeLabelOf(e.m))}</div>
+        <div class="wi-detail" style="display:block; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line);">
+          <div class="ex">${escHtml(it.ex)} <button class="speak-btn" data-text="${escAttr(it.ex)}">🔊</button></div><div class="ja">${escHtml(it.ja || '')}</div>
+          <div class="def">${escHtml(it.meaning || '')}</div>
+        </div>
+      </div>`;
+    }
     const verb = baseForm(e.v || '');
     const w = e.k ? findWordByKey(e.k) : findWordByVerb(verb); // 旧ログ(kなし)は表記から推測（複数意味の語は先頭のものになる可能性あり）
     if (!w) {
@@ -3300,6 +3327,14 @@ function idiomSrsScore(key) {
 function isNewIdiom(key) {
   return !loadJSON(LS_IDIOM_SRS, {})[key] && !loadJSON(LS_IDIOM_ANSWERED, {})[key];
 }
+function recordIdiomAnswerLog(mode, item, ok, sessionId) {
+  const log = loadJSON(LS.ANSWER_LOG, {});
+  const dateKey = todayKey();
+  if (!log[dateKey]) log[dateKey] = [];
+  log[dateKey].push({ m: mode, v: item.phrase, k: idiomKey(item), ok: !!ok, s: sessionId });
+  saveJSON(LS.ANSWER_LOG, log);
+  pushAnswerLogToCloud(dateKey, log[dateKey]);
+}
 
 (function () {
   const PREP_CATEGORIES = ['prep-2word', 'prep-3word']; // 「群前置詞」に分類するカテゴリ
@@ -3475,7 +3510,7 @@ function isNewIdiom(key) {
   function startIdiomQuiz(statusFilter) {
     const qs = buildIdiomQuiz(idiomCount, quizContent, statusFilter);
     if (!qs.length) { toast('該当する熟語がありませんでした'); return; }
-    idiomQuizState = { questions: qs, idx: 0, correctCount: 0, mode: idiomMode };
+    idiomQuizState = { questions: qs, idx: 0, correctCount: 0, mode: idiomMode, sessionId: Date.now() };
     document.getElementById('quiz-setup').hidden = true;
     document.getElementById('quiz-play').hidden = true;
     document.getElementById('quiz-done').hidden = true;
@@ -3594,6 +3629,9 @@ function isNewIdiom(key) {
     recordIdiomAnswered(key, ok);
     recordIdiomResult(key, ok);
     updateIdiomSrs(key, ok);
+    logToday(ok);
+    recordIdiomAnswerLog(idiomQuizState.mode === 'order' ? 'idiom-order' : 'idiom-choice', q.item, ok, idiomQuizState.sessionId);
+    syncLeaderboard(null, ok);
     playResultSound(ok);
     setTimeout(() => {
       idiomQuizState.idx++;

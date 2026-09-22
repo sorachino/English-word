@@ -539,3 +539,13 @@ select{
 .nuance-edit-area .nuance-edit-base, .nuance-edit-area .nuance-edit-extra{width:100%; min-height:80px; padding:10px 12px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:13.5px; line-height:1.6; resize:vertical; box-sizing:border-box;}
 .nuance-edit-actions{display:flex; gap:8px; margin-top:8px;}
 .nuance-edit-actions .btn-ghost, .nuance-edit-actions .btn-primary{flex:1; margin-top:0;}
+
+/* ===================== 熟語タブ ===================== */
+.idiom-question-card{padding:22px 18px;}
+.idiom-category-tag{display:inline-block; font-size:11px; color:var(--navy); background:#EEF2F7; border-radius:10px; padding:3px 10px; margin-bottom:10px;}
+.idiom-phrase{font-weight:900; font-size:20px; color:var(--navy); margin-bottom:14px;}
+.idiom-example{font-size:13.5px; color:var(--ink-soft); margin-bottom:16px; line-height:1.6;}
+.idiom-example .ja{margin-top:4px;}
+#idiom-choice-group{display:flex; flex-direction:column; gap:8px;}
+#idiom-choice-group .choice-btn{width:100%; text-align:left;}
+.idiom-list-wrap .word-item{margin-bottom:10px;}

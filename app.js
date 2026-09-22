@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '144'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '145'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1577,7 +1577,7 @@ function wordItemEl(w) {
       startEditWord(idx);
     });
   }
-  div.addEventListener('click', () => div.classList.toggle('open'));
+  div.addEventListener('click', (e) => { if (e.target.closest('.speak-btn, .wi-mark, .wi-edit-btn, .wi-del-btn')) return; div.classList.toggle('open'); });
   return div;
 }
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -2111,7 +2111,7 @@ function myDictItemEl(w) {
       <button type="button" class="btn-ghost btn-block mydict-edit-btn">編集する</button>
       <button type="button" class="btn-ghost btn-block mydict-delete-btn">削除</button>
     </div>`;
-  div.addEventListener('click', () => div.classList.toggle('open'));
+  div.addEventListener('click', (e) => { if (e.target.closest('.speak-btn, .wi-mark, .wi-edit-btn, .wi-del-btn')) return; div.classList.toggle('open'); });
   return div;
 }
 
@@ -3509,7 +3509,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       </div>`;
     }).join('') || '<div class="empty-note">該当する熟語が見つかりませんでした。</div>';
     wrap.querySelectorAll('.word-item').forEach(div => {
-      div.addEventListener('click', () => div.classList.toggle('open'));
+      div.addEventListener('click', (e) => { if (e.target.closest('.speak-btn, .wi-mark, .wi-edit-btn, .wi-del-btn')) return; div.classList.toggle('open'); });
     });
     wrap.querySelectorAll('.wi-mark').forEach(btn => {
       btn.addEventListener('click', (e) => {

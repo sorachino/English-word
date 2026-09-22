@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '138'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '139'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3327,6 +3327,12 @@ function idiomSrsScore(key) {
 function isNewIdiom(key) {
   return !loadJSON(LS_IDIOM_SRS, {})[key] && !loadJSON(LS_IDIOM_ANSWERED, {})[key];
 }
+function idiomAnswerStatsHtml(key) {
+  const rec = loadJSON(LS_IDIOM_ANSWERED, {})[key];
+  const ok = rec ? (rec.ok || 0) : 0;
+  const ng = rec ? (rec.ng || 0) : 0;
+  return `これまで<span class="stat-ok">○${ok}回</span>／<span class="stat-ng">×${ng}回</span>`;
+}
 function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   const log = loadJSON(LS.ANSWER_LOG, {});
   const dateKey = todayKey();
@@ -3489,8 +3495,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
         </div>
         ${showMeaningLine ? `<div class="wi-meaning">${escHtml(it.meaning)}</div>` : ''}
         <div class="wi-detail" style="display:block;">
+          <div class="wi-answer-stats">${idiomAnswerStatsHtml(key)}</div>
+          ${it.nuance ? `<div class="reveal-nuance">💡 ${escHtml(it.nuance)}</div>` : ''}
           <div class="ex">${escHtml(it.ex)} <button class="speak-btn" data-text="${escAttr(it.ex)}">🔊</button></div>
           <div class="ja">${escHtml(it.ja)}</div>
+          ${it.etymology ? `<div class="etym-box">${etymHtml(it.etymology, '')}</div>` : ''}
         </div>
       </div>`;
     }).join('') || '<div class="empty-note">該当する熟語が見つかりませんでした。</div>';
@@ -3746,9 +3755,15 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-reveal-phrase').textContent = q.item.phrase;
     document.getElementById('idiom-reveal-category').textContent = q.item.categoryLabel;
     document.getElementById('idiom-reveal-meaning').textContent = q.item.meaning;
+    const nuanceEl = document.getElementById('idiom-reveal-nuance');
+    if (q.item.nuance) { nuanceEl.textContent = '💡 ' + q.item.nuance; nuanceEl.hidden = false; }
+    else { nuanceEl.textContent = ''; nuanceEl.hidden = true; }
     document.getElementById('idiom-reveal-ex').textContent = q.item.ex;
     document.getElementById('idiom-reveal-speak-btn').dataset.text = q.item.ex || '';
     document.getElementById('idiom-reveal-ja').textContent = q.item.ja;
+    const etymEl = document.getElementById('idiom-reveal-etym');
+    if (q.item.etymology) { etymEl.innerHTML = etymHtml(q.item.etymology, ''); etymEl.hidden = false; }
+    else { etymEl.innerHTML = ''; etymEl.hidden = true; }
     document.getElementById('idiom-reveal-box').hidden = false;
   }
 

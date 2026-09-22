@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '139'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '140'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3327,6 +3327,13 @@ function idiomSrsScore(key) {
 function isNewIdiom(key) {
   return !loadJSON(LS_IDIOM_SRS, {})[key] && !loadJSON(LS_IDIOM_ANSWERED, {})[key];
 }
+function idiomStatusClass(key) {
+  const answered = loadJSON(LS_IDIOM_ANSWERED, {});
+  const rec = answered[key];
+  if (rec) return rec.ng > 0 ? ' status-ng' : ' status-ok';
+  if (loadJSON(LS_IDIOM_SRS, {})[key]) return ' status-ok';
+  return '';
+}
 function idiomAnswerStatsHtml(key) {
   const rec = loadJSON(LS_IDIOM_ANSWERED, {})[key];
   const ok = rec ? (rec.ok || 0) : 0;
@@ -3485,7 +3492,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       // 「文型別動詞」はフレーズ自体に意味が(~になる等)で含まれているため、意味行は重複するので省略する
       const showMeaningLine = it.category !== 'verb-pattern';
       return `
-      <div class="word-item" data-idiom-key="${escAttr(key)}">
+      <div class="word-item${idiomStatusClass(key)}" data-idiom-key="${escAttr(key)}">
         <div class="wi-head">
           <span class="wi-verb">${escHtml(it.phrase)}</span>
           <div class="wi-right">
@@ -3707,12 +3714,12 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     btn.addEventListener('pointercancel', finish);
   }
 
-  function checkIdiomOrderAnswer(q) {
+  function checkIdiomOrderAnswer(q, forceGiveUp) {
     if (q.resolved) return;
     q.resolved = true;
     document.getElementById('idiom-order-submit-btn').disabled = true;
     const answer = q.orderPicked.map(tok => tok.t).join(' ');
-    const ok = answer === q.item.ex.trim();
+    const ok = !forceGiveUp && answer === q.item.ex.trim();
     const phraseEl = document.getElementById('idiom-q-phrase');
     phraseEl.textContent = q.item.phrase;
     phraseEl.hidden = false;
@@ -3726,6 +3733,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     const q = idiomQuizState && idiomQuizState.questions[idiomQuizState.idx];
     if (!q || q.resolved || q.orderBank.length > 0) return;
     checkIdiomOrderAnswer(q);
+  });
+  document.getElementById('idiom-order-giveup-btn').addEventListener('click', () => {
+    const q = idiomQuizState && idiomQuizState.questions[idiomQuizState.idx];
+    if (!q || q.resolved) return;
+    checkIdiomOrderAnswer(q, true);
   });
   document.getElementById('idiom-order-reset-btn').addEventListener('click', () => {
     const q = idiomQuizState && idiomQuizState.questions[idiomQuizState.idx];

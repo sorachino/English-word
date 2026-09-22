@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '137'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '138'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3444,9 +3444,19 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     });
   });
 
+  function loadIdiomMarked() { return new Set(loadJSON('pv_idiom_marked', [])); }
+  function saveIdiomMarked(set) { saveJSON('pv_idiom_marked', [...set]); }
+  function toggleIdiomMarked(key) {
+    const set = loadIdiomMarked();
+    if (set.has(key)) set.delete(key); else set.add(key);
+    saveIdiomMarked(set);
+    return set.has(key);
+  }
+
   function renderIdiomList() {
     const q = document.getElementById('idiom-search').value.trim().toLowerCase();
     const cat = document.getElementById('idiom-category-filter').value;
+    const markedOnly = document.getElementById('idiom-marked-only-toggle').checked;
     let items = cat === '0' ? IDIOM_DATA.slice() : IDIOM_DATA.filter(it => it.category === cat);
     if (q) items = items.filter(it => it.phrase.toLowerCase().includes(q) || it.meaning.includes(q));
     if (idiomStatusFilter !== 'all') {
@@ -3457,19 +3467,47 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
         return !weak[key] && !isNewIdiom(key);
       });
     }
+    if (markedOnly) {
+      const marked = loadIdiomMarked();
+      items = items.filter(it => marked.has(idiomKey(it)));
+    }
+    const marked = loadIdiomMarked();
     const wrap = document.getElementById('idiom-list');
-    wrap.innerHTML = items.map(it => `
-      <div class="word-item">
-        <div class="wi-head"><span class="wi-verb">${escHtml(it.phrase)}</span><span class="wi-stage">${escHtml(it.categoryLabel)}</span></div>
-        <div class="wi-meaning">${escHtml(it.meaning)}</div>
+    wrap.innerHTML = items.map(it => {
+      const key = idiomKey(it);
+      const isMarked = marked.has(key);
+      // 「文型別動詞」はフレーズ自体に意味が(~になる等)で含まれているため、意味行は重複するので省略する
+      const showMeaningLine = it.category !== 'verb-pattern';
+      return `
+      <div class="word-item" data-idiom-key="${escAttr(key)}">
+        <div class="wi-head">
+          <span class="wi-verb">${escHtml(it.phrase)}</span>
+          <div class="wi-right">
+            <button class="wi-mark${isMarked ? ' on' : ''}" type="button" aria-label="マーク">${isMarked ? '★' : '☆'}</button>
+            <span class="wi-stage">${escHtml(it.categoryLabel)}</span>
+          </div>
+        </div>
+        ${showMeaningLine ? `<div class="wi-meaning">${escHtml(it.meaning)}</div>` : ''}
         <div class="wi-detail" style="display:block;">
           <div class="ex">${escHtml(it.ex)} <button class="speak-btn" data-text="${escAttr(it.ex)}">🔊</button></div>
           <div class="ja">${escHtml(it.ja)}</div>
         </div>
-      </div>`).join('') || '<div class="empty-note">該当する熟語が見つかりませんでした。</div>';
+      </div>`;
+    }).join('') || '<div class="empty-note">該当する熟語が見つかりませんでした。</div>';
+    wrap.querySelectorAll('.wi-mark').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const key = btn.closest('.word-item').dataset.idiomKey;
+        const nowOn = toggleIdiomMarked(key);
+        btn.textContent = nowOn ? '★' : '☆';
+        btn.classList.toggle('on', nowOn);
+        if (markedOnly && !nowOn) renderIdiomList();
+      });
+    });
     renderIdiomProgress();
   }
   document.getElementById('idiom-search').addEventListener('input', renderIdiomList);
+  document.getElementById('idiom-marked-only-toggle').addEventListener('change', renderIdiomList);
   document.getElementById('idiom-category-filter').addEventListener('change', renderIdiomList);
 
   document.querySelectorAll('#list-content-group .chip').forEach(chip => {

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '135'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '136'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3526,6 +3526,9 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
 
   function showIdiomQuestion() {
     const q = idiomQuizState.questions[idiomQuizState.idx];
+    document.getElementById('idiom-stamp-result').hidden = true;
+    document.getElementById('idiom-stamp-result').innerHTML = '';
+    document.getElementById('idiom-reveal-box').hidden = true;
     document.getElementById('idiom-q-idx').textContent = idiomQuizState.idx + 1;
     document.getElementById('idiom-q-total').textContent = idiomQuizState.questions.length;
     document.getElementById('idiom-progress-fill').style.width = (100 * idiomQuizState.idx / idiomQuizState.questions.length) + '%';
@@ -3697,15 +3700,31 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     recordIdiomAnswerLog(idiomQuizState.mode === 'order' ? 'idiom-order' : 'idiom-choice', q.item, ok, idiomQuizState.sessionId);
     syncLeaderboard(null, ok);
     playResultSound(ok);
-    setTimeout(() => {
-      idiomQuizState.idx++;
-      if (idiomQuizState.idx >= idiomQuizState.questions.length) {
-        finishIdiomQuiz();
-      } else {
-        showIdiomQuestion();
-      }
-    }, ok || idiomQuizState.mode !== 'order' ? 900 : 1800);
+
+    const stamp = document.getElementById('idiom-stamp-result');
+    stamp.hidden = false;
+    stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
+
+    document.getElementById('idiom-reveal-phrase').textContent = q.item.phrase;
+    document.getElementById('idiom-reveal-category').textContent = q.item.categoryLabel;
+    document.getElementById('idiom-reveal-meaning').textContent = q.item.meaning;
+    document.getElementById('idiom-reveal-ex').textContent = q.item.ex;
+    document.getElementById('idiom-reveal-speak-btn').dataset.text = q.item.ex || '';
+    document.getElementById('idiom-reveal-ja').textContent = q.item.ja;
+    document.getElementById('idiom-reveal-box').hidden = false;
   }
+
+  document.getElementById('idiom-next-btn').addEventListener('click', () => {
+    document.getElementById('idiom-stamp-result').hidden = true;
+    document.getElementById('idiom-stamp-result').innerHTML = '';
+    document.getElementById('idiom-reveal-box').hidden = true;
+    idiomQuizState.idx++;
+    if (idiomQuizState.idx >= idiomQuizState.questions.length) {
+      finishIdiomQuiz();
+    } else {
+      showIdiomQuestion();
+    }
+  });
 
   function finishIdiomQuiz() {
     document.getElementById('idiom-quiz-play').hidden = true;

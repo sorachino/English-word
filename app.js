@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '141'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '142'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3630,8 +3630,6 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     q.orderPicked = [];
     document.getElementById('idiom-order-hint').innerHTML = `<div class="ja">${escHtml(q.item.ja)}</div>`;
     document.getElementById('idiom-order-hint').hidden = false;
-    document.getElementById('idiom-order-result').hidden = true;
-    document.getElementById('idiom-order-result').textContent = '';
     const bank = shuffle(tokens.map((t, i) => ({ t, i })).slice());
     q.orderBank = bank;
     renderIdiomOrderUI(q);
@@ -3725,10 +3723,6 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     const phraseEl = document.getElementById('idiom-q-phrase');
     phraseEl.textContent = q.item.phrase;
     phraseEl.hidden = false;
-    const resultEl = document.getElementById('idiom-order-result');
-    resultEl.hidden = false;
-    resultEl.className = 'idiom-order-result ' + (ok ? 'ok' : 'ng');
-    resultEl.innerHTML = ok ? '正解！' : `不正解。正しい語順：<br>${escHtml(q.item.ex)}`;
     finishIdiomAnswer(q, ok);
   }
   document.getElementById('idiom-order-submit-btn').addEventListener('click', () => {

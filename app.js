@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '143'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '144'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3489,8 +3489,6 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     wrap.innerHTML = items.map(it => {
       const key = idiomKey(it);
       const isMarked = marked.has(key);
-      // フレーズ自体に意味が(~になる等)で埋め込まれている語（be/keep/become等の単独動詞パターン）は意味行が重複するので省略する
-      const showMeaningLine = !it.phrase.includes('~');
       return `
       <div class="word-item${idiomStatusClass(key)}" data-idiom-key="${escAttr(key)}">
         <div class="wi-head">
@@ -3500,7 +3498,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
             <span class="wi-stage">${escHtml(it.categoryLabel)}</span>
           </div>
         </div>
-        ${showMeaningLine ? `<div class="wi-meaning">${escHtml(it.meaning)}</div>` : ''}
+        <div class="wi-meaning">${escHtml(it.meaning)}</div>
         <div class="wi-detail">
           <div class="wi-answer-stats">${idiomAnswerStatsHtml(key)}</div>
           ${it.nuance ? `<div class="reveal-nuance">💡 ${escHtml(it.nuance)}</div>` : ''}

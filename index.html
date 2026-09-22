@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="129">
+<meta name="build-version" content="130">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -93,6 +93,11 @@
           </div>
         </div>
         <button class="btn-primary btn-block" id="idiom-start-quiz">4択クイズをはじめる</button>
+        <div class="dp-quick-actions" id="idiom-dp-quick-actions">
+          <button type="button" class="btn-ghost" id="idiom-dp-start-weak">苦手語（<span id="idiom-dp-weak-num">0</span>）</button>
+          <button type="button" class="btn-ghost" id="idiom-dp-start-review">復習（<span id="idiom-dp-review-num">0</span>）</button>
+          <button type="button" class="btn-ghost" id="idiom-dp-start-unlearned">未学習（<span id="idiom-dp-unlearned-num2">0</span>）</button>
+        </div>
       </div>
     </div>
 
@@ -260,6 +265,19 @@
     </div>
 
     <div class="idiom-list-wrap" id="idiom-list-wrap" hidden>
+      <div class="card dict-progress-card">
+        <div class="section-label">学習範囲（すべて）</div>
+        <div class="dict-progress-nums">
+          <div class="dp-num"><div class="n" id="idiom-dp-ok-num">0</div><div class="l"><span class="dp-dot dp-dot-ok"></span>習得済</div></div>
+          <div class="dp-num"><div class="n" id="idiom-dp-ng-num">0</div><div class="l"><span class="dp-dot dp-dot-ng"></span>苦手語</div></div>
+          <div class="dp-num"><div class="n" id="idiom-dp-unlearned-num">0</div><div class="l"><span class="dp-dot dp-dot-unlearned"></span>未学習</div></div>
+        </div>
+        <div class="dict-progress-bar">
+          <div class="dp-seg dp-seg-ok" id="idiom-dp-seg-ok"></div>
+          <div class="dp-seg dp-seg-ng" id="idiom-dp-seg-ng"></div>
+          <div class="dp-seg dp-seg-unlearned" id="idiom-dp-seg-unlearned"></div>
+        </div>
+      </div>
       <div class="setup-row">
         <label>カテゴリ</label>
         <select id="idiom-category-filter">
@@ -268,6 +286,11 @@
       </div>
       <div class="list-controls">
         <input type="search" id="idiom-search" placeholder="熟語・意味で検索">
+      </div>
+      <div class="chip-group" id="idiom-status-filter-group">
+        <button class="chip active" data-status="all">すべて</button>
+        <button class="chip" data-status="ok">習得済</button>
+        <button class="chip" data-status="ng">苦手語</button>
       </div>
       <div class="word-list" id="idiom-list"></div>
     </div>
@@ -547,6 +570,6 @@
 <script src="ai-config.js?v=1"></script>
 <script src="data.js?v=28"></script>
 <script src="idioms.js?v=1"></script>
-<script src="app.js?v=129"></script>
+<script src="app.js?v=130"></script>
 </body>
 </html>

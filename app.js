@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '129'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '130'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -498,7 +498,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.tab).classList.add('active');
-    if (btn.dataset.tab === 'quiz') renderDictProgress();
+    if (btn.dataset.tab === 'quiz') { renderDictProgress(); if (window.refreshIdiomQuickActions) window.refreshIdiomQuickActions(); }
     if (btn.dataset.tab === 'list') { renderWordList(); renderMyWordList(); renderSharedWordList(); pullGlobalGroupDefs(); }
     if (btn.dataset.tab === 'mydict') renderMyDictList();
     if (btn.dataset.tab === 'stats') { renderStats(); renderLeaderboard(); updateLbNameDisplay(); renderChampionCalendar(); renderRecentSession(); }
@@ -3264,6 +3264,43 @@ if ('caches' in window) {
 
 // ===================== 熟語（318語：文型別動詞・群前置詞・動詞+前置詞など） =====================
 // クイズはクイズタブに統合（句動詞/群前置詞/それ以外を選択）、一覧は句動詞辞書タブに統合。
+// 正答/誤答・苦手・復習・未学習は、句動詞と同じ考え方の別枠（キーの名前空間だけ分離）で管理する。
+const LS_IDIOM_ANSWERED = 'pv_idiom_answered';
+const LS_IDIOM_WEAK = 'pv_idiom_weak';
+const LS_IDIOM_SRS = 'pv_idiom_srs';
+function idiomKey(it) { return 'i' + it.no; }
+function recordIdiomAnswered(key, ok) {
+  const data = loadJSON(LS_IDIOM_ANSWERED, {});
+  if (!data[key]) data[key] = { ok: 0, ng: 0 };
+  if (ok) { data[key].ok++; data[key].ng = 0; } else { data[key].ng++; }
+  saveJSON(LS_IDIOM_ANSWERED, data);
+}
+function recordIdiomResult(key, ok) {
+  const weak = loadJSON(LS_IDIOM_WEAK, {});
+  if (ok) { if (weak[key]) delete weak[key]; }
+  else { if (!weak[key]) weak[key] = { wrong: 0 }; weak[key].wrong = (weak[key].wrong || 0) + 1; }
+  saveJSON(LS_IDIOM_WEAK, weak);
+}
+function updateIdiomSrs(key, ok) {
+  const srs = loadJSON(LS_IDIOM_SRS, {});
+  const entry = srs[key] || { interval: 1, dueDate: todayKey(), reps: 0 };
+  if (ok) { entry.reps = (entry.reps || 0) + 1; entry.interval = entry.reps <= 1 ? 1 : Math.min(60, entry.interval * 2); }
+  else { entry.interval = 1; entry.reps = 0; }
+  const due = new Date();
+  due.setDate(due.getDate() + entry.interval);
+  entry.dueDate = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}-${String(due.getDate()).padStart(2, '0')}`;
+  srs[key] = entry;
+  saveJSON(LS_IDIOM_SRS, srs);
+}
+function idiomSrsScore(key) {
+  const entry = loadJSON(LS_IDIOM_SRS, {})[key];
+  if (!entry) return null;
+  return -daysBetween(todayKey(), entry.dueDate);
+}
+function isNewIdiom(key) {
+  return !loadJSON(LS_IDIOM_SRS, {})[key] && !loadJSON(LS_IDIOM_ANSWERED, {})[key];
+}
+
 (function () {
   const PREP_CATEGORIES = ['prep-2word', 'prep-3word']; // 「群前置詞」に分類するカテゴリ
 
@@ -3278,6 +3315,7 @@ if ('caches' in window) {
   function refreshQuizContentUI() {
     document.getElementById('pv-quiz-options').hidden = quizContent !== 'pv';
     document.getElementById('idiom-quiz-options').hidden = quizContent === 'pv';
+    if (quizContent !== 'pv') refreshIdiomQuickActions();
   }
   document.querySelectorAll('#quiz-content-group .chip').forEach(chip => {
     chip.classList.toggle('active', chip.dataset.content === quizContent);
@@ -3289,6 +3327,23 @@ if ('caches' in window) {
     });
   });
   refreshQuizContentUI();
+
+  function refreshIdiomQuickActions() {
+    const pool = poolForContent(quizContent);
+    const weak = loadJSON(LS_IDIOM_WEAK, {});
+    let weakN = 0, reviewN = 0, unlearnedN = 0;
+    pool.forEach(it => {
+      const key = idiomKey(it);
+      if (isNewIdiom(key)) { unlearnedN++; return; }
+      if (weak[key]) weakN++;
+      const s = idiomSrsScore(key);
+      if (s !== null && s <= 0) reviewN++;
+    });
+    document.getElementById('idiom-dp-weak-num').textContent = weakN;
+    document.getElementById('idiom-dp-review-num').textContent = reviewN;
+    document.getElementById('idiom-dp-unlearned-num2').textContent = unlearnedN;
+  }
+  window.refreshIdiomQuickActions = refreshIdiomQuickActions;
 
   let idiomCount = parseInt(localStorage.getItem('pv_idiom_count'), 10) || 10;
   document.querySelectorAll('#idiom-count-group .chip').forEach(chip => {
@@ -3317,11 +3372,46 @@ if ('caches' in window) {
   }
   populateIdiomCategoryFilter();
 
+  function renderIdiomProgress() {
+    let okCount = 0, ngCount = 0, unlearnedCount = 0;
+    const weak = loadJSON(LS_IDIOM_WEAK, {});
+    IDIOM_DATA.forEach(it => {
+      const key = idiomKey(it);
+      if (isNewIdiom(key)) unlearnedCount++;
+      else if (weak[key]) ngCount++;
+      else okCount++;
+    });
+    const total = IDIOM_DATA.length || 1;
+    document.getElementById('idiom-dp-ok-num').textContent = okCount;
+    document.getElementById('idiom-dp-ng-num').textContent = ngCount;
+    document.getElementById('idiom-dp-unlearned-num').textContent = unlearnedCount;
+    document.getElementById('idiom-dp-seg-ok').style.width = (100 * okCount / total) + '%';
+    document.getElementById('idiom-dp-seg-ng').style.width = (100 * ngCount / total) + '%';
+    document.getElementById('idiom-dp-seg-unlearned').style.width = (100 * unlearnedCount / total) + '%';
+  }
+
+  let idiomStatusFilter = 'all';
+  document.querySelectorAll('#idiom-status-filter-group .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      idiomStatusFilter = chip.dataset.status;
+      document.querySelectorAll('#idiom-status-filter-group .chip').forEach(c => c.classList.toggle('active', c === chip));
+      renderIdiomList();
+    });
+  });
+
   function renderIdiomList() {
     const q = document.getElementById('idiom-search').value.trim().toLowerCase();
     const cat = document.getElementById('idiom-category-filter').value;
     let items = cat === '0' ? IDIOM_DATA.slice() : IDIOM_DATA.filter(it => it.category === cat);
     if (q) items = items.filter(it => it.phrase.toLowerCase().includes(q) || it.meaning.includes(q));
+    if (idiomStatusFilter !== 'all') {
+      const weak = loadJSON(LS_IDIOM_WEAK, {});
+      items = items.filter(it => {
+        const key = idiomKey(it);
+        if (idiomStatusFilter === 'ng') return !!weak[key];
+        return !weak[key] && !isNewIdiom(key);
+      });
+    }
     const wrap = document.getElementById('idiom-list');
     wrap.innerHTML = items.map(it => `
       <div class="word-item">
@@ -3332,6 +3422,7 @@ if ('caches' in window) {
           <div class="ja">${escHtml(it.ja)}</div>
         </div>
       </div>`).join('') || '<div class="empty-note">該当する熟語が見つかりませんでした。</div>';
+    renderIdiomProgress();
   }
   document.getElementById('idiom-search').addEventListener('input', renderIdiomList);
   document.getElementById('idiom-category-filter').addEventListener('change', renderIdiomList);
@@ -3349,8 +3440,19 @@ if ('caches' in window) {
   // ---------- 4択クイズ本体（クイズタブから起動） ----------
   let idiomQuizState = null;
 
-  function buildIdiomQuiz(count, content) {
-    const pool = shuffle(poolForContent(content).slice());
+  function buildIdiomQuiz(count, content, statusFilter) {
+    let pool = poolForContent(content);
+    if (statusFilter) {
+      const weak = loadJSON(LS_IDIOM_WEAK, {});
+      pool = pool.filter(it => {
+        const key = idiomKey(it);
+        if (statusFilter === 'weak') return !!weak[key];
+        if (statusFilter === 'unlearned') return isNewIdiom(key);
+        if (statusFilter === 'review') { const s = idiomSrsScore(key); return s !== null && s <= 0; }
+        return true;
+      });
+    }
+    pool = shuffle(pool.slice());
     const picks = pool.slice(0, count);
     return picks.map(it => {
       const distractorPool = IDIOM_DATA.filter(o => o.no !== it.no && o.meaning !== it.meaning);
@@ -3360,9 +3462,9 @@ if ('caches' in window) {
     });
   }
 
-  document.getElementById('idiom-start-quiz').addEventListener('click', () => {
-    const qs = buildIdiomQuiz(idiomCount, quizContent);
-    if (!qs.length) { toast('この条件では問題が作れませんでした'); return; }
+  function startIdiomQuiz(statusFilter) {
+    const qs = buildIdiomQuiz(idiomCount, quizContent, statusFilter);
+    if (!qs.length) { toast('該当する熟語がありませんでした'); return; }
     idiomQuizState = { questions: qs, idx: 0, correctCount: 0 };
     document.getElementById('quiz-setup').hidden = true;
     document.getElementById('quiz-play').hidden = true;
@@ -3371,7 +3473,11 @@ if ('caches' in window) {
     document.getElementById('idiom-quiz-done').hidden = true;
     document.getElementById('idiom-quiz-play').hidden = false;
     showIdiomQuestion();
-  });
+  }
+  document.getElementById('idiom-start-quiz').addEventListener('click', () => startIdiomQuiz(null));
+  document.getElementById('idiom-dp-start-weak').addEventListener('click', () => startIdiomQuiz('weak'));
+  document.getElementById('idiom-dp-start-review').addEventListener('click', () => startIdiomQuiz('review'));
+  document.getElementById('idiom-dp-start-unlearned').addEventListener('click', () => startIdiomQuiz('unlearned'));
 
   function showIdiomQuestion() {
     const q = idiomQuizState.questions[idiomQuizState.idx];
@@ -3396,6 +3502,10 @@ if ('caches' in window) {
     const ok = chosen === q.item.meaning;
     q.correct = ok;
     if (ok) idiomQuizState.correctCount++;
+    const key = idiomKey(q.item);
+    recordIdiomAnswered(key, ok);
+    recordIdiomResult(key, ok);
+    updateIdiomSrs(key, ok);
     const group = document.getElementById('idiom-choice-group');
     group.querySelectorAll('.choice-btn').forEach(btn => {
       const btnText = btn.textContent;
@@ -3418,6 +3528,7 @@ if ('caches' in window) {
     document.getElementById('idiom-quiz-done').hidden = false;
     document.getElementById('idiom-done-score-num').textContent = idiomQuizState.correctCount;
     document.getElementById('idiom-done-score-total').textContent = idiomQuizState.questions.length;
+    refreshIdiomQuickActions();
   }
 
   document.getElementById('idiom-restart-btn').addEventListener('click', () => {

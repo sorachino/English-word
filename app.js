@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '140'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '141'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3620,7 +3620,9 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   }
 
   // ---------- 並び替えモード ----------
-  function tokenize(sentence) { return sentence.trim().split(/\s+/); }
+  function tokenize(sentence) {
+    return sentence.trim().split(/\s+/).map(w => w.replace(/\.+$/, ''));
+  }
 
   function showIdiomOrderQuestion(q) {
     const tokens = tokenize(q.item.ex);
@@ -3719,7 +3721,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     q.resolved = true;
     document.getElementById('idiom-order-submit-btn').disabled = true;
     const answer = q.orderPicked.map(tok => tok.t).join(' ');
-    const ok = !forceGiveUp && answer === q.item.ex.trim();
+    const ok = !forceGiveUp && answer === tokenize(q.item.ex).join(' ');
     const phraseEl = document.getElementById('idiom-q-phrase');
     phraseEl.textContent = q.item.phrase;
     phraseEl.hidden = false;

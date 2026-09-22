@@ -570,4 +570,5 @@ select{
 #idiom-order-submit-btn:disabled{opacity:.4; cursor:not-allowed;}
 #idiom-order-submit-btn{margin-bottom:8px;}
 .idiom-order-actions{display:flex; gap:8px; margin-bottom:8px;}
-.idiom-order-actions #idiom-order-submit-btn{flex:1;}
+.idiom-order-actions #idiom-order-submit-btn,
+.idiom-order-actions #idiom-order-giveup-btn{flex:1; margin:0;}

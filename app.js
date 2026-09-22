@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '132'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '133'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3530,8 +3530,9 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-q-total').textContent = idiomQuizState.questions.length;
     document.getElementById('idiom-progress-fill').style.width = (100 * idiomQuizState.idx / idiomQuizState.questions.length) + '%';
     document.getElementById('idiom-q-category').textContent = q.item.categoryLabel;
-    document.getElementById('idiom-q-phrase').textContent = q.item.phrase;
     const isOrder = idiomQuizState.mode === 'order';
+    document.getElementById('idiom-q-phrase').hidden = isOrder;
+    document.getElementById('idiom-q-phrase').textContent = q.item.phrase;
     document.getElementById('idiom-choice-mode-block').hidden = isOrder;
     document.getElementById('idiom-order-mode-block').hidden = !isOrder;
     if (isOrder) {
@@ -3579,27 +3580,80 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   function renderIdiomOrderUI(q) {
     const answerEl = document.getElementById('idiom-order-answer');
     const bankEl = document.getElementById('idiom-order-bank');
-    answerEl.innerHTML = q.orderPicked.map((tok, pos) => `<button type="button" class="order-chip" data-pos="${pos}">${escHtml(tok.t)}</button>`).join('') || '<span class="order-placeholder">ここに単語をタップして並べてください</span>';
-    bankEl.innerHTML = q.orderBank.map((tok, pos) => `<button type="button" class="order-chip" data-bankpos="${pos}">${escHtml(tok.t)}</button>`).join('');
+    answerEl.innerHTML = q.orderPicked.map((tok, pos) => `<button type="button" class="order-chip" data-zone="answer" data-pos="${pos}">${escHtml(tok.t)}</button>`).join('') || '<span class="order-placeholder">ここに単語をタップまたはドラッグして並べてください</span>';
+    bankEl.innerHTML = q.orderBank.map((tok, pos) => `<button type="button" class="order-chip" data-zone="bank" data-pos="${pos}">${escHtml(tok.t)}</button>`).join('');
     if (!q.resolved) {
-      answerEl.querySelectorAll('.order-chip').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const pos = parseInt(btn.dataset.pos, 10);
-          const [tok] = q.orderPicked.splice(pos, 1);
-          q.orderBank.push(tok);
-          renderIdiomOrderUI(q);
-        });
-      });
-      bankEl.querySelectorAll('.order-chip').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const pos = parseInt(btn.dataset.bankpos, 10);
-          const [tok] = q.orderBank.splice(pos, 1);
-          q.orderPicked.push(tok);
-          renderIdiomOrderUI(q);
-          if (q.orderBank.length === 0) checkIdiomOrderAnswer(q);
-        });
+      [...answerEl.querySelectorAll('.order-chip'), ...bankEl.querySelectorAll('.order-chip')].forEach(btn => {
+        attachIdiomChipInteraction(btn, q);
       });
     }
+  }
+
+  let idiomDragCtx = null;
+  function attachIdiomChipInteraction(btn, q) {
+    btn.addEventListener('pointerdown', (e) => {
+      if (q.resolved) return;
+      e.preventDefault();
+      const zone = btn.dataset.zone, pos = parseInt(btn.dataset.pos, 10);
+      const rect = btn.getBoundingClientRect();
+      const ghost = btn.cloneNode(true);
+      Object.assign(ghost.style, {
+        position: 'fixed', left: rect.left + 'px', top: rect.top + 'px',
+        width: rect.width + 'px', pointerEvents: 'none', zIndex: '9999', opacity: '0.9', margin: '0',
+      });
+      document.body.appendChild(ghost);
+      btn.style.visibility = 'hidden';
+      idiomDragCtx = { zone, pos, ghost, offX: e.clientX - rect.left, offY: e.clientY - rect.top, moved: false, startX: e.clientX, startY: e.clientY, btn };
+      try { btn.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    btn.addEventListener('pointermove', (e) => {
+      if (!idiomDragCtx || idiomDragCtx.btn !== btn) return;
+      if (!idiomDragCtx.moved && (Math.abs(e.clientX - idiomDragCtx.startX) > 4 || Math.abs(e.clientY - idiomDragCtx.startY) > 4)) idiomDragCtx.moved = true;
+      idiomDragCtx.ghost.style.left = (e.clientX - idiomDragCtx.offX) + 'px';
+      idiomDragCtx.ghost.style.top = (e.clientY - idiomDragCtx.offY) + 'px';
+    });
+    const finish = (e) => {
+      if (!idiomDragCtx || idiomDragCtx.btn !== btn) return;
+      const ctx = idiomDragCtx;
+      idiomDragCtx = null;
+      if (ctx.ghost.parentNode) ctx.ghost.parentNode.removeChild(ctx.ghost);
+      btn.style.visibility = '';
+      if (q.resolved) return;
+      const answerZone = document.getElementById('idiom-order-answer');
+      const bankZone = document.getElementById('idiom-order-bank');
+      if (!ctx.moved) {
+        // タップ：バンク→解答の末尾に追加／解答→バンクの末尾に戻す
+        if (ctx.zone === 'bank') {
+          if (ctx.pos < q.orderBank.length) { const [tok] = q.orderBank.splice(ctx.pos, 1); q.orderPicked.push(tok); }
+        } else {
+          if (ctx.pos < q.orderPicked.length) { const [tok] = q.orderPicked.splice(ctx.pos, 1); q.orderBank.push(tok); }
+        }
+      } else {
+        const dropEl = document.elementFromPoint(e.clientX, e.clientY);
+        const dropChip = dropEl && dropEl.closest('.order-chip');
+        const inAnswer = !!dropEl && (answerZone.contains(dropEl) || (dropChip && answerZone.contains(dropChip)));
+        const inBank = !!dropEl && (bankZone.contains(dropEl) || (dropChip && bankZone.contains(dropChip)));
+        const sourceArr = ctx.zone === 'bank' ? q.orderBank : q.orderPicked;
+        if (ctx.pos < sourceArr.length) {
+          const [tok] = sourceArr.splice(ctx.pos, 1);
+          if (inAnswer) {
+            let insertAt = q.orderPicked.length;
+            if (dropChip && dropChip.dataset.zone === 'answer') insertAt = parseInt(dropChip.dataset.pos, 10);
+            q.orderPicked.splice(insertAt, 0, tok);
+          } else if (inBank) {
+            let insertAt = q.orderBank.length;
+            if (dropChip && dropChip.dataset.zone === 'bank') insertAt = parseInt(dropChip.dataset.pos, 10);
+            q.orderBank.splice(insertAt, 0, tok);
+          } else {
+            sourceArr.splice(ctx.pos, 0, tok); // ドロップ先が判定できなければ元の位置に戻す
+          }
+        }
+      }
+      renderIdiomOrderUI(q);
+      if (q.orderBank.length === 0) checkIdiomOrderAnswer(q);
+    };
+    btn.addEventListener('pointerup', finish);
+    btn.addEventListener('pointercancel', finish);
   }
 
   function checkIdiomOrderAnswer(q) {
@@ -3607,6 +3661,9 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     q.resolved = true;
     const answer = q.orderPicked.map(tok => tok.t).join(' ');
     const ok = answer === q.item.ex.trim();
+    const phraseEl = document.getElementById('idiom-q-phrase');
+    phraseEl.textContent = q.item.phrase;
+    phraseEl.hidden = false;
     const resultEl = document.getElementById('idiom-order-result');
     resultEl.hidden = false;
     resultEl.className = 'idiom-order-result ' + (ok ? 'ok' : 'ng');

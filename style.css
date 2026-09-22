@@ -565,3 +565,4 @@ select{
 .idiom-order-result{font-size:13.5px; padding:10px; border-radius:8px; margin-bottom:10px; line-height:1.6;}
 .idiom-order-result.ok{background:var(--ok-soft); color:var(--ok);}
 .idiom-order-result.ng{background:var(--hanko-soft); color:var(--hanko);}
+.order-chip{touch-action:none;}

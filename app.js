@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '134'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '135'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3588,6 +3588,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
         attachIdiomChipInteraction(btn, q);
       });
     }
+    document.getElementById('idiom-order-submit-btn').disabled = q.resolved || q.orderBank.length > 0;
   }
 
   let idiomDragCtx = null;
@@ -3651,7 +3652,6 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
         }
       }
       renderIdiomOrderUI(q);
-      if (q.orderBank.length === 0) checkIdiomOrderAnswer(q);
     };
     btn.addEventListener('pointerup', finish);
     btn.addEventListener('pointercancel', finish);
@@ -3660,6 +3660,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   function checkIdiomOrderAnswer(q) {
     if (q.resolved) return;
     q.resolved = true;
+    document.getElementById('idiom-order-submit-btn').disabled = true;
     const answer = q.orderPicked.map(tok => tok.t).join(' ');
     const ok = answer === q.item.ex.trim();
     const phraseEl = document.getElementById('idiom-q-phrase');
@@ -3671,6 +3672,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     resultEl.innerHTML = ok ? '正解！' : `不正解。正しい語順：<br>${escHtml(q.item.ex)}`;
     finishIdiomAnswer(q, ok);
   }
+  document.getElementById('idiom-order-submit-btn').addEventListener('click', () => {
+    const q = idiomQuizState && idiomQuizState.questions[idiomQuizState.idx];
+    if (!q || q.resolved || q.orderBank.length > 0) return;
+    checkIdiomOrderAnswer(q);
+  });
   document.getElementById('idiom-order-reset-btn').addEventListener('click', () => {
     const q = idiomQuizState && idiomQuizState.questions[idiomQuizState.idx];
     if (!q || q.resolved) return;

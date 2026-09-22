@@ -566,3 +566,5 @@ select{
 .idiom-order-result.ok{background:var(--ok-soft); color:var(--ok);}
 .idiom-order-result.ng{background:var(--hanko-soft); color:var(--hanko);}
 .order-chip{touch-action:none;}
+#idiom-order-submit-btn:disabled{opacity:.4; cursor:not-allowed;}
+#idiom-order-submit-btn{margin-bottom:8px;}

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="128">
+<meta name="build-version" content="129">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -36,8 +36,7 @@
   <button class="tab" data-tab="list"><span class="tab-idx">02</span>句動詞辞書</button>
   <button class="tab" data-tab="mydict"><span class="tab-idx">03</span>MY辞書</button>
   <button class="tab" data-tab="nuance"><span class="tab-idx">04</span>使い分け</button>
-  <button class="tab" data-tab="idiom"><span class="tab-idx">05</span>熟語</button>
-  <button class="tab" data-tab="stats"><span class="tab-idx">06</span>記録</button>
+  <button class="tab" data-tab="stats"><span class="tab-idx">05</span>記録</button>
 </nav>
 
 <main id="views">
@@ -46,34 +45,55 @@
   <section class="view active" id="view-quiz">
     <div class="quiz-setup card" id="quiz-setup">
       <div class="setup-row">
-        <label>出題モード</label>
-        <div class="chip-group" id="quiz-mode-group">
-          <button class="chip active" data-mode="normal">通常</button>
-          <button class="chip" data-mode="listening">リスニング</button>
-          <button class="chip" data-mode="reverse">逆方向</button>
-          <button class="chip" data-mode="matching">マッチング</button>
+        <label>出題内容</label>
+        <div class="chip-group" id="quiz-content-group">
+          <button class="chip active" data-content="pv">句動詞</button>
+          <button class="chip" data-content="prep">群前置詞</button>
+          <button class="chip" data-content="other">それ以外</button>
         </div>
       </div>
-      <div class="setup-row">
-        <label>範囲</label>
-        <select id="quiz-stage">
-          <option value="0">全ステージ</option>
-        </select>
-      </div>
-      <div class="setup-row">
-        <label>問題数</label>
-        <div class="chip-group" id="quiz-count-group">
-          <button class="chip" data-count="5">5</button>
-          <button class="chip active" data-count="10">10</button>
-          <button class="chip" data-count="20">20</button>
+      <div id="pv-quiz-options">
+        <div class="setup-row">
+          <label>出題モード</label>
+          <div class="chip-group" id="quiz-mode-group">
+            <button class="chip active" data-mode="normal">通常</button>
+            <button class="chip" data-mode="listening">リスニング</button>
+            <button class="chip" data-mode="reverse">逆方向</button>
+            <button class="chip" data-mode="matching">マッチング</button>
+          </div>
         </div>
+        <div class="setup-row">
+          <label>範囲</label>
+          <select id="quiz-stage">
+            <option value="0">全ステージ</option>
+          </select>
+        </div>
+        <div class="setup-row">
+          <label>問題数</label>
+          <div class="chip-group" id="quiz-count-group">
+            <button class="chip" data-count="5">5</button>
+            <button class="chip active" data-count="10">10</button>
+            <button class="chip" data-count="20">20</button>
+          </div>
+        </div>
+        <div class="dp-quick-actions" id="dp-quick-actions">
+          <button type="button" class="btn-ghost" id="dp-start-weak">苦手語（<span id="dp-weak-num">0</span>）</button>
+          <button type="button" class="btn-ghost" id="dp-start-review">復習（<span id="dp-review-num">0</span>）</button>
+          <button type="button" class="btn-ghost" id="dp-start-unlearned">未学習（<span id="dp-unlearned-num2">0</span>）</button>
+        </div>
+        <button type="button" class="btn-primary" id="start-matching-btn" hidden>マッチングを始める</button>
       </div>
-      <div class="dp-quick-actions" id="dp-quick-actions">
-        <button type="button" class="btn-ghost" id="dp-start-weak">苦手語（<span id="dp-weak-num">0</span>）</button>
-        <button type="button" class="btn-ghost" id="dp-start-review">復習（<span id="dp-review-num">0</span>）</button>
-        <button type="button" class="btn-ghost" id="dp-start-unlearned">未学習（<span id="dp-unlearned-num2">0</span>）</button>
+      <div id="idiom-quiz-options" hidden>
+        <div class="setup-row">
+          <label>問題数</label>
+          <div class="chip-group" id="idiom-count-group">
+            <button class="chip" data-count="5">5</button>
+            <button class="chip active" data-count="10">10</button>
+            <button class="chip" data-count="20">20</button>
+          </div>
+        </div>
+        <button class="btn-primary btn-block" id="idiom-start-quiz">4択クイズをはじめる</button>
       </div>
-      <button type="button" class="btn-primary" id="start-matching-btn" hidden>マッチングを始める</button>
     </div>
 
     <div class="quiz-play" id="quiz-play" hidden>
@@ -163,10 +183,38 @@
       <button class="btn-primary" id="match-again-btn" hidden>もう一度（新しい組み合わせ）</button>
       <button class="btn-ghost" id="match-back-btn" hidden>設定に戻る</button>
     </div>
+
+    <div class="idiom-quiz-play" id="idiom-quiz-play" hidden>
+      <div class="progress-row">
+        <div class="progress-track"><div class="progress-fill" id="idiom-progress-fill"></div></div>
+        <div class="q-count"><span id="idiom-q-idx">1</span> / <span id="idiom-q-total">10</span></div>
+      </div>
+      <div class="card idiom-question-card" id="idiom-question-card">
+        <div class="idiom-category-tag" id="idiom-q-category"></div>
+        <div class="idiom-phrase" id="idiom-q-phrase"></div>
+        <div class="idiom-example" id="idiom-q-example"></div>
+        <div class="choice-group" id="idiom-choice-group"></div>
+      </div>
+    </div>
+
+    <div class="idiom-quiz-done" id="idiom-quiz-done" hidden>
+      <div class="card">
+        <div class="done-score"><span id="idiom-done-score-num">0</span> / <span id="idiom-done-score-total">10</span> 問正解</div>
+        <button class="btn-primary btn-block" id="idiom-restart-btn">設定に戻る</button>
+      </div>
+    </div>
   </section>
 
   <!-- ============ 単語帳 ============ -->
   <section class="view" id="view-list">
+    <div class="setup-row">
+      <label>表示内容</label>
+      <div class="chip-group" id="list-content-group">
+        <button class="chip active" data-content="pv">句動詞</button>
+        <button class="chip" data-content="idiom">熟語</button>
+      </div>
+    </div>
+    <div id="pv-list-wrap">
     <div class="card dict-progress-card">
       <div class="section-label">学習範囲（すべて）</div>
       <div class="dict-progress-nums">
@@ -209,6 +257,20 @@
     <div class="my-words-head">みんなのマイ単語</div>
     <div class="word-list" id="shared-word-list"></div>
     <div class="empty-note" id="shared-word-empty" hidden>まだ他の人が追加した単語はありません。</div>
+    </div>
+
+    <div class="idiom-list-wrap" id="idiom-list-wrap" hidden>
+      <div class="setup-row">
+        <label>カテゴリ</label>
+        <select id="idiom-category-filter">
+          <option value="0">すべて（318語）</option>
+        </select>
+      </div>
+      <div class="list-controls">
+        <input type="search" id="idiom-search" placeholder="熟語・意味で検索">
+      </div>
+      <div class="word-list" id="idiom-list"></div>
+    </div>
   </section>
 
   <!-- ============ 辞書に追加（モーダル） ============ -->
@@ -402,53 +464,6 @@
     <div class="nuance-list" id="nuance-list"></div>
   </section>
 
-  <section class="view" id="view-idiom">
-    <div class="idiom-setup card" id="idiom-setup">
-      <div class="setup-row">
-        <label>カテゴリ</label>
-        <select id="idiom-category-filter">
-          <option value="0">すべて（318語）</option>
-        </select>
-      </div>
-      <div class="setup-row">
-        <label>問題数</label>
-        <div class="chip-group" id="idiom-count-group">
-          <button class="chip" data-count="5">5</button>
-          <button class="chip active" data-count="10">10</button>
-          <button class="chip" data-count="20">20</button>
-        </div>
-      </div>
-      <button class="btn-primary" id="idiom-start-quiz">4択クイズをはじめる</button>
-      <button class="btn-ghost btn-block" id="idiom-show-list">一覧を見る</button>
-    </div>
-
-    <div class="idiom-list-wrap" id="idiom-list-wrap" hidden>
-      <div class="list-controls">
-        <input type="search" id="idiom-search" placeholder="熟語・意味で検索">
-      </div>
-      <button class="btn-ghost btn-block" id="idiom-back-to-setup">← クイズ設定に戻る</button>
-      <div class="word-list" id="idiom-list"></div>
-    </div>
-
-    <div class="idiom-quiz-play" id="idiom-quiz-play" hidden>
-      <div class="progress-bar"><div class="progress-fill" id="idiom-progress-fill"></div></div>
-      <div class="q-count"><span id="idiom-q-idx">1</span> / <span id="idiom-q-total">10</span></div>
-      <div class="card idiom-question-card" id="idiom-question-card">
-        <div class="idiom-category-tag" id="idiom-q-category"></div>
-        <div class="idiom-phrase" id="idiom-q-phrase"></div>
-        <div class="idiom-example" id="idiom-q-example"></div>
-        <div class="choice-group" id="idiom-choice-group"></div>
-      </div>
-    </div>
-
-    <div class="idiom-quiz-done" id="idiom-quiz-done" hidden>
-      <div class="card">
-        <div class="done-score"><span id="idiom-done-score-num">0</span> / <span id="idiom-done-score-total">10</span> 問正解</div>
-        <button class="btn-primary btn-block" id="idiom-restart-btn">設定に戻る</button>
-      </div>
-    </div>
-  </section>
-
 </main>
 
 <div class="streak-popup" id="streak-popup" hidden>
@@ -532,6 +547,6 @@
 <script src="ai-config.js?v=1"></script>
 <script src="data.js?v=28"></script>
 <script src="idioms.js?v=1"></script>
-<script src="app.js?v=128"></script>
+<script src="app.js?v=129"></script>
 </body>
 </html>

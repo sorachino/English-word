@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '149'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '150'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -87,7 +87,8 @@ const IRREGULAR = {
   draw:'drew drawn drawing', drag:'dragged dragging', drop:'dropped dropping',
   eat:'ate eaten eating', fall:'fell fallen falling', feel:'felt feeling',
   fill:'filled filling', find:'found finding', fit:'fitting', get:'got gotten getting',
-  give:'gave given giving', go:'went gone goes going', hang:'hung hanging',
+  give:'gave given giving', go:'went gone goes going', grow:'grew grown growing',
+  hang:'hung hanging',
   have:'had has having', hear:'heard hearing', hit:'hitting', hold:'held holding',
   hook:'hooked hooking', keep:'kept keeping', kick:'kicked kicking',
   know:'knew known knowing', lay:'laid laying', leave:'left leaving', let:'letting',
@@ -99,6 +100,7 @@ const IRREGULAR = {
   stand:'stood standing', stick:'stuck sticking', strike:'struck striking',
   sweep:'swept sweeping', take:'took taken taking', teach:'taught teaching',
   tell:'told telling', think:'thought thinking', throw:'threw thrown throwing',
+  try:'tried tries trying',
   wear:'wore worn wearing', win:'won winning', wind:'wound winding',
   write:'wrote written writing',
 };

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '148'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '149'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3781,6 +3781,59 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     if (q.item.etymology) { etymEl.innerHTML = etymHtml(q.item.etymology, ''); etymEl.hidden = false; }
     else { etymEl.innerHTML = ''; etymEl.hidden = true; }
     document.getElementById('idiom-reveal-box').hidden = false;
+
+    const markWrongBtn = document.getElementById('idiom-mark-wrong-btn');
+    if (ok) {
+      markWrongBtn.hidden = false;
+      markWrongBtn.disabled = false;
+      markWrongBtn.onclick = () => markIdiomAsWrong(q);
+    } else {
+      markWrongBtn.hidden = true;
+    }
+  }
+
+  function markIdiomAsWrong(q) {
+    if (!q || !q.correct) return;
+    const key = idiomKey(q.item);
+
+    const answered = loadJSON(LS_IDIOM_ANSWERED, {});
+    if (!answered[key]) answered[key] = { ok: 0, ng: 0 };
+    answered[key].ok = Math.max(0, (answered[key].ok || 0) - 1);
+    answered[key].ng = (answered[key].ng || 0) + 1;
+    saveJSON(LS_IDIOM_ANSWERED, answered);
+
+    recordIdiomResult(key, false);
+    updateIdiomSrs(key, false);
+
+    q.correct = false;
+    if (idiomQuizState.correctCount > 0) idiomQuizState.correctCount--;
+
+    const log = loadJSON(LS.LOG, {});
+    const today = todayKey();
+    if (log[today] && log[today].correct > 0) {
+      log[today].correct -= 1;
+      saveJSON(LS.LOG, log);
+    }
+    const db = initFirebase();
+    const nickname = getNickname();
+    if (db && nickname) {
+      db.ref(`users/${nickname}/log/${today}/correct`).set(firebase.database.ServerValue.increment(-1)).catch(() => {});
+    }
+
+    const answerLog = loadJSON(LS.ANSWER_LOG, {});
+    const todayEntries = answerLog[today];
+    if (todayEntries) {
+      for (let i = todayEntries.length - 1; i >= 0; i--) {
+        if (todayEntries[i].k === key && todayEntries[i].ok) { todayEntries[i].ok = false; break; }
+      }
+      saveJSON(LS.ANSWER_LOG, answerLog);
+      pushAnswerLogToCloud(today, todayEntries);
+    }
+
+    const statsView = document.getElementById('view-stats');
+    if (statsView && statsView.classList.contains('active')) renderStats();
+    document.getElementById('idiom-mark-wrong-btn').hidden = true;
+    toast('苦手な語として記録しました');
   }
 
   document.getElementById('idiom-next-btn').addEventListener('click', () => {

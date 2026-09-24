@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="151">
+<meta name="build-version" content="152">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -37,6 +37,7 @@
   <button class="tab" data-tab="mydict"><span class="tab-idx">03</span>MY辞書</button>
   <button class="tab" data-tab="nuance"><span class="tab-idx">04</span>使い分け</button>
   <button class="tab" data-tab="stats"><span class="tab-idx">05</span>記録</button>
+  <button class="tab" data-tab="shadow"><span class="tab-idx">06</span>音読</button>
 </nav>
 
 <main id="views">
@@ -527,6 +528,36 @@
     <div class="nuance-list" id="nuance-list"></div>
   </section>
 
+  <!-- ============ 音読（シャドーイング） ============ -->
+  <section class="view" id="view-shadow">
+    <div class="card" id="shadow-list-view">
+      <div class="setup-row">
+        <label>表示内容</label>
+        <div class="content-toggle-wrap" id="shadow-content-toggle-wrap">
+          <span class="content-toggle-label active" data-content="pv">句動詞</span>
+          <button type="button" class="content-toggle-switch" id="shadow-content-switch" role="switch" aria-checked="false"><span class="content-toggle-knob"></span></button>
+          <span class="content-toggle-label" data-content="idiom">熟語</span>
+        </div>
+      </div>
+      <div class="list-controls">
+        <input type="search" id="shadow-search" placeholder="句動詞・熟語・意味で検索">
+      </div>
+      <div class="word-list" id="shadow-list"></div>
+    </div>
+    <div class="card" id="shadow-detail-view" hidden>
+      <button type="button" class="btn-ghost" id="shadow-back-btn">← 一覧に戻る</button>
+      <div class="reveal-title-row" style="margin-top:10px;">
+        <div class="reveal-verb" id="shadow-detail-title"></div>
+      </div>
+      <div class="reveal-meaning" id="shadow-detail-meaning"></div>
+      <div class="shadow-dialogue" id="shadow-dialogue-lines"></div>
+      <div class="shadow-nav-row">
+        <button type="button" class="btn-ghost" id="shadow-prev-btn">← 前へ</button>
+        <button type="button" class="btn-ghost" id="shadow-next-btn">次へ →</button>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <div class="streak-popup" id="streak-popup" hidden>
@@ -610,6 +641,7 @@
 <script src="ai-config.js?v=1"></script>
 <script src="data.js?v=28"></script>
 <script src="idioms.js?v=6"></script>
-<script src="app.js?v=151"></script>
+<script src="dialogues.js?v=1"></script>
+<script src="app.js?v=152"></script>
 </body>
 </html>

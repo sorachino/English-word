@@ -580,3 +580,21 @@ select{
 .content-toggle-switch.on{background:var(--navy);}
 .content-toggle-knob{position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s;}
 .content-toggle-switch.on .content-toggle-knob{transform:translateX(20px);}
+
+/* ---------- 音読（シャドーイング） ---------- */
+.shadow-nav-row{display:flex; gap:8px; margin-top:14px;}
+.shadow-nav-row button{flex:1;}
+.shadow-dialogue{display:flex; flex-direction:column; gap:12px; margin:14px 0;}
+.shadow-line{display:flex; gap:8px; max-width:88%;}
+.shadow-line.spk-B{align-self:flex-end; flex-direction:row-reverse;}
+.shadow-spk{
+  flex:none; width:26px; height:26px; border-radius:50%; background:var(--navy); color:#fff;
+  font-family:"JetBrains Mono",monospace; font-weight:700; font-size:12px;
+  display:flex; align-items:center; justify-content:center; margin-top:2px;
+}
+.shadow-line.spk-B .shadow-spk{background:var(--hanko);}
+.shadow-text{background:var(--paper-raised); border-radius:12px; padding:10px 12px; flex:1;}
+.shadow-line.spk-B .shadow-text{background:#fdeeec;}
+.shadow-en{font-size:14.5px; color:var(--ink); line-height:1.5; display:flex; align-items:flex-start; gap:6px; flex-wrap:wrap;}
+.shadow-ja{font-size:12.5px; color:var(--ink-soft); margin-top:4px;}
+.shadow-list .word-item{cursor:pointer;}

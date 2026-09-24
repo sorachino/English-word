@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '151'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '152'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -513,6 +513,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     if (btn.dataset.tab === 'mydict') renderMyDictList();
     if (btn.dataset.tab === 'stats') { renderStats(); renderLeaderboard(); updateLbNameDisplay(); renderChampionCalendar(); renderRecentSession(); }
     if (btn.dataset.tab === 'nuance') { pullGlobalGroupDefs(); renderNuanceList(); }
+    if (btn.dataset.tab === 'shadow') { renderShadowList(); }
   });
 });
 
@@ -3877,5 +3878,106 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   document.getElementById('idiom-restart-btn').addEventListener('click', () => {
     document.getElementById('idiom-quiz-done').hidden = true;
     document.getElementById('quiz-setup').hidden = false;
+  });
+})();
+
+// ===================== 音読（シャドーイング） =====================
+(function () {
+  const DIALOGUES = (typeof DIALOGUE_DATA !== 'undefined') ? DIALOGUE_DATA : {};
+  let shadowContent = localStorage.getItem('pv_shadow_content') || 'pv';
+  let shadowPoolCache = [];
+  let shadowIdx = 0;
+
+  function shadowEntries(content) {
+    if (content === 'idiom') {
+      return IDIOM_DATA.map(it => ({ key: idiomKey(it), title: it.phrase, meaning: it.meaning, tag: it.categoryLabel }));
+    }
+    return PV_DATA.map(w => ({ key: wordKey(w), title: w.verb, meaning: w.meaning, tag: 'Stage ' + w.stage }));
+  }
+
+  function refreshShadowContentUI() {
+    const sw = document.getElementById('shadow-content-switch');
+    const labels = document.querySelectorAll('#shadow-content-toggle-wrap .content-toggle-label');
+    const showIdiom = shadowContent === 'idiom';
+    sw.classList.toggle('on', showIdiom);
+    sw.setAttribute('aria-checked', showIdiom ? 'true' : 'false');
+    labels.forEach(l => l.classList.toggle('active', (l.dataset.content === 'idiom') === showIdiom));
+  }
+  function setShadowContent(content) {
+    shadowContent = content;
+    localStorage.setItem('pv_shadow_content', content);
+    refreshShadowContentUI();
+    renderShadowList();
+  }
+  document.getElementById('shadow-content-switch').addEventListener('click', () => {
+    setShadowContent(shadowContent === 'idiom' ? 'pv' : 'idiom');
+  });
+  document.querySelectorAll('#shadow-content-toggle-wrap .content-toggle-label').forEach(l => {
+    l.addEventListener('click', () => setShadowContent(l.dataset.content));
+  });
+  refreshShadowContentUI();
+
+  window.renderShadowList = function renderShadowList() {
+    const q = document.getElementById('shadow-search').value.trim().toLowerCase();
+    let entries = shadowEntries(shadowContent);
+    if (q) entries = entries.filter(e => e.title.toLowerCase().includes(q) || (e.meaning || '').includes(q));
+    shadowPoolCache = entries;
+    const wrap = document.getElementById('shadow-list');
+    wrap.innerHTML = entries.map((e, i) => {
+      const has = !!DIALOGUES[e.key];
+      return `
+      <div class="word-item" data-idx="${i}">
+        <div class="wi-head">
+          <span class="wi-verb">${escHtml(e.title)}</span>
+          <div class="wi-right">
+            <span class="wi-stage">${has ? '🗣️ 会話あり' : '準備中'}</span>
+          </div>
+        </div>
+        <div class="wi-meaning">${escHtml(e.meaning)}</div>
+      </div>`;
+    }).join('') || '<div class="empty-note">該当する語が見つかりませんでした。</div>';
+    wrap.querySelectorAll('.word-item').forEach(div => {
+      div.addEventListener('click', () => openShadowDetail(parseInt(div.dataset.idx, 10)));
+    });
+  };
+  document.getElementById('shadow-search').addEventListener('input', renderShadowList);
+
+  function openShadowDetail(idx) {
+    shadowIdx = idx;
+    document.getElementById('shadow-list-view').hidden = true;
+    document.getElementById('shadow-detail-view').hidden = false;
+    renderShadowDetail();
+  }
+  function renderShadowDetail() {
+    const e = shadowPoolCache[shadowIdx];
+    if (!e) return;
+    document.getElementById('shadow-detail-title').textContent = e.title;
+    document.getElementById('shadow-detail-meaning').textContent = e.meaning;
+    const dlg = DIALOGUES[e.key];
+    const linesEl = document.getElementById('shadow-dialogue-lines');
+    if (!dlg || !dlg.lines || !dlg.lines.length) {
+      linesEl.innerHTML = '<div class="empty-note">この語の会話文はまだ準備中です。</div>';
+    } else {
+      linesEl.innerHTML = dlg.lines.map(line => `
+        <div class="shadow-line spk-${escAttr(line.spk)}">
+          <div class="shadow-spk">${escHtml(line.spk)}</div>
+          <div class="shadow-text">
+            <div class="shadow-en">${escHtml(line.en)} <button class="speak-btn" data-text="${escAttr(line.en)}">🔊</button></div>
+            <div class="shadow-ja">${escHtml(line.ja)}</div>
+          </div>
+        </div>`).join('');
+    }
+    document.getElementById('shadow-prev-btn').disabled = shadowIdx <= 0;
+    document.getElementById('shadow-next-btn').disabled = shadowIdx >= shadowPoolCache.length - 1;
+  }
+  document.getElementById('shadow-back-btn').addEventListener('click', () => {
+    document.getElementById('shadow-detail-view').hidden = true;
+    document.getElementById('shadow-list-view').hidden = false;
+  });
+  document.getElementById('shadow-prev-btn').addEventListener('click', () => {
+    if (shadowIdx > 0) { shadowIdx--; renderShadowDetail(); }
+  });
+  document.getElementById('shadow-next-btn').addEventListener('click', () => {
+    if (shadowIdx < shadowPoolCache.length - 1) { shadowIdx++; renderShadowDetail(); }
   });
 })();

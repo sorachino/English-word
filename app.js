@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '152'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '153'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3884,6 +3884,52 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
 // ===================== 音読（シャドーイング） =====================
 (function () {
   const DIALOGUES = (typeof DIALOGUE_DATA !== 'undefined') ? DIALOGUE_DATA : {};
+
+  // ---------- 発音チェック（音声認識） ----------
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  function normalizeForCompare(s) {
+    return s.toLowerCase().replace(/[.,!?;:"']/g, '').trim().split(/\s+/).filter(Boolean);
+  }
+  function checkPronunciation(targetText, idx) {
+    const resultEl = document.getElementById('shadow-mic-result-' + idx);
+    if (!SpeechRec) {
+      toast('この端末は発音チェックに対応していません（Android/PCのChromeなどをお試しください）');
+      return;
+    }
+    const rec = new SpeechRec();
+    rec.lang = 'en-US';
+    rec.maxAlternatives = 1;
+    resultEl.hidden = false;
+    resultEl.className = 'shadow-mic-result listening';
+    resultEl.textContent = '🎤 聞き取り中…話してください';
+    rec.onresult = (ev) => {
+      const heard = ev.results[0][0].transcript;
+      const targetWords = normalizeForCompare(targetText);
+      const heardWords = new Set(normalizeForCompare(heard));
+      const matched = targetWords.filter(w => heardWords.has(w));
+      const score = targetWords.length ? Math.round((matched.length / targetWords.length) * 100) : 0;
+      const ok = score >= 70;
+      resultEl.className = 'shadow-mic-result ' + (ok ? 'ok' : 'ng');
+      resultEl.innerHTML = `聞き取り結果: 「${escHtml(heard)}」 ｜ 一致度 ${score}%`;
+    };
+    rec.onerror = (ev) => {
+      resultEl.className = 'shadow-mic-result ng';
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        resultEl.textContent = 'マイクの使用が許可されていません。設定を確認してください。';
+      } else if (ev.error === 'no-speech') {
+        resultEl.textContent = '声が聞き取れませんでした。もう一度お試しください。';
+      } else {
+        resultEl.textContent = '認識に失敗しました（' + ev.error + '）。もう一度お試しください。';
+      }
+    };
+    try { rec.start(); } catch (e) { toast('音声認識を開始できませんでした'); }
+  }
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.mic-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    checkPronunciation(btn.dataset.text || '', btn.dataset.lineIdx);
+  });
   let shadowContent = localStorage.getItem('pv_shadow_content') || 'pv';
   let shadowPoolCache = [];
   let shadowIdx = 0;
@@ -3958,12 +4004,16 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     if (!dlg || !dlg.lines || !dlg.lines.length) {
       linesEl.innerHTML = '<div class="empty-note">この語の会話文はまだ準備中です。</div>';
     } else {
-      linesEl.innerHTML = dlg.lines.map(line => `
+      linesEl.innerHTML = dlg.lines.map((line, i) => `
         <div class="shadow-line spk-${escAttr(line.spk)}">
           <div class="shadow-spk">${escHtml(line.spk)}</div>
           <div class="shadow-text">
-            <div class="shadow-en">${escHtml(line.en)} <button class="speak-btn" data-text="${escAttr(line.en)}">🔊</button></div>
+            <div class="shadow-en">${escHtml(line.en)}
+              <button class="speak-btn" data-text="${escAttr(line.en)}">🔊</button>
+              <button class="mic-btn" data-line-idx="${i}" data-text="${escAttr(line.en)}">🎤</button>
+            </div>
             <div class="shadow-ja">${escHtml(line.ja)}</div>
+            <div class="shadow-mic-result" id="shadow-mic-result-${i}" hidden></div>
           </div>
         </div>`).join('');
     }

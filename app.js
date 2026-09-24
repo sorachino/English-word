@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '150'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '151'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -182,7 +182,14 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn) {
   }
 
   shuffle(pool);
+  // 苦手語モードだけは、最後に解答した日時が古い語を優先して出題する
+  // （長く放置している苦手語ほど忘れているはずなので、そちらを優先的に復習させる）
+  if (weakOn) {
+    const answered = loadJSON(LS_ANSWERED, {});
+    pool.sort((a, b) => (answered[wordKey(a)]?.lastAt || 0) - (answered[wordKey(b)]?.lastAt || 0));
+  }
   let picks = pool.slice(0, count);
+  if (weakOn) shuffle(picks); // 出題内容は古い順に選ぶが、出す順番自体はランダムにする
   picks = declusterByGroup(picks);
 
   const allVerbs = [...new Set(words.map(w => baseForm(w.verb)))];
@@ -332,6 +339,7 @@ function recordAnswered(verb, ok) {
   if (!data[verb]) data[verb] = { ok: 0, ng: 0, totalNg: 0 };
   if (typeof data[verb].totalNg !== 'number') data[verb].totalNg = data[verb].ng || 0; // 旧データ互換：現在の連続誤答分だけは救済
   if (ok) { data[verb].ok++; data[verb].ng = 0; } else { data[verb].ng++; data[verb].totalNg++; }
+  data[verb].lastAt = Date.now(); // 最後に解答した日時（苦手語クイズの出題順に使う）
   saveJSON(LS_ANSWERED, data);
 }
 
@@ -3302,6 +3310,7 @@ function recordIdiomAnswered(key, ok) {
   const data = loadJSON(LS_IDIOM_ANSWERED, {});
   if (!data[key]) data[key] = { ok: 0, ng: 0 };
   if (ok) { data[key].ok++; data[key].ng = 0; } else { data[key].ng++; }
+  data[key].lastAt = Date.now(); // 最後に解答した日時（苦手語クイズの出題順に使う）
   saveJSON(LS_IDIOM_ANSWERED, data);
 }
 function recordIdiomResult(key, ok) {
@@ -3559,8 +3568,15 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
         return true;
       });
     }
-    pool = shuffle(pool.slice());
-    const picks = pool.slice(0, count);
+    pool = pool.slice();
+    shuffle(pool);
+    // 苦手語モードだけは、最後に解答した日時が古い語を優先して出題する
+    if (statusFilter === 'weak') {
+      const answered = loadJSON(LS_IDIOM_ANSWERED, {});
+      pool.sort((a, b) => (answered[idiomKey(a)]?.lastAt || 0) - (answered[idiomKey(b)]?.lastAt || 0));
+    }
+    let picks = pool.slice(0, count);
+    if (statusFilter === 'weak') shuffle(picks); // 出題内容は古い順に選ぶが、出す順番自体はランダムにする
     return picks.map(it => {
       const distractorPool = IDIOM_DATA.filter(o => o.no !== it.no && o.meaning !== it.meaning);
       const distractors = shuffle(distractorPool.slice()).slice(0, 3).map(o => o.meaning);

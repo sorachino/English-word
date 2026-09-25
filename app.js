@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '154'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '155'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1038,14 +1038,15 @@ function pickBestVoice() {
   return pool[0];
 }
 const ttsCache = {};
-function playAudioBase64(b64) {
+function playAudioBase64(b64, onEnd) {
   try {
     const audio = new Audio('data:audio/mp3;base64,' + b64);
-    audio.play().catch(() => {});
-  } catch (e) { /* 無視 */ }
+    if (onEnd) { audio.onended = onEnd; audio.onerror = onEnd; }
+    audio.play().catch(() => { if (onEnd) onEnd(); });
+  } catch (e) { if (onEnd) onEnd(); }
 }
-async function speakCloud(text) {
-  if (ttsCache[text]) { playAudioBase64(ttsCache[text]); return; }
+async function speakCloud(text, onEnd) {
+  if (ttsCache[text]) { playAudioBase64(ttsCache[text], onEnd); return; }
   try {
     const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${TTS_API_KEY}`, {
       method: 'POST',
@@ -1059,16 +1060,18 @@ async function speakCloud(text) {
     const data = await res.json();
     if (data.audioContent) {
       ttsCache[text] = data.audioContent;
-      playAudioBase64(data.audioContent);
+      playAudioBase64(data.audioContent, onEnd);
       ttsUsageCount += text.length;
       updateVoiceCloudNote();
       const db = initFirebase();
       if (db) db.ref(`tts_usage/${ttsMonthKey()}`).set(firebase.database.ServerValue.increment(text.length)).catch(() => {});
     } else {
       toast('読み上げに失敗しました');
+      if (onEnd) onEnd();
     }
   } catch (e) {
     toast('読み上げに失敗しました（通信エラー）');
+    if (onEnd) onEnd();
   }
 }
 function ttsConfigured() {
@@ -1148,9 +1151,9 @@ function updateVoiceCloudNote() {
 }
 if (ttsConfigured()) initTtsUsage();
 
-function speakWeb(text, forceName) {
+function speakWeb(text, forceName, onEnd) {
   try {
-    if (!('speechSynthesis' in window)) { toast('この端末は読み上げに対応していません'); return; }
+    if (!('speechSynthesis' in window)) { toast('この端末は読み上げに対応していません'); if (onEnd) onEnd(); return; }
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     let voice = null;
@@ -1171,19 +1174,20 @@ function speakWeb(text, forceName) {
     if (!voice) voice = pickBestVoice();
     if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = 'en-US'; }
     u.rate = 0.95;
+    if (onEnd) { u.onend = onEnd; u.onerror = onEnd; }
     window.speechSynthesis.speak(u);
-  } catch (e) { /* 無視 */ }
+  } catch (e) { if (onEnd) onEnd(); }
 }
-function speak(text) {
-  if (!text) return;
+function speak(text, onEnd) {
+  if (!text) { if (onEnd) onEnd(); return; }
   if (ttsConfigured()) {
     const cloudSel = localStorage.getItem('pv_cloud_voice_name');
-    if (cloudSel === '__samantha__') { speakWeb(text, 'Samantha'); return; }
-    if (ttsOverThreshold()) { speakWeb(text, 'Samantha'); return; }
-    speakCloud(text);
+    if (cloudSel === '__samantha__') { speakWeb(text, 'Samantha', onEnd); return; }
+    if (ttsOverThreshold()) { speakWeb(text, 'Samantha', onEnd); return; }
+    speakCloud(text, onEnd);
     return;
   }
-  speakWeb(text, null);
+  speakWeb(text, null, onEnd);
 }
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('.speak-btn');
@@ -3890,10 +3894,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   function normalizeForCompare(s) {
     return s.toLowerCase().replace(/[.,!?;:"']/g, '').trim().split(/\s+/).filter(Boolean);
   }
-  function checkPronunciation(targetText, idx) {
+  function checkPronunciation(targetText, idx, onDone) {
     const resultEl = document.getElementById('shadow-mic-result-' + idx);
     if (!SpeechRec) {
       toast('この端末は発音チェックに対応していません（Android/PCのChromeなどをお試しください）');
+      if (onDone) onDone();
       return;
     }
     const rec = new SpeechRec();
@@ -3911,6 +3916,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       const ok = score >= 70;
       resultEl.className = 'shadow-mic-result ' + (ok ? 'ok' : 'ng');
       resultEl.innerHTML = `聞き取り結果: 「${escHtml(heard)}」 ｜ 一致度 ${score}%`;
+      if (onDone) onDone();
     };
     rec.onerror = (ev) => {
       resultEl.className = 'shadow-mic-result ng';
@@ -3921,15 +3927,10 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       } else {
         resultEl.textContent = '認識に失敗しました（' + ev.error + '）。もう一度お試しください。';
       }
+      if (onDone) onDone();
     };
-    try { rec.start(); } catch (e) { toast('音声認識を開始できませんでした'); }
+    try { rec.start(); } catch (e) { toast('音声認識を開始できませんでした'); if (onDone) onDone(); }
   }
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.mic-btn');
-    if (!btn) return;
-    e.stopPropagation();
-    checkPronunciation(btn.dataset.text || '', btn.dataset.lineIdx);
-  });
   let shadowContent = localStorage.getItem('pv_shadow_content') || 'pv';
   let shadowPoolCache = [];
   let shadowIdx = 0;
@@ -3990,6 +3991,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
 
   function openShadowDetail(idx) {
     shadowIdx = idx;
+    cancelShadowSequence();
     document.getElementById('shadow-list-view').hidden = true;
     document.getElementById('shadow-detail-view').hidden = false;
     renderShadowDetail();
@@ -4006,14 +4008,12 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     } else {
       const hideEn = document.getElementById('shadow-hide-en-toggle').checked;
       linesEl.innerHTML = dlg.lines.map((line, i) => `
-        <div class="shadow-line spk-${escAttr(line.spk)}">
+        <div class="shadow-line spk-${escAttr(line.spk)}" data-idx="${i}">
           <div class="shadow-spk">${escHtml(line.spk)}</div>
           <div class="shadow-text">
             <div class="shadow-en">${hideEn
               ? `<span class="shadow-en-hidden" data-en="${escAttr(line.en)}"></span>`
               : escHtml(line.en)}
-              <button class="speak-btn" data-text="${escAttr(line.en)}">🔊</button>
-              <button class="mic-btn" data-line-idx="${i}" data-text="${escAttr(line.en)}">🎤</button>
             </div>
             <div class="shadow-ja">${escHtml(line.ja)}</div>
             <div class="shadow-mic-result" id="shadow-mic-result-${i}" hidden></div>
@@ -4023,6 +4023,72 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('shadow-prev-btn').disabled = shadowIdx <= 0;
     document.getElementById('shadow-next-btn').disabled = shadowIdx >= shadowPoolCache.length - 1;
   }
+  let shadowSeqToken = 0;
+  function clearShadowHighlights() {
+    document.querySelectorAll('#shadow-dialogue-lines .shadow-line.playing').forEach(el => el.classList.remove('playing'));
+  }
+  function setShadowSeqButtonsDisabled(disabled) {
+    document.getElementById('shadow-play-all-btn').disabled = disabled;
+    document.getElementById('shadow-practice-btn').disabled = disabled;
+    document.getElementById('shadow-prev-btn').disabled = disabled || shadowIdx <= 0;
+    document.getElementById('shadow-next-btn').disabled = disabled || shadowIdx >= shadowPoolCache.length - 1;
+  }
+  function cancelShadowSequence() {
+    shadowSeqToken++;
+    clearShadowHighlights();
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  }
+  function currentShadowDialogue() {
+    const e = shadowPoolCache[shadowIdx];
+    return e ? DIALOGUES[e.key] : null;
+  }
+  function playAllSequence() {
+    const dlg = currentShadowDialogue();
+    if (!dlg || !dlg.lines || !dlg.lines.length) { toast('この語の会話文はまだ準備中です'); return; }
+    const token = ++shadowSeqToken;
+    setShadowSeqButtonsDisabled(true);
+    let idx = 0;
+    function step() {
+      if (token !== shadowSeqToken) return;
+      if (idx >= dlg.lines.length) { clearShadowHighlights(); setShadowSeqButtonsDisabled(false); return; }
+      clearShadowHighlights();
+      const lineEl = document.querySelector(`#shadow-dialogue-lines .shadow-line[data-idx="${idx}"]`);
+      if (lineEl) lineEl.classList.add('playing');
+      speak(dlg.lines[idx].en, () => {
+        if (token !== shadowSeqToken) return;
+        setTimeout(() => { idx++; step(); }, 700);
+      });
+    }
+    step();
+  }
+  function startPracticeSequence() {
+    const dlg = currentShadowDialogue();
+    if (!dlg || !dlg.lines || !dlg.lines.length) { toast('この語の会話文はまだ準備中です'); return; }
+    if (!SpeechRec) { toast('この端末は発音チェックに対応していません（Android/PCのChromeなどをお試しください）'); return; }
+    const token = ++shadowSeqToken;
+    setShadowSeqButtonsDisabled(true);
+    let idx = 0;
+    function step() {
+      if (token !== shadowSeqToken) return;
+      if (idx >= dlg.lines.length) { clearShadowHighlights(); setShadowSeqButtonsDisabled(false); return; }
+      clearShadowHighlights();
+      const lineEl = document.querySelector(`#shadow-dialogue-lines .shadow-line[data-idx="${idx}"]`);
+      if (lineEl) lineEl.classList.add('playing');
+      speak(dlg.lines[idx].en, () => {
+        if (token !== shadowSeqToken) return;
+        setTimeout(() => {
+          if (token !== shadowSeqToken) return;
+          checkPronunciation(dlg.lines[idx].en, idx, () => {
+            if (token !== shadowSeqToken) return;
+            setTimeout(() => { idx++; step(); }, 900);
+          });
+        }, 400);
+      });
+    }
+    step();
+  }
+  document.getElementById('shadow-play-all-btn').addEventListener('click', playAllSequence);
+  document.getElementById('shadow-practice-btn').addEventListener('click', startPracticeSequence);
   document.getElementById('shadow-hide-en-toggle').addEventListener('change', renderShadowDetail);
   document.getElementById('shadow-dialogue-lines').addEventListener('click', (e) => {
     const span = e.target.closest('.shadow-en-hidden');
@@ -4030,13 +4096,16 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     span.outerHTML = escHtml(span.dataset.en);
   });
   document.getElementById('shadow-back-btn').addEventListener('click', () => {
+    cancelShadowSequence();
     document.getElementById('shadow-detail-view').hidden = true;
     document.getElementById('shadow-list-view').hidden = false;
   });
   document.getElementById('shadow-prev-btn').addEventListener('click', () => {
+    cancelShadowSequence();
     if (shadowIdx > 0) { shadowIdx--; renderShadowDetail(); }
   });
   document.getElementById('shadow-next-btn').addEventListener('click', () => {
+    cancelShadowSequence();
     if (shadowIdx < shadowPoolCache.length - 1) { shadowIdx++; renderShadowDetail(); }
   });
 })();

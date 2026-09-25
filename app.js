@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '153'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '154'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -4004,11 +4004,14 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     if (!dlg || !dlg.lines || !dlg.lines.length) {
       linesEl.innerHTML = '<div class="empty-note">この語の会話文はまだ準備中です。</div>';
     } else {
+      const hideEn = document.getElementById('shadow-hide-en-toggle').checked;
       linesEl.innerHTML = dlg.lines.map((line, i) => `
         <div class="shadow-line spk-${escAttr(line.spk)}">
           <div class="shadow-spk">${escHtml(line.spk)}</div>
           <div class="shadow-text">
-            <div class="shadow-en">${escHtml(line.en)}
+            <div class="shadow-en">${hideEn
+              ? `<span class="shadow-en-hidden" data-en="${escAttr(line.en)}"></span>`
+              : escHtml(line.en)}
               <button class="speak-btn" data-text="${escAttr(line.en)}">🔊</button>
               <button class="mic-btn" data-line-idx="${i}" data-text="${escAttr(line.en)}">🎤</button>
             </div>
@@ -4020,6 +4023,12 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('shadow-prev-btn').disabled = shadowIdx <= 0;
     document.getElementById('shadow-next-btn').disabled = shadowIdx >= shadowPoolCache.length - 1;
   }
+  document.getElementById('shadow-hide-en-toggle').addEventListener('change', renderShadowDetail);
+  document.getElementById('shadow-dialogue-lines').addEventListener('click', (e) => {
+    const span = e.target.closest('.shadow-en-hidden');
+    if (!span) return;
+    span.outerHTML = escHtml(span.dataset.en);
+  });
   document.getElementById('shadow-back-btn').addEventListener('click', () => {
     document.getElementById('shadow-detail-view').hidden = true;
     document.getElementById('shadow-list-view').hidden = false;

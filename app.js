@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '155'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '156'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -454,10 +454,9 @@ function answerStatsHtml(verb) {
   const c = answerCountsOf(verb);
   return `これまで<span class="stat-ok">○${c.ok}回</span>／<span class="stat-ng">×${c.ng}回</span>`;
 }
-function etymHtml(etymology, illustration) {
+function etymHtml(etymology) {
   const lines = String(etymology).split('\n').map(l => escHtml(l)).join('<br>');
-  const iconHtml = illustration ? `<div class="etym-icon">${illustration}</div>` : '';
-  return `<div class="etym-title"><i>💡</i>語源でおぼえる</div><div class="etym-row">${iconHtml}<div class="etym-body">${lines}</div></div>`;
+  return `<div class="etym-title"><i>💡</i>語源でおぼえる</div><div class="etym-row"><div class="etym-body">${lines}</div></div>`;
 }
 function wordStatusClass(key) {
   const answered = loadJSON(LS_ANSWERED, {});

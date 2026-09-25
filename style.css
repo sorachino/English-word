@@ -599,8 +599,8 @@ select{
 .shadow-ja{font-size:12.5px; color:var(--ink-soft); margin-top:4px;}
 .shadow-list .word-item{cursor:pointer;}
 .mic-btn{
-  border:1px solid var(--line); background:#fff; border-radius:6px; padding:2px 6px;
-  cursor:pointer; font-size:13px; line-height:1;
+  flex:none; background:var(--paper); border:1px solid var(--line); border-radius:6px;
+  font-size:13px; padding:3px 7px; cursor:pointer; line-height:1.4;
 }
 .shadow-mic-result{margin-top:6px; font-size:12.5px; padding:6px 8px; border-radius:8px; line-height:1.5;}
 .shadow-mic-result.listening{background:var(--gold-soft); color:var(--ink);}

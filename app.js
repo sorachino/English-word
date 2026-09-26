@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '162'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '163'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -4139,8 +4139,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
         const hideEn = document.getElementById('shadow-hide-en-toggle').checked;
         // 隠している時は自分で文を考える時間が要るため、聞き取り開始までの間隔と
         // タイムアウトまでの時間を長めに取る
-        const preDelay = hideEn ? 2500 : 400;
-        const recTimeout = hideEn ? 12000 : 8000;
+        const preDelay = hideEn ? 1000 : 400;
+        const recTimeout = 8000;
         setTimeout(() => {
           if (token !== shadowSeqToken) return;
           checkPronunciation(dlg.lines[idx].en, idx, (status) => {

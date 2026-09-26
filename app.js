@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '159'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '160'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3922,13 +3922,13 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     resultEl.className = 'shadow-mic-result listening';
     resultEl.textContent = '🎤 聞き取り中…話してください';
     let done = false;
-    const finish = () => { if (done) return; done = true; clearTimeout(safetyTimer); if (currentRec === rec) currentRec = null; if (onDone) onDone(); };
+    const finish = (status) => { if (done) return; done = true; clearTimeout(safetyTimer); if (currentRec === rec) currentRec = null; if (onDone) onDone(status); };
     const safetyTimer = setTimeout(() => {
       if (done) return;
       try { rec.abort(); } catch (e) { /* 無視 */ }
       resultEl.className = 'shadow-mic-result ng';
       resultEl.textContent = '聞き取りがタイムアウトしました。もう一度お試しください。';
-      finish();
+      finish('timeout');
     }, 8000);
     rec.onresult = (ev) => {
       if (done) return;
@@ -3940,21 +3940,23 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       const ok = score >= 70;
       resultEl.className = 'shadow-mic-result ' + (ok ? 'ok' : 'ng');
       resultEl.innerHTML = `聞き取り結果: 「${escHtml(heard)}」 ｜ 一致度 ${score}%`;
-      finish();
+      finish('ok');
     };
     rec.onerror = (ev) => {
       if (done) return;
       resultEl.className = 'shadow-mic-result ng';
+      let status = 'error';
       if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
         resultEl.textContent = 'マイクの使用が許可されていません。設定を確認してください。';
+        status = 'blocked';
       } else if (ev.error === 'no-speech') {
         resultEl.textContent = '声が聞き取れませんでした。もう一度お試しください。';
       } else {
         resultEl.textContent = '認識に失敗しました（' + ev.error + '）。もう一度お試しください。';
       }
-      finish();
+      finish(status);
     };
-    try { rec.start(); } catch (e) { toast('音声認識を開始できませんでした'); finish(); }
+    try { rec.start(); } catch (e) { toast('音声認識を開始できませんでした'); finish('blocked'); }
   }
   let shadowContent = localStorage.getItem('pv_shadow_content') || 'pv';
   let shadowPoolCache = [];
@@ -4132,8 +4134,15 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
         if (token !== shadowSeqToken) return;
         setTimeout(() => {
           if (token !== shadowSeqToken) return;
-          checkPronunciation(dlg.lines[idx].en, idx, () => {
+          checkPronunciation(dlg.lines[idx].en, idx, (status) => {
             if (token !== shadowSeqToken) return;
+            if (status === 'timeout' || status === 'blocked') {
+              // マイクが根本的に反応していないと判断し、無駄に全行タイムアウトさせず練習を中断する
+              clearShadowHighlights();
+              setShadowSeqButtonsDisabled(false);
+              toast('音声認識が反応しないため、発音練習を中断しました');
+              return;
+            }
             setTimeout(() => { idx++; step(); }, 900);
           });
         }, 400);

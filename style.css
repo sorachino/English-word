@@ -612,7 +612,6 @@ select{
   padding:2px 10px; cursor:pointer; user-select:none;
 }
 .shadow-en-hidden::before{content:"タップして表示"; color:var(--ink-soft);}
-.shadow-title-row{display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:8px;}
-.shadow-top-actions{display:flex; flex-direction:column; gap:6px; flex:none;}
-.shadow-top-actions button{font-size:12px; padding:6px 10px; white-space:nowrap;}
+.shadow-top-actions{display:flex; gap:8px; margin:10px 0;}
+.shadow-top-actions button{flex:1; font-size:13px; padding:8px 10px;}
 .shadow-line.playing .shadow-text{outline:2px solid var(--gold); outline-offset:2px;}

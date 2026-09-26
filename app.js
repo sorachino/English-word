@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '157'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '158'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3905,6 +3905,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   function normalizeForCompare(s) {
     return s.toLowerCase().replace(/[.,!?;:"']/g, '').trim().split(/\s+/).filter(Boolean);
   }
+  let currentRec = null;
   function checkPronunciation(targetText, idx, onDone) {
     const resultEl = document.getElementById('shadow-mic-result-' + idx);
     if (!SpeechRec) {
@@ -3912,13 +3913,25 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       if (onDone) onDone();
       return;
     }
+    if (currentRec) { try { currentRec.abort(); } catch (e) { /* 無視 */ } currentRec = null; }
     const rec = new SpeechRec();
+    currentRec = rec;
     rec.lang = 'en-US';
     rec.maxAlternatives = 1;
     resultEl.hidden = false;
     resultEl.className = 'shadow-mic-result listening';
     resultEl.textContent = '🎤 聞き取り中…話してください';
+    let done = false;
+    const finish = () => { if (done) return; done = true; clearTimeout(safetyTimer); if (currentRec === rec) currentRec = null; if (onDone) onDone(); };
+    const safetyTimer = setTimeout(() => {
+      if (done) return;
+      try { rec.abort(); } catch (e) { /* 無視 */ }
+      resultEl.className = 'shadow-mic-result ng';
+      resultEl.textContent = '聞き取りがタイムアウトしました。もう一度お試しください。';
+      finish();
+    }, 8000);
     rec.onresult = (ev) => {
+      if (done) return;
       const heard = ev.results[0][0].transcript;
       const targetWords = normalizeForCompare(targetText);
       const heardWords = new Set(normalizeForCompare(heard));
@@ -3927,9 +3940,10 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       const ok = score >= 70;
       resultEl.className = 'shadow-mic-result ' + (ok ? 'ok' : 'ng');
       resultEl.innerHTML = `聞き取り結果: 「${escHtml(heard)}」 ｜ 一致度 ${score}%`;
-      if (onDone) onDone();
+      finish();
     };
     rec.onerror = (ev) => {
+      if (done) return;
       resultEl.className = 'shadow-mic-result ng';
       if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
         resultEl.textContent = 'マイクの使用が許可されていません。設定を確認してください。';
@@ -3938,9 +3952,9 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       } else {
         resultEl.textContent = '認識に失敗しました（' + ev.error + '）。もう一度お試しください。';
       }
-      if (onDone) onDone();
+      finish();
     };
-    try { rec.start(); } catch (e) { toast('音声認識を開始できませんでした'); if (onDone) onDone(); }
+    try { rec.start(); } catch (e) { toast('音声認識を開始できませんでした'); finish(); }
   }
   let shadowContent = localStorage.getItem('pv_shadow_content') || 'pv';
   let shadowPoolCache = [];
@@ -4048,6 +4062,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     shadowSeqToken++;
     clearShadowHighlights();
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    if (currentRec) { try { currentRec.abort(); } catch (e) { /* 無視 */ } currentRec = null; }
   }
   function currentShadowDialogue() {
     const e = shadowPoolCache[shadowIdx];

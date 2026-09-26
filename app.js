@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '156'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '157'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1037,10 +1037,15 @@ function pickBestVoice() {
   return pool[0];
 }
 const ttsCache = {};
+let currentAudio = null;
 function playAudioBase64(b64, onEnd) {
   try {
     const audio = new Audio('data:audio/mp3;base64,' + b64);
-    if (onEnd) { audio.onended = onEnd; audio.onerror = onEnd; }
+    if (onEnd) {
+      audio.onended = () => { currentAudio = null; onEnd(); };
+      audio.onerror = () => { currentAudio = null; onEnd(); };
+    }
+    currentAudio = audio; // GCで再生が途切れないよう参照を保持
     audio.play().catch(() => { if (onEnd) onEnd(); });
   } catch (e) { if (onEnd) onEnd(); }
 }
@@ -1150,6 +1155,9 @@ function updateVoiceCloudNote() {
 }
 if (ttsConfigured()) initTtsUsage();
 
+// Chromeにはspeaking中のSpeechSynthesisUtteranceがGCされて音声が途中で
+// 切れてしまう既知の不具合があるため、直近のutteranceをここで保持しておく
+let currentUtterance = null;
 function speakWeb(text, forceName, onEnd) {
   try {
     if (!('speechSynthesis' in window)) { toast('この端末は読み上げに対応していません'); if (onEnd) onEnd(); return; }
@@ -1173,7 +1181,11 @@ function speakWeb(text, forceName, onEnd) {
     if (!voice) voice = pickBestVoice();
     if (voice) { u.voice = voice; u.lang = voice.lang; } else { u.lang = 'en-US'; }
     u.rate = 0.95;
-    if (onEnd) { u.onend = onEnd; u.onerror = onEnd; }
+    if (onEnd) {
+      u.onend = () => { currentUtterance = null; onEnd(); };
+      u.onerror = () => { currentUtterance = null; onEnd(); };
+    }
+    currentUtterance = u; // GCで音声が途切れないよう参照を保持
     window.speechSynthesis.speak(u);
   } catch (e) { if (onEnd) onEnd(); }
 }

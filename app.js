@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '164'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '165'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3922,10 +3922,15 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     resultEl.className = 'shadow-mic-result listening';
     resultEl.textContent = '🎤 聞き取り中…話してください';
     let done = false;
+    let ended = false;
+    let pendingStatus = null;
     const revealLine = () => {
       const span = document.querySelector(`#shadow-dialogue-lines .shadow-line[data-idx="${idx}"] .shadow-en-hidden`);
       if (span) span.outerHTML = escHtml(span.dataset.en);
     };
+    // マイクが完全に解放されたことをonendで確認してからonDoneを呼ぶ（解放前に次のセッションを
+    // 開始してしまうと、認識精度が徐々に落ちていく原因になるため）
+    const callOnDone = (status) => { revealLine(); if (onDone) onDone(status); };
     const finish = (status) => {
       if (done) return;
       done = true;
@@ -3933,8 +3938,18 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       rec.onresult = null;
       rec.onerror = null;
       if (currentRec === rec) currentRec = null;
-      revealLine();
-      if (onDone) onDone(status);
+      if (ended) {
+        callOnDone(status);
+      } else {
+        pendingStatus = status;
+        // onendが発火しない端末向けの保険（マイク解放を待ちすぎて固まらないように）
+        setTimeout(() => { if (pendingStatus !== null) { const s = pendingStatus; pendingStatus = null; callOnDone(s); } }, 1500);
+      }
+    };
+    rec.onend = () => {
+      ended = true;
+      if (pendingStatus !== null) { const s = pendingStatus; pendingStatus = null; callOnDone(s); }
+      else if (!done) { finish('error'); } // onresult/onerrorが呼ばれずonendだけ来た保険
     };
     const safetyTimer = setTimeout(() => {
       if (done) return;

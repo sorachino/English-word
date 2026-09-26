@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '160'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '161'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3922,7 +3922,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     resultEl.className = 'shadow-mic-result listening';
     resultEl.textContent = '🎤 聞き取り中…話してください';
     let done = false;
-    const finish = (status) => { if (done) return; done = true; clearTimeout(safetyTimer); if (currentRec === rec) currentRec = null; if (onDone) onDone(status); };
+    const revealLine = () => {
+      const span = document.querySelector(`#shadow-dialogue-lines .shadow-line[data-idx="${idx}"] .shadow-en-hidden`);
+      if (span) span.outerHTML = escHtml(span.dataset.en);
+    };
+    const finish = (status) => { if (done) return; done = true; clearTimeout(safetyTimer); if (currentRec === rec) currentRec = null; revealLine(); if (onDone) onDone(status); };
     const safetyTimer = setTimeout(() => {
       if (done) return;
       try { rec.abort(); } catch (e) { /* 無視 */ }

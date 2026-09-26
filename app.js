@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '165'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '166'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1049,7 +1049,7 @@ function playAudioBase64(b64, onEnd) {
     audio.play().catch(() => { if (onEnd) onEnd(); });
   } catch (e) { if (onEnd) onEnd(); }
 }
-async function speakCloud(text, onEnd) {
+async function speakCloud(text, onEnd, retried) {
   if (ttsCache[text]) { playAudioBase64(ttsCache[text], onEnd); return; }
   try {
     const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${TTS_API_KEY}`, {
@@ -1069,11 +1069,14 @@ async function speakCloud(text, onEnd) {
       updateVoiceCloudNote();
       const db = initFirebase();
       if (db) db.ref(`tts_usage/${ttsMonthKey()}`).set(firebase.database.ServerValue.increment(text.length)).catch(() => {});
+    } else if (!retried) {
+      speakCloud(text, onEnd, true); // 初回失敗時（コールドスタート等）は1回だけ自動リトライ
     } else {
       toast('読み上げに失敗しました');
       if (onEnd) onEnd();
     }
   } catch (e) {
+    if (!retried) { speakCloud(text, onEnd, true); return; }
     toast('読み上げに失敗しました（通信エラー）');
     if (onEnd) onEnd();
   }

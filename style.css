@@ -615,3 +615,4 @@ select{
 .shadow-top-actions{display:flex; gap:8px; margin:10px 0;}
 .shadow-top-actions button{flex:1; font-size:13px; padding:8px 10px;}
 .shadow-line.playing .shadow-text{outline:2px solid var(--gold); outline-offset:2px;}
+#shadow-detail-title{margin-right:8px;}

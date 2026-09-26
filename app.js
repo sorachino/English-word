@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '158'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '159'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3962,9 +3962,23 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
 
   function shadowEntries(content) {
     if (content === 'idiom') {
-      return IDIOM_DATA.map(it => ({ key: idiomKey(it), title: it.phrase, meaning: it.meaning, tag: it.categoryLabel }));
+      return IDIOM_DATA.map(it => ({ key: idiomKey(it), markKey: idiomKey(it), markKind: 'idiom', title: it.phrase, meaning: it.meaning, tag: it.categoryLabel }));
     }
-    return PV_DATA.map(w => ({ key: wordKey(w), title: w.verb, meaning: w.meaning, tag: 'Stage ' + w.stage }));
+    return PV_DATA.map(w => ({ key: wordKey(w), markKey: w.verb, markKind: 'pv', title: w.verb, meaning: w.meaning, tag: 'Stage ' + w.stage }));
+  }
+  function isShadowMarked(e) {
+    if (e.markKind === 'idiom') return loadJSON('pv_idiom_marked', []).includes(e.markKey);
+    return loadMarked().has(e.markKey);
+  }
+  function toggleShadowMarked(e) {
+    if (e.markKind === 'idiom') {
+      const arr = loadJSON('pv_idiom_marked', []);
+      const set = new Set(arr);
+      if (set.has(e.markKey)) set.delete(e.markKey); else set.add(e.markKey);
+      saveJSON('pv_idiom_marked', [...set]);
+      return set.has(e.markKey);
+    }
+    return toggleMarked(e.markKey);
   }
 
   function refreshShadowContentUI() {
@@ -3997,17 +4011,27 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     const wrap = document.getElementById('shadow-list');
     wrap.innerHTML = entries.map((e, i) => {
       const has = !!DIALOGUES[e.key];
+      const marked = isShadowMarked(e);
       return `
       <div class="word-item" data-idx="${i}">
         <div class="wi-head">
           <span class="wi-verb">${escHtml(e.title)}</span>
           <div class="wi-right">
+            <button class="wi-mark${marked ? ' on' : ''}" type="button" aria-label="マーク">${marked ? '★' : '☆'}</button>
             <span class="wi-stage">${has ? '🗣️ 会話あり' : '準備中'}</span>
           </div>
         </div>
         <div class="wi-meaning">${escHtml(e.meaning)}</div>
       </div>`;
     }).join('') || '<div class="empty-note">該当する語が見つかりませんでした。</div>';
+    wrap.querySelectorAll('.wi-mark').forEach((btn, i) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const nowOn = toggleShadowMarked(entries[i]);
+        btn.textContent = nowOn ? '★' : '☆';
+        btn.classList.toggle('on', nowOn);
+      });
+    });
     wrap.querySelectorAll('.word-item').forEach(div => {
       div.addEventListener('click', () => openShadowDetail(parseInt(div.dataset.idx, 10)));
     });
@@ -4026,6 +4050,10 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     if (!e) return;
     document.getElementById('shadow-detail-title').textContent = e.title;
     document.getElementById('shadow-detail-meaning').textContent = e.meaning;
+    const markBtn = document.getElementById('shadow-detail-mark-btn');
+    const marked = isShadowMarked(e);
+    markBtn.textContent = marked ? '★' : '☆';
+    markBtn.classList.toggle('on', marked);
     const dlg = DIALOGUES[e.key];
     const linesEl = document.getElementById('shadow-dialogue-lines');
     if (!dlg || !dlg.lines || !dlg.lines.length) {
@@ -4113,6 +4141,14 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     }
     step();
   }
+  document.getElementById('shadow-detail-mark-btn').addEventListener('click', () => {
+    const e = shadowPoolCache[shadowIdx];
+    if (!e) return;
+    const nowOn = toggleShadowMarked(e);
+    const btn = document.getElementById('shadow-detail-mark-btn');
+    btn.textContent = nowOn ? '★' : '☆';
+    btn.classList.toggle('on', nowOn);
+  });
   document.getElementById('shadow-play-all-btn').addEventListener('click', playAllSequence);
   document.getElementById('shadow-practice-btn').addEventListener('click', startPracticeSequence);
   document.getElementById('shadow-hide-en-toggle').addEventListener('change', renderShadowDetail);

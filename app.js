@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '161'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '162'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3906,7 +3906,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     return s.toLowerCase().replace(/[.,!?;:"']/g, '').trim().split(/\s+/).filter(Boolean);
   }
   let currentRec = null;
-  function checkPronunciation(targetText, idx, onDone) {
+  function checkPronunciation(targetText, idx, onDone, timeoutMs) {
     const resultEl = document.getElementById('shadow-mic-result-' + idx);
     if (!SpeechRec) {
       toast('この端末は発音チェックに対応していません（Android/PCのChromeなどをお試しください）');
@@ -3933,7 +3933,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       resultEl.className = 'shadow-mic-result ng';
       resultEl.textContent = '聞き取りがタイムアウトしました。もう一度お試しください。';
       finish('timeout');
-    }, 8000);
+    }, timeoutMs || 8000);
     rec.onresult = (ev) => {
       if (done) return;
       const heard = ev.results[0][0].transcript;
@@ -4136,6 +4136,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       if (lineEl) lineEl.classList.add('playing');
       speak(dlg.lines[idx].en, () => {
         if (token !== shadowSeqToken) return;
+        const hideEn = document.getElementById('shadow-hide-en-toggle').checked;
+        // 隠している時は自分で文を考える時間が要るため、聞き取り開始までの間隔と
+        // タイムアウトまでの時間を長めに取る
+        const preDelay = hideEn ? 2500 : 400;
+        const recTimeout = hideEn ? 12000 : 8000;
         setTimeout(() => {
           if (token !== shadowSeqToken) return;
           checkPronunciation(dlg.lines[idx].en, idx, (status) => {
@@ -4148,8 +4153,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
               return;
             }
             setTimeout(() => { idx++; step(); }, 900);
-          });
-        }, 400);
+          }, recTimeout);
+        }, preDelay);
       });
     }
     step();

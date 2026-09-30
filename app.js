@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '166'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '167'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3681,6 +3681,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   function renderIdiomOrderUI(q) {
     const answerEl = document.getElementById('idiom-order-answer');
     const bankEl = document.getElementById('idiom-order-bank');
+    // iOS Safariで直前の表示（プレースホルダー等）が一瞬残って重なって見えることがあるため、
+    // 一度空にしてから書き込んで強制的に再描画させる
+    answerEl.innerHTML = '';
+    bankEl.innerHTML = '';
+    void answerEl.offsetHeight;
     answerEl.innerHTML = q.orderPicked.map((tok, pos) => `<button type="button" class="order-chip" data-zone="answer" data-pos="${pos}">${escHtml(tok.t)}</button>`).join('') || '<span class="order-placeholder">ここに単語をタップまたはドラッグして並べてください</span>';
     bankEl.innerHTML = q.orderBank.map((tok, pos) => `<button type="button" class="order-chip" data-zone="bank" data-pos="${pos}">${escHtml(tok.t)}</button>`).join('');
     if (!q.resolved) {

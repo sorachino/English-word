@@ -38,7 +38,7 @@ body{
 .app-head{
   display:flex; align-items:center; justify-content:space-between;
   gap:8px;
-  padding:14px 12px 10px;
+  padding:calc(14px + env(safe-area-inset-top, 0px)) 12px 10px;
   background:var(--navy);
   color:#fff;
   border-bottom:3px solid var(--gold);

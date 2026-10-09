@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '167'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '168'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -2750,8 +2750,11 @@ function pullAndMergeCloud(nickname) {
       if (sub) { saveJSON(LS.MY_DICT, [...map.values()]); changed = true; }
     }
 
+    if (mergeIdiomFromCloud(cloud, db, nickname)) changed = true;
+
     if (changed) {
       renderDictProgress();
+      if (window.refreshIdiomUI) window.refreshIdiomUI();
       updateStreakPill();
       const statsView = document.getElementById('view-stats');
       if (statsView && statsView.classList.contains('active')) renderStats();
@@ -3370,6 +3373,79 @@ function idiomAnswerStatsHtml(key) {
   const ng = rec ? (rec.ng || 0) : 0;
   return `これまで<span class="stat-ok">○${ok}回</span>／<span class="stat-ng">×${ng}回</span>`;
 }
+
+// ---- 熟語の学習記録のクラウド同期 ----
+// 句動詞と同じ users/{ニックネーム}/ 配下に idiomWeak / idiomAnswered / idiomSrs として保存する。
+// （以前は端末のlocalStorageだけに保存しており、別の端末やブラウザで開くと未学習に戻っていた）
+function pushIdiomStateToCloud(key) {
+  const db = initFirebase();
+  if (!db) return;
+  const nickname = getNickname();
+  if (!nickname) return;
+  const safe = sanitizeKey(key);
+  const updates = {};
+  updates[`users/${nickname}/idiomWeak/${safe}`] = loadJSON(LS_IDIOM_WEAK, {})[key] || null;
+  updates[`users/${nickname}/idiomAnswered/${safe}`] = loadJSON(LS_IDIOM_ANSWERED, {})[key] || null;
+  updates[`users/${nickname}/idiomSrs/${safe}`] = loadJSON(LS_IDIOM_SRS, {})[key] || null;
+  db.ref().update(updates).catch(() => {});
+}
+// クラウドの熟語記録をローカルへ取り込み、クラウドに無いローカル分はクラウドへ書き上げる。
+// 何か変わったらtrueを返す。
+function mergeIdiomFromCloud(cloud, db, nickname) {
+  const cWeak = (cloud.idiomWeak && typeof cloud.idiomWeak === 'object') ? cloud.idiomWeak : {};
+  const cAns = (cloud.idiomAnswered && typeof cloud.idiomAnswered === 'object') ? cloud.idiomAnswered : {};
+  const cSrs = (cloud.idiomSrs && typeof cloud.idiomSrs === 'object') ? cloud.idiomSrs : {};
+  const localWeak = loadJSON(LS_IDIOM_WEAK, {});
+  const localAns = loadJSON(LS_IDIOM_ANSWERED, {});
+  const localSrs = loadJSON(LS_IDIOM_SRS, {});
+  let wChanged = false, aChanged = false, sChanged = false;
+
+  Object.entries(cWeak).forEach(([k, cw]) => {
+    if (!cw || localWeak[k]) return;
+    localWeak[k] = { wrong: cw.wrong || 1 };
+    wChanged = true;
+  });
+  Object.entries(cAns).forEach(([k, ca]) => {
+    if (!ca) return;
+    const cur = localAns[k];
+    if (!cur) { localAns[k] = ca; aChanged = true; return; }
+    const ok = Math.max(cur.ok || 0, ca.ok || 0);
+    const lastAt = Math.max(cur.lastAt || 0, ca.lastAt || 0);
+    // 連続誤答数は「より新しく解答した側」を採用（片方で正解済みなのに誤答が残らないように）
+    const newer = (ca.lastAt || 0) > (cur.lastAt || 0) ? ca : cur;
+    const ng = (cur.lastAt && ca.lastAt) ? (newer.ng || 0) : Math.max(cur.ng || 0, ca.ng || 0);
+    if (ok !== (cur.ok || 0) || ng !== (cur.ng || 0) || lastAt !== (cur.lastAt || 0)) {
+      localAns[k] = lastAt ? { ok, ng, lastAt } : { ok, ng };
+      aChanged = true;
+    }
+  });
+  Object.entries(cSrs).forEach(([k, cs]) => {
+    if (!cs || localSrs[k]) return;
+    localSrs[k] = { interval: cs.interval || 1, dueDate: cs.dueDate || todayKey(), reps: cs.reps || 0 };
+    sChanged = true;
+  });
+  if (wChanged) saveJSON(LS_IDIOM_WEAK, localWeak);
+  if (aChanged) saveJSON(LS_IDIOM_ANSWERED, localAns);
+  if (sChanged) saveJSON(LS_IDIOM_SRS, localSrs);
+
+  // この端末にだけある記録（今回の同期対応より前に学習した分など）をクラウドへ上げる
+  const updates = {};
+  Object.keys(localAns).forEach(k => {
+    if (JSON.stringify(cAns[k] || null) !== JSON.stringify(localAns[k])) {
+      updates[`users/${nickname}/idiomAnswered/${sanitizeKey(k)}`] = localAns[k];
+    }
+  });
+  Object.keys(localWeak).forEach(k => {
+    // クラウドが回答履歴を一度も見ていない語だけ上げる（他端末で克服済みの苦手語を復活させないため）
+    if (!cWeak[k] && !cAns[k]) updates[`users/${nickname}/idiomWeak/${sanitizeKey(k)}`] = localWeak[k];
+  });
+  Object.keys(localSrs).forEach(k => {
+    if (!cSrs[k]) updates[`users/${nickname}/idiomSrs/${sanitizeKey(k)}`] = localSrs[k];
+  });
+  if (Object.keys(updates).length) db.ref().update(updates).catch(() => {});
+
+  return wChanged || aChanged || sChanged;
+}
 function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   const log = loadJSON(LS.ANSWER_LOG, {});
   const dateKey = todayKey();
@@ -3422,6 +3498,12 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-dp-unlearned-num2').textContent = unlearnedN;
   }
   window.refreshIdiomQuickActions = refreshIdiomQuickActions;
+  // クラウドから熟語の記録を取り込んだ後に、表示中の画面を更新する
+  window.refreshIdiomUI = function () {
+    refreshIdiomQuickActions();
+    const wrap = document.getElementById('idiom-list-wrap');
+    if (wrap && !wrap.hidden) renderIdiomList();
+  };
 
   let idiomCount = parseInt(localStorage.getItem('pv_idiom_count'), 10) || 10;
   document.querySelectorAll('#idiom-count-group .chip').forEach(chip => {
@@ -3801,6 +3883,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     recordIdiomAnswered(key, ok);
     recordIdiomResult(key, ok);
     updateIdiomSrs(key, ok);
+    pushIdiomStateToCloud(key);
     logToday(ok);
     recordIdiomAnswerLog(idiomQuizState.mode === 'order' ? 'idiom-order' : 'idiom-choice', q.item, ok, idiomQuizState.sessionId);
     syncLeaderboard(null, ok);
@@ -3846,6 +3929,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
 
     recordIdiomResult(key, false);
     updateIdiomSrs(key, false);
+    pushIdiomStateToCloud(key);
 
     q.correct = false;
     if (idiomQuizState.correctCount > 0) idiomQuizState.correctCount--;

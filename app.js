@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '168'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '169'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3374,6 +3374,29 @@ function idiomAnswerStatsHtml(key) {
   return `これまで<span class="stat-ok">○${ok}回</span>／<span class="stat-ng">×${ng}回</span>`;
 }
 
+// 4択の不正解の選択肢を選ぶ。同じカテゴリの熟語の意味を優先し（前置詞の問題に動詞の意味が
+// 混ざると消去法で解けてしまうため）、足りない分だけ他のカテゴリから補う。意味の重複は避ける。
+function pickIdiomDistractors(it, count) {
+  const used = new Set([it.meaning]);
+  const take = (list) => {
+    const out = [];
+    shuffle(list.slice()).forEach(o => {
+      if (out.length + picked.length >= count || used.has(o.meaning)) return;
+      used.add(o.meaning);
+      out.push(o.meaning);
+    });
+    return out;
+  };
+  const picked = [];
+  const same = IDIOM_DATA.filter(o => o.no !== it.no && o.category === it.category);
+  picked.push(...take(same));
+  if (picked.length < count) {
+    const others = IDIOM_DATA.filter(o => o.no !== it.no && o.category !== it.category);
+    picked.push(...take(others));
+  }
+  return picked;
+}
+
 // ---- 熟語の学習記録のクラウド同期 ----
 // 句動詞と同じ users/{ニックネーム}/ 配下に idiomWeak / idiomAnswered / idiomSrs として保存する。
 // （以前は端末のlocalStorageだけに保存しており、別の端末やブラウザで開くと未学習に戻っていた）
@@ -3679,8 +3702,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     let picks = pool.slice(0, count);
     if (statusFilter === 'weak') shuffle(picks); // 出題内容は古い順に選ぶが、出す順番自体はランダムにする
     return picks.map(it => {
-      const distractorPool = IDIOM_DATA.filter(o => o.no !== it.no && o.meaning !== it.meaning);
-      const distractors = shuffle(distractorPool.slice()).slice(0, 3).map(o => o.meaning);
+      const distractors = pickIdiomDistractors(it, 3);
       const choices = shuffle([it.meaning, ...distractors]);
       return { item: it, choices, resolved: false, correct: false };
     });

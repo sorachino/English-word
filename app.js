@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '169'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '170'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3321,7 +3321,7 @@ if ('caches' in window) {
 }
 
 
-// ===================== 熟語（318語：文型別動詞・群前置詞・動詞+前置詞など） =====================
+// ===================== 熟語（文型別動詞・群前置詞・動詞+前置詞など） =====================
 // クイズはクイズタブに統合（句動詞/群前置詞/それ以外を選択）、一覧は句動詞辞書タブに統合。
 // 正答/誤答・苦手・復習・未学習は、句動詞と同じ考え方の別枠（キーの名前空間だけ分離）で管理する。
 const LS_IDIOM_ANSWERED = 'pv_idiom_answered';
@@ -3555,6 +3555,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   function populateIdiomCategoryFilter() {
     const sel = document.getElementById('idiom-category-filter');
     if (!sel || sel.dataset.populated) return;
+    const allOpt = sel.querySelector('option[value="0"]');
+    if (allOpt) allOpt.textContent = `すべて（${IDIOM_DATA.length}語）`;
     Object.keys(CATEGORY_LABELS).forEach(cat => {
       const n = IDIOM_DATA.filter(it => it.category === cat).length;
       const o = document.createElement('option');

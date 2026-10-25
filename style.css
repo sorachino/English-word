@@ -616,3 +616,21 @@ select{
 .shadow-top-actions button{flex:1; font-size:13px; padding:8px 10px;}
 .shadow-line.playing .shadow-text{outline:2px solid var(--gold); outline-offset:2px;}
 #shadow-detail-title{margin-right:8px;}
+
+/* ---------- 使い分け：動詞別ビュー ---------- */
+.nuance-mode-row{margin:2px 0 10px;}
+.nuance-verbcard .nv-head{display:flex; justify-content:space-between; align-items:baseline; cursor:pointer; margin-bottom:6px; font-family:"JetBrains Mono",monospace;}
+.nuance-verbcard .nv-count{font-family:inherit; font-weight:600; font-size:12px; color:var(--ink-soft);}
+.nuance-verbcard .nv-caret{display:inline-block; transition:transform .15s;}
+.nuance-verbcard.open .nv-caret{transform:rotate(180deg);}
+.nuance-verbcard .nuance-verbs{margin-bottom:0;}
+.nuance-verbcard .nv-body{display:none; margin-top:10px;}
+.nuance-verbcard.open .nv-body{display:block;}
+.nv-row{border-top:1px dashed var(--line); padding:8px 0; cursor:pointer;}
+.nv-row-main{display:flex; gap:10px; align-items:baseline;}
+.nv-verb{flex:none; font-weight:700; color:var(--navy); min-width:6.5em;}
+.nv-meaning{font-size:13px; color:var(--ink); line-height:1.5;}
+.nv-detail{display:none; margin-top:6px; font-size:12.5px; line-height:1.65; color:var(--ink-soft);}
+.nv-row.open .nv-detail{display:block;}
+.nv-nuance{margin-bottom:4px;}
+.nv-ex{color:var(--ink); font-size:13px;}

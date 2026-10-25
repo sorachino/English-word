@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '170'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '171'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -1996,10 +1996,81 @@ document.getElementById('group-match-confirm').addEventListener('click', () => {
 });
 
 // ===================== UI: 使い分け =====================
+// 表示モード: 'group'=意味別（従来）／ 'verb'=動詞別（hold・bringなど同じ動詞の句動詞をまとめて比較）
+function nuanceMode() { return localStorage.getItem('pv_nuance_mode') === 'verb' ? 'verb' : 'group'; }
+function refreshNuanceModeUI() {
+  const verb = nuanceMode() === 'verb';
+  const sw = document.getElementById('nuance-mode-switch');
+  if (!sw) return;
+  sw.classList.toggle('on', verb);
+  sw.setAttribute('aria-checked', verb ? 'true' : 'false');
+  document.querySelectorAll('#nuance-mode-toggle-wrap .content-toggle-label').forEach(l => {
+    l.classList.toggle('active', (l.dataset.mode === 'verb') === verb);
+  });
+  document.getElementById('nuance-search').placeholder = verb ? '動詞（hold・bringなど）・意味で検索' : '句動詞・グループ名で検索';
+}
+function setNuanceMode(mode) {
+  localStorage.setItem('pv_nuance_mode', mode === 'verb' ? 'verb' : 'group');
+  refreshNuanceModeUI();
+  renderNuanceList();
+}
+
+// 動詞別ビュー：先頭の動詞（hold, bring…）ごとに句動詞をまとめ、意味の違いを並べて見られるようにする
+function renderNuanceByVerb(listEl, q) {
+  const byHead = {};
+  allWords().forEach(w => {
+    const head = baseForm(w.verb).split(/\s+/)[0].toLowerCase();
+    if (!head) return;
+    (byHead[head] = byHead[head] || []).push(w);
+  });
+  let heads = Object.keys(byHead).filter(h => byHead[h].length >= 2);
+  heads.sort((a, b) => byHead[b].length - byHead[a].length || a.localeCompare(b));
+  if (q) {
+    heads = heads.filter(h => h.includes(q) || byHead[h].some(w =>
+      baseForm(w.verb).toLowerCase().includes(q) || (w.meaning || '').toLowerCase().includes(q)));
+  }
+  listEl.innerHTML = '';
+  if (!heads.length) { listEl.innerHTML = '<div class="empty-note">該当する動詞がありません。</div>'; return; }
+
+  heads.forEach(head => {
+    const members = byHead[head].slice().sort((a, b) =>
+      baseForm(a.verb).localeCompare(baseForm(b.verb)) || (a.no > b.no ? 1 : -1));
+    const particle = w => baseForm(w.verb).split(/\s+/).slice(1).join(' ');
+    const chips = [...new Set(members.map(particle).filter(Boolean))]
+      .map(p => `<span class="nuance-verb-chip">${escHtml(p)}</span>`).join('');
+    const rows = members.map(w => {
+      const hasDetail = !!(w.nuance || w.ex1);
+      return `<div class="nv-row">
+        <div class="nv-row-main"><span class="nv-verb">${escHtml(baseForm(w.verb))}</span><span class="nv-meaning">${escHtml(w.meaning || '')}</span></div>
+        ${hasDetail ? `<div class="nv-detail">
+          ${w.nuance ? `<div class="nv-nuance">💡 ${escHtml(w.nuance)}</div>` : ''}
+          ${w.ex1 ? `<div class="nv-ex">${escHtml(w.ex1)} <button type="button" class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="nv-ja">${escHtml(w.ja1 || '')}</div>` : ''}
+        </div>` : ''}
+      </div>`;
+    }).join('');
+
+    const card = document.createElement('div');
+    card.className = 'nuance-card nuance-verbcard' + (q ? ' open' : '');
+    card.innerHTML = `
+      <div class="nuance-label nv-head"><span>${escHtml(head)}</span><span class="nv-count">${members.length}語 <span class="nv-caret">▾</span></span></div>
+      <div class="nuance-verbs">${chips}</div>
+      <div class="nv-body">${rows}</div>`;
+    card.querySelector('.nv-head').addEventListener('click', () => card.classList.toggle('open'));
+    card.querySelectorAll('.nv-row').forEach(row => {
+      row.addEventListener('click', e => {
+        if (e.target.closest('.speak-btn')) return;
+        row.classList.toggle('open');
+      });
+    });
+    listEl.appendChild(card);
+  });
+}
+
 function renderNuanceList() {
   const listEl = document.getElementById('nuance-list');
   const q = (document.getElementById('nuance-search').value || '').trim().toLowerCase();
   if (!listEl) return;
+  if (nuanceMode() === 'verb') { renderNuanceByVerb(listEl, q); return; }
   if (typeof GROUP_INFO === 'undefined') { listEl.innerHTML = '<div class="empty-note">グループ情報が読み込めませんでした。</div>'; return; }
 
   const customGroups = loadJSON(LS.CUSTOM_GROUPS, {});
@@ -2121,6 +2192,11 @@ function renderNuanceList() {
   });
 }
 document.getElementById('nuance-search').addEventListener('input', renderNuanceList);
+document.getElementById('nuance-mode-switch').addEventListener('click', () => setNuanceMode(nuanceMode() === 'verb' ? 'group' : 'verb'));
+document.querySelectorAll('#nuance-mode-toggle-wrap .content-toggle-label').forEach(l => {
+  l.addEventListener('click', () => setNuanceMode(l.dataset.mode));
+});
+refreshNuanceModeUI();
 
 // ===================== MY辞書（日本語→英語、句動詞とは別データ） =====================
 function myDictWords() { return loadJSON(LS.MY_DICT, []); }
@@ -3666,7 +3742,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
 
   (function() {
     const sw = document.getElementById('list-content-switch');
-    const labels = document.querySelectorAll('.content-toggle-label');
+    const labels = document.querySelectorAll('#list-content-toggle-wrap .content-toggle-label');
     function setListContent(showIdiom) {
       sw.classList.toggle('on', showIdiom);
       sw.setAttribute('aria-checked', showIdiom ? 'true' : 'false');

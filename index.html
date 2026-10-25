@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="170">
+<meta name="build-version" content="171">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=77">
+<link rel="stylesheet" href="style.css?v=78">
 </head>
 <body>
 
@@ -522,6 +522,13 @@
 
   <!-- ============ 使い分け ============ -->
   <section class="view" id="view-nuance">
+    <div class="nuance-mode-row">
+      <div class="content-toggle-wrap" id="nuance-mode-toggle-wrap">
+        <span class="content-toggle-label active" data-mode="group">意味別</span>
+        <button type="button" class="content-toggle-switch" id="nuance-mode-switch" role="switch" aria-checked="false"><span class="content-toggle-knob"></span></button>
+        <span class="content-toggle-label" data-mode="verb">動詞別（hold・bringなど）</span>
+      </div>
+    </div>
     <div class="list-controls">
       <input type="search" id="nuance-search" placeholder="句動詞・グループ名で検索">
     </div>
@@ -650,6 +657,6 @@
 <script src="data.js?v=34"></script>
 <script src="idioms.js?v=14"></script>
 <script src="dialogues.js?v=23"></script>
-<script src="app.js?v=170"></script>
+<script src="app.js?v=171"></script>
 </body>
 </html>

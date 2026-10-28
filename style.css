@@ -634,3 +634,10 @@ select{
 .nv-row.open .nv-detail{display:block;}
 .nv-nuance{margin-bottom:4px;}
 .nv-ex{color:var(--ink); font-size:13px;}
+
+/* 動詞別ビュー：会話チャンク */
+.nv-subhead{margin:14px 0 2px; padding-top:10px; border-top:2px solid var(--gold-soft); font-size:12px; font-weight:900; letter-spacing:.04em; color:var(--gold);}
+.nuance-verb-chip.nv-chip-chunk{background:var(--gold-soft); color:var(--navy); border-color:var(--gold);}
+.nv-chunk .nv-row-main{flex-direction:column; gap:3px;}
+.nv-chunk .nv-verb{min-width:0; font-family:"JetBrains Mono",monospace; font-size:13.5px;}
+.nv-scene{display:inline-block; margin-left:6px; padding:1px 7px; border-radius:10px; background:var(--hanko-soft); color:var(--hanko); font-size:10.5px; font-weight:700; vertical-align:1px; white-space:nowrap;}

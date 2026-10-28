@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '171'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '172'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -2015,7 +2015,7 @@ function setNuanceMode(mode) {
   renderNuanceList();
 }
 
-// 動詞別ビュー：先頭の動詞（hold, bring…）ごとに句動詞をまとめ、意味の違いを並べて見られるようにする
+// 動詞別ビュー：先頭の動詞（hold, bring…）ごとに句動詞と会話チャンクをまとめ、違いを並べて見られるようにする
 function renderNuanceByVerb(listEl, q) {
   const byHead = {};
   allWords().forEach(w => {
@@ -2023,38 +2023,54 @@ function renderNuanceByVerb(listEl, q) {
     if (!head) return;
     (byHead[head] = byHead[head] || []).push(w);
   });
-  let heads = Object.keys(byHead).filter(h => byHead[h].length >= 2);
-  heads.sort((a, b) => byHead[b].length - byHead[a].length || a.localeCompare(b));
+  const chunkByHead = {};
+  (typeof CHUNK_DATA !== 'undefined' ? CHUNK_DATA : []).forEach(c => {
+    (chunkByHead[c.head] = chunkByHead[c.head] || []).push(c);
+  });
+  const total = h => (byHead[h] || []).length + (chunkByHead[h] || []).length;
+  // 句動詞が2語以上ある動詞、または会話チャンクがある動詞を表示する
+  let heads = [...new Set([...Object.keys(byHead), ...Object.keys(chunkByHead)])]
+    .filter(h => (byHead[h] || []).length >= 2 || (chunkByHead[h] || []).length >= 1);
+  heads.sort((a, b) => total(b) - total(a) || a.localeCompare(b));
   if (q) {
-    heads = heads.filter(h => h.includes(q) || byHead[h].some(w =>
-      baseForm(w.verb).toLowerCase().includes(q) || (w.meaning || '').toLowerCase().includes(q)));
+    heads = heads.filter(h => h.includes(q)
+      || (byHead[h] || []).some(w => baseForm(w.verb).toLowerCase().includes(q) || (w.meaning || '').toLowerCase().includes(q))
+      || (chunkByHead[h] || []).some(c => (c.phrase + ' ' + c.meaning + ' ' + (c.scene || '')).toLowerCase().includes(q)));
   }
   listEl.innerHTML = '';
   if (!heads.length) { listEl.innerHTML = '<div class="empty-note">該当する動詞がありません。</div>'; return; }
 
   heads.forEach(head => {
-    const members = byHead[head].slice().sort((a, b) =>
+    const members = (byHead[head] || []).slice().sort((a, b) =>
       baseForm(a.verb).localeCompare(baseForm(b.verb)) || (a.no > b.no ? 1 : -1));
+    const chunks = chunkByHead[head] || [];
     const particle = w => baseForm(w.verb).split(/\s+/).slice(1).join(' ');
     const chips = [...new Set(members.map(particle).filter(Boolean))]
-      .map(p => `<span class="nuance-verb-chip">${escHtml(p)}</span>`).join('');
-    const rows = members.map(w => {
-      const hasDetail = !!(w.nuance || w.ex1);
-      return `<div class="nv-row">
+      .map(p => `<span class="nuance-verb-chip">${escHtml(p)}</span>`).join('')
+      + (chunks.length ? '<span class="nuance-verb-chip nv-chip-chunk">チャンク</span>' : '');
+
+    const detailHtml = (nuance, ex, ja) => (nuance || ex) ? `<div class="nv-detail">
+        ${nuance ? `<div class="nv-nuance">💡 ${escHtml(nuance)}</div>` : ''}
+        ${ex ? `<div class="nv-ex">${escHtml(ex)} <button type="button" class="speak-btn" data-text="${escAttr(ex)}">🔊</button></div><div class="nv-ja">${escHtml(ja || '')}</div>` : ''}
+      </div>` : '';
+    const pvRows = members.map(w => `<div class="nv-row">
         <div class="nv-row-main"><span class="nv-verb">${escHtml(baseForm(w.verb))}</span><span class="nv-meaning">${escHtml(w.meaning || '')}</span></div>
-        ${hasDetail ? `<div class="nv-detail">
-          ${w.nuance ? `<div class="nv-nuance">💡 ${escHtml(w.nuance)}</div>` : ''}
-          ${w.ex1 ? `<div class="nv-ex">${escHtml(w.ex1)} <button type="button" class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="nv-ja">${escHtml(w.ja1 || '')}</div>` : ''}
-        </div>` : ''}
-      </div>`;
-    }).join('');
+        ${detailHtml(w.nuance, w.ex1, w.ja1)}
+      </div>`).join('');
+    const chunkRows = chunks.map(c => `<div class="nv-row nv-chunk">
+        <div class="nv-row-main"><span class="nv-verb">${escHtml(c.phrase)}</span><span class="nv-meaning">${escHtml(c.meaning)}${c.scene ? `<span class="nv-scene">${escHtml(c.scene)}</span>` : ''}</span></div>
+        ${detailHtml(c.nuance, c.ex, c.ja)}
+      </div>`).join('');
+    const countParts = [];
+    if (members.length) countParts.push(`${members.length}語`);
+    if (chunks.length) countParts.push(`チャンク${chunks.length}`);
 
     const card = document.createElement('div');
     card.className = 'nuance-card nuance-verbcard' + (q ? ' open' : '');
     card.innerHTML = `
-      <div class="nuance-label nv-head"><span>${escHtml(head)}</span><span class="nv-count">${members.length}語 <span class="nv-caret">▾</span></span></div>
+      <div class="nuance-label nv-head"><span>${escHtml(head)}</span><span class="nv-count">${countParts.join('／')} <span class="nv-caret">▾</span></span></div>
       <div class="nuance-verbs">${chips}</div>
-      <div class="nv-body">${rows}</div>`;
+      <div class="nv-body">${pvRows}${chunks.length ? `<div class="nv-subhead">会話チャンク</div>${chunkRows}` : ''}</div>`;
     card.querySelector('.nv-head').addEventListener('click', () => card.classList.toggle('open'));
     card.querySelectorAll('.nv-row').forEach(row => {
       row.addEventListener('click', e => {

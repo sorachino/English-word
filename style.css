@@ -635,9 +635,11 @@ select{
 .nv-nuance{margin-bottom:4px;}
 .nv-ex{color:var(--ink); font-size:13px;}
 
-/* 動詞別ビュー：会話チャンク */
-.nv-subhead{margin:14px 0 2px; padding-top:10px; border-top:2px solid var(--gold-soft); font-size:12px; font-weight:900; letter-spacing:.04em; color:var(--gold);}
-.nuance-verb-chip.nv-chip-chunk{background:var(--gold-soft); color:var(--navy); border-color:var(--gold);}
-.nv-chunk .nv-row-main{flex-direction:column; gap:3px;}
-.nv-chunk .nv-verb{min-width:0; font-family:"JetBrains Mono",monospace; font-size:13.5px;}
-.nv-scene{display:inline-block; margin-left:6px; padding:1px 7px; border-radius:10px; background:var(--hanko-soft); color:var(--hanko); font-size:10.5px; font-weight:700; vertical-align:1px; white-space:nowrap;}
+/* 動詞別ビュー：各句動詞の行に付ける会話チャンク */
+.nv-chunkline{margin-top:6px; padding:6px 10px; border-left:3px solid var(--gold); background:var(--gold-soft); border-radius:0 6px 6px 0;}
+.nv-cphrase{font-family:"JetBrains Mono",monospace; font-size:13px; font-weight:600; color:var(--navy); line-height:1.5;}
+.nv-cphrase .speak-btn{margin-left:4px; vertical-align:1px;}
+.nv-cja{font-size:12px; color:var(--ink-soft); margin-top:2px; line-height:1.5;}
+.nv-scene{display:inline-block; margin-left:6px; padding:1px 7px; border-radius:10px; background:var(--hanko-soft); color:var(--hanko); font-size:10.5px; font-weight:700; vertical-align:1px; white-space:nowrap; font-family:inherit;}
+.nv-cnote{margin-bottom:6px;}
+

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '173'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '174'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -2016,10 +2016,10 @@ function setNuanceMode(mode) {
 }
 
 // 動詞別ビュー：先頭の動詞（hold, bring…）ごとに句動詞をまとめ、意味の違いを並べて見られるようにする。
-// 各句動詞の行の下には、会話でそのまま使えるチャンク（CHUNK_DATA、句動詞のnoがキー）を表示する
+// 各句動詞の行の下には、よく一緒に使う語との組み合わせ（コロケーション）と例文（COLLOC_DATA、句動詞のnoがキー）を表示する
 function renderNuanceByVerb(listEl, q) {
-  const CHUNKS = (typeof CHUNK_DATA !== 'undefined') ? CHUNK_DATA : {};
-  const chunkOf = w => CHUNKS[String(w.no)] || null;
+  const COLLOCS = (typeof COLLOC_DATA !== 'undefined') ? COLLOC_DATA : {};
+  const collocOf = w => COLLOCS[String(w.no)] || null;
   const byHead = {};
   allWords().forEach(w => {
     const head = baseForm(w.verb).split(/\s+/)[0].toLowerCase();
@@ -2030,9 +2030,9 @@ function renderNuanceByVerb(listEl, q) {
   heads.sort((a, b) => byHead[b].length - byHead[a].length || a.localeCompare(b));
   if (q) {
     heads = heads.filter(h => h.includes(q) || byHead[h].some(w => {
-      const c = chunkOf(w);
+      const c = collocOf(w);
       return baseForm(w.verb).toLowerCase().includes(q) || (w.meaning || '').toLowerCase().includes(q)
-        || (c && (c.phrase + ' ' + c.ja + ' ' + c.scene).toLowerCase().includes(q));
+        || (c && (c.colloc.join(' ') + ' ' + c.ex + ' ' + c.ja).toLowerCase().includes(q));
     }));
   }
   listEl.innerHTML = '';
@@ -2046,20 +2046,21 @@ function renderNuanceByVerb(listEl, q) {
       .map(p => `<span class="nuance-verb-chip">${escHtml(p)}</span>`).join('');
 
     const rows = members.map(w => {
-      const c = chunkOf(w);
-      const chunkLine = c ? `<div class="nv-chunkline">
-          <div class="nv-cphrase">💬 ${escHtml(c.phrase)} <button type="button" class="speak-btn" data-text="${escAttr(c.phrase)}">🔊</button></div>
-          <div class="nv-cja">${escHtml(c.ja)}${c.scene ? `<span class="nv-scene">${escHtml(c.scene)}</span>` : ''}</div>
+      const c = collocOf(w);
+      const collocBlock = c ? `<div class="nv-colloc">
+          <div class="nv-colloc-list">🔗 ${c.colloc.map(x => `<span class="nv-co">${escHtml(x)}</span>`).join(' ')}</div>
+          <div class="nv-cex">${escHtml(c.ex)} <button type="button" class="speak-btn" data-text="${escAttr(c.ex)}">🔊</button></div>
+          <div class="nv-cja">${escHtml(c.ja)}</div>
         </div>` : '';
       const hasDetail = !!(c || w.nuance || w.ex1);
       const detail = hasDetail ? `<div class="nv-detail">
-          ${c && c.note ? `<div class="nv-nuance nv-cnote">💬 ${escHtml(c.note)}</div>` : ''}
+          ${c && c.note ? `<div class="nv-nuance nv-cnote">🔗 ${escHtml(c.note)}</div>` : ''}
           ${w.nuance ? `<div class="nv-nuance">💡 ${escHtml(w.nuance)}</div>` : ''}
           ${w.ex1 ? `<div class="nv-ex">${escHtml(w.ex1)} <button type="button" class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="nv-ja">${escHtml(w.ja1 || '')}</div>` : ''}
         </div>` : '';
       return `<div class="nv-row">
         <div class="nv-row-main"><span class="nv-verb">${escHtml(baseForm(w.verb))}</span><span class="nv-meaning">${escHtml(w.meaning || '')}</span></div>
-        ${chunkLine}${detail}
+        ${collocBlock}${detail}
       </div>`;
     }).join('');
 

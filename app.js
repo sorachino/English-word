@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '177'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '178'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -163,6 +163,29 @@ function blankSentence(sentence, verb) {
   return sentence.slice(0, start) + inner + sentence.slice(end);
 }
 
+// 句動詞クイズ用のチャンク（例: pull off a deal）。データが無い語（マイ単語など）は従来どおり例文で出題する。
+function pvChunkOf(w) {
+  if (typeof PV_CHUNK_DATA === 'undefined' || w.mine) return null;
+  return PV_CHUNK_DATA[String(w.no)] || null;
+}
+// チャンクの中の句動詞（動詞部分と前置詞・副詞部分。間に目的語が入る場合は両方）を強調して返す
+function highlightVerbInChunk(chunk, verb) {
+  const parts = baseForm(verb).split(' ');
+  const head = parts[0], tail = parts.slice(1);
+  const headPat = headPattern(head.toLowerCase());
+  const pat = tail.length
+    ? '\\b(' + headPat + ')((?:\\s+\\w+){0,3})?\\s+(' + tail.map(esc).join('\\s+') + ')\\b'
+    : '\\b(' + headPat + ')\\b';
+  const m = chunk.match(new RegExp(pat, 'i'));
+  if (!m) return null;
+  const start = m.index, end = start + m[0].length;
+  let inner;
+  const middle = (tail.length && m[2]) ? m[2].trim() : '';
+  if (middle) inner = '<b class="hl">' + escHtml(m[1]) + '</b> ' + escHtml(middle) + ' <b class="hl">' + escHtml(m[3]) + '</b>';
+  else inner = '<b class="hl">' + escHtml(m[0]) + '</b>';
+  return escHtml(chunk.slice(0, start)) + inner + escHtml(chunk.slice(end));
+}
+
 // ===================== クイズエンジン =====================
 let quizState = null;
 
@@ -217,8 +240,17 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn) {
     const meaningDistractors = otherMeanings.slice(0, 3).map(w2 => w2.meaning);
     const meaningChoices = shuffle(meaningDistractors.concat([w.meaning]));
 
+    // チャンク出題（通常＝空欄に入れる／逆方向＝日本語訳の4択）。取得・空欄化・強調のどれかが失敗したら従来の形に戻す
+    let chunk = null;
+    const pc = pvChunkOf(w);
+    if (pc) {
+      const blank = blankSentence(pc.chunk, w.verb), hl = highlightVerbInChunk(pc.chunk, w.verb);
+      if (blank && hl) chunk = { blankHtml: blank, hlHtml: hl, ja: pc.ja, choices: shuffle([pc.ja, ...pc.wrong.slice(0, 3)]) };
+    }
+
     questions.push({
       word: w, answer: verb, questionHtml: blanked.html, full: blanked.full, ja: blanked.ja, usedEx: blanked.usedEx,
+      chunk,
       meaning: w.meaning, def: w.def, note: w.note, choices, meaningChoices,
       resolved: false, method: null, // 'first' | 'hint' | 'choice' | 'wrong'
       hintShown: false,
@@ -794,14 +826,15 @@ function showQuestion() {
     replayBtn.onclick = () => speak(q.full);
     speak(q.full);
   } else if (quizState.mode === 'reverse') {
-    document.getElementById('question-text').textContent = q.answer;
+    if (q.chunk) document.getElementById('question-text').innerHTML = '<span class="pv-chunk">' + q.chunk.hlHtml + '</span>';
+    else document.getElementById('question-text').textContent = q.answer;
     replayBtn.hidden = true;
   } else {
-    document.getElementById('question-text').innerHTML = q.questionHtml;
+    document.getElementById('question-text').innerHTML = q.chunk ? '<span class="pv-chunk">' + q.chunk.blankHtml + '</span>' : q.questionHtml;
     replayBtn.hidden = true;
   }
   document.getElementById('ja-preview').textContent =
-    (quizState.mode === 'reverse' || quizState.mode === 'listening') ? '' : q.ja;
+    (quizState.mode === 'reverse' || quizState.mode === 'listening') ? '' : (q.chunk ? q.chunk.ja : q.ja);
   document.getElementById('answer-input').placeholder = quizState.mode === 'reverse' ? '意味を日本語で入力' : '句動詞を入力';
   document.getElementById('hint-box').hidden = true;
   document.getElementById('hint-box').textContent = '';
@@ -871,7 +904,7 @@ function switchToChoices() {
   document.getElementById('submit-btn').hidden = true;
   const grid = document.getElementById('choice-grid');
   grid.innerHTML = '';
-  const list = quizState.mode === 'reverse' ? q.meaningChoices : q.choices;
+  const list = quizState.mode === 'reverse' ? (q.chunk ? q.chunk.choices : q.meaningChoices) : q.choices;
   list.forEach(c => {
     const b = document.createElement('button');
     b.className = 'choice-btn'; b.textContent = c;
@@ -903,7 +936,7 @@ function showSelfGrade(userVal, q) {
   document.getElementById('choice-btn').hidden = true;
   document.getElementById('giveup-btn').hidden = true;
   document.getElementById('self-grade-user-answer').textContent = userVal;
-  document.getElementById('self-grade-correct-answer').textContent = q.meaning;
+  document.getElementById('self-grade-correct-answer').textContent = q.chunk ? q.chunk.ja + '（' + q.meaning + '）' : q.meaning;
   document.getElementById('self-grade-box').hidden = false;
   document.getElementById('self-grade-ok-btn').onclick = () => {
     document.getElementById('self-grade-box').hidden = true;
@@ -917,7 +950,7 @@ function showSelfGrade(userVal, q) {
 
 function resolveChoice(chosen, btnEl) {
   const q = quizState.questions[quizState.idx];
-  const correctText = quizState.mode === 'reverse' ? q.meaning : q.answer;
+  const correctText = quizState.mode === 'reverse' ? (q.chunk ? q.chunk.ja : q.meaning) : q.answer;
   const ok = chosen === correctText;
   document.querySelectorAll('.choice-btn').forEach(b => {
     b.disabled = true;

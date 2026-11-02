@@ -653,3 +653,7 @@ select{
 .idiom-chunk .hl{color:var(--hanko); border-bottom:3px solid var(--gold); padding-bottom:1px;}
 .idiom-chunk-hint{margin-top:6px; font-size:12.5px; font-weight:400; font-family:inherit; color:var(--ink-soft);}
 
+/* 句動詞クイズ：チャンク表示 */
+.question-text .pv-chunk{font-family:"JetBrains Mono",monospace;}
+.question-text b.hl{color:var(--hanko); border-bottom:3px solid var(--gold); padding-bottom:1px;}
+

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="178">
+<meta name="build-version" content="179">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="句動詞ノート">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=83">
+<link rel="stylesheet" href="style.css?v=84">
 </head>
 <body>
 
@@ -124,7 +124,9 @@
         <div class="question-text" id="question-text">Loading…</div>
         <button class="btn-ghost" id="listen-replay-btn" type="button" hidden>🔊 もう一度再生する</button>
         <div class="ja-preview" id="ja-preview"></div>
+        <div class="idiom-chunk-hint" id="pv-q-hint"></div>
         <div class="hint-box" id="hint-box" hidden></div>
+        <div class="choice-group" id="choice-grid" hidden></div>
       </div>
 
       <form id="answer-form" class="answer-form">
@@ -140,11 +142,10 @@
         </div>
       </div>
 
-      <div class="choice-grid" id="choice-grid" hidden></div>
-
       <div class="quiz-actions">
         <button class="btn-ghost" id="hint-btn">ヒント</button>
         <button class="btn-ghost" id="choice-btn">4択にする</button>
+        <button class="btn-ghost" id="input-style-btn" hidden>入力で答える</button>
         <button class="btn-ghost btn-giveup" id="giveup-btn">わからない</button>
         <button class="btn-primary btn-submit" id="submit-btn" type="submit" form="answer-form">答える</button>
       </div>
@@ -660,6 +661,6 @@
 <script src="collocations.js?v=3"></script>
 <script src="prep-chunks.js?v=3"></script>
 <script src="pv-chunks.js?v=1"></script>
-<script src="app.js?v=178"></script>
+<script src="app.js?v=179"></script>
 </body>
 </html>

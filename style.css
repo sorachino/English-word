@@ -657,3 +657,8 @@ select{
 .question-text .pv-chunk{font-family:"JetBrains Mono",monospace;}
 .question-text b.hl{color:var(--hanko); border-bottom:3px solid var(--gold); padding-bottom:1px;}
 
+/* 句動詞クイズ：4択を基本にした表示（群前置詞のクイズと同じ縦並び） */
+#choice-grid.choice-group{display:flex; flex-direction:column; gap:10px; margin:14px 0 4px;}
+#choice-grid .choice-btn{width:100%; text-align:left;}
+#pv-q-hint:empty{display:none;}
+

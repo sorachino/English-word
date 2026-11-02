@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '178'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '179'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -838,7 +838,6 @@ function showQuestion() {
   document.getElementById('answer-input').placeholder = quizState.mode === 'reverse' ? '意味を日本語で入力' : '句動詞を入力';
   document.getElementById('hint-box').hidden = true;
   document.getElementById('hint-box').textContent = '';
-  document.getElementById('answer-form').hidden = false;
   document.getElementById('answer-input').value = '';
   document.getElementById('self-grade-box').hidden = true;
   document.getElementById('choice-grid').hidden = true;
@@ -856,7 +855,41 @@ function showQuestion() {
   document.getElementById('giveup-btn').hidden = false;
   document.getElementById('submit-btn').hidden = false;
   document.getElementById('submit-btn').disabled = false;
-  setTimeout(() => document.getElementById('answer-input').focus(), 50);
+  document.getElementById('input-style-btn').hidden = true;
+  applyAnswerView(q, pvChoiceViewOn());
+}
+
+// 通常・逆方向は4択を基本の答え方にする（群前置詞のクイズと同じ）。リスニングは従来どおり入力が基本。
+// 「入力で答える」を選んだ場合は、その方式を端末に保存して次の問題以降も使う。
+function pvChoiceViewOn() {
+  return (quizState.mode === 'normal' || quizState.mode === 'reverse') && localStorage.getItem('pv_quiz_input_style') !== '1';
+}
+function applyAnswerView(q, choiceView) {
+  const reverse = quizState.mode === 'reverse';
+  const hintEl = document.getElementById('pv-q-hint');
+  if (choiceView) {
+    document.getElementById('answer-form').hidden = true;
+    document.getElementById('submit-btn').hidden = true;
+    document.getElementById('hint-btn').hidden = true;
+    document.getElementById('choice-btn').hidden = true;
+    document.getElementById('input-style-btn').hidden = false;
+    hintEl.textContent = reverse
+      ? (q.chunk ? '日本語にすると？（太字の句動詞に注目）' : '意味は？')
+      : '空欄に入る句動詞は？';
+    renderPvChoices(q);
+  } else {
+    document.getElementById('answer-form').hidden = false;
+    document.getElementById('submit-btn').hidden = false;
+    document.getElementById('hint-btn').hidden = false;
+    const cb = document.getElementById('choice-btn');
+    cb.hidden = false;
+    cb.textContent = quizState.mode === 'listening' ? '4択にする' : '4択で答える';
+    document.getElementById('input-style-btn').hidden = true;
+    document.getElementById('choice-grid').hidden = true;
+    document.getElementById('choice-grid').innerHTML = '';
+    hintEl.textContent = '';
+    setTimeout(() => document.getElementById('answer-input').focus(), 50);
+  }
 }
 
 document.getElementById('hint-btn').addEventListener('click', () => {
@@ -886,7 +919,17 @@ document.getElementById('hint-btn').addEventListener('click', () => {
   q.usedHint = true;
 });
 
-document.getElementById('choice-btn').addEventListener('click', () => switchToChoices());
+document.getElementById('choice-btn').addEventListener('click', () => {
+  const q = quizState.questions[quizState.idx];
+  if (quizState.mode === 'listening') { switchToChoices(); return; }
+  localStorage.removeItem('pv_quiz_input_style'); // 4択を基本の答え方に戻す
+  applyAnswerView(q, true);
+});
+document.getElementById('input-style-btn').addEventListener('click', () => {
+  const q = quizState.questions[quizState.idx];
+  localStorage.setItem('pv_quiz_input_style', '1'); // 以降の問題も入力で答える
+  applyAnswerView(q, false);
+});
 
 document.getElementById('giveup-btn').addEventListener('click', () => {
   document.getElementById('answer-form').hidden = true;
@@ -898,10 +941,7 @@ document.getElementById('giveup-btn').addEventListener('click', () => {
   finishQuestion(false, 'wrong', false, '');
 });
 
-function switchToChoices() {
-  const q = quizState.questions[quizState.idx];
-  document.getElementById('answer-form').hidden = true;
-  document.getElementById('submit-btn').hidden = true;
+function renderPvChoices(q) {
   const grid = document.getElementById('choice-grid');
   grid.innerHTML = '';
   const list = quizState.mode === 'reverse' ? (q.chunk ? q.chunk.choices : q.meaningChoices) : q.choices;
@@ -912,6 +952,13 @@ function switchToChoices() {
     grid.appendChild(b);
   });
   grid.hidden = false;
+}
+// リスニングの「4択にする」（従来どおり、4択を使った扱い＝復習間隔は伸びない）
+function switchToChoices() {
+  const q = quizState.questions[quizState.idx];
+  document.getElementById('answer-form').hidden = true;
+  document.getElementById('submit-btn').hidden = true;
+  renderPvChoices(q);
   q.usedChoice = true;
   document.getElementById('choice-btn').disabled = true;
 }
@@ -957,7 +1004,8 @@ function resolveChoice(chosen, btnEl) {
     if (b.textContent === correctText) b.classList.add('correct');
     else if (b === btnEl) b.classList.add('wrong');
   });
-  finishQuestion(ok, ok ? 'choice' : 'wrong', true, chosen);
+  const okMethod = quizState.mode === 'listening' ? 'choice' : (q.usedHint ? 'hint' : 'first');
+  finishQuestion(ok, ok ? okMethod : 'wrong', true, chosen);
 }
 
 // ===================== 効果音 =====================
@@ -1345,7 +1393,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
   }
 
   const markWrongBtn = document.getElementById('mark-wrong-btn');
-  if (ok && (method === 'hint' || method === 'choice')) {
+  if (ok && (method === 'hint' || method === 'choice' || delay)) {
     markWrongBtn.hidden = false;
     markWrongBtn.disabled = false;
     markWrongBtn.onclick = markCurrentAsWrong;

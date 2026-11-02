@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '174'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '175'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     if (htmlBuild !== EXPECTED_BUILD) {
@@ -3828,14 +3828,17 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-progress-fill').style.width = (100 * idiomQuizState.idx / idiomQuizState.questions.length) + '%';
     document.getElementById('idiom-q-category').textContent = q.item.categoryLabel;
     const isOrder = idiomQuizState.mode === 'order';
-    document.getElementById('idiom-q-phrase').hidden = isOrder;
+    const pc = prepChunkOf(q.item);
+    document.getElementById('idiom-q-phrase').hidden = isOrder || !!pc;
     document.getElementById('idiom-q-phrase').textContent = q.item.phrase;
     document.getElementById('idiom-choice-mode-block').hidden = isOrder;
     document.getElementById('idiom-order-mode-block').hidden = !isOrder;
     if (isOrder) {
       showIdiomOrderQuestion(q);
     } else {
-      document.getElementById('idiom-q-example').innerHTML = `${escHtml(q.item.ex)} <button class="speak-btn" data-text="${escAttr(q.item.ex)}">🔊</button>`;
+      document.getElementById('idiom-q-example').innerHTML = pc
+        ? `<span class="idiom-chunk">${chunkHtml(pc)}</span> <button class="speak-btn" data-text="${escAttr(pc.chunk)}">🔊</button><div class="idiom-chunk-hint">太字の前置詞の意味は？</div>`
+        : `${escHtml(q.item.ex)} <button class="speak-btn" data-text="${escAttr(q.item.ex)}">🔊</button>`;
       const group = document.getElementById('idiom-choice-group');
       group.innerHTML = q.choices.map((c, i) => `<button class="choice-btn" data-idx="${i}">${escHtml(c)}</button>`).join('');
       group.querySelectorAll('.choice-btn').forEach(btn => {
@@ -3864,11 +3867,24 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     return sentence.trim().split(/\s+/).map(w => w.replace(/\.+$/, ''));
   }
 
+  // 群前置詞は、前置詞とその前後の語を切り出したチャンク（例: two months ahead of us）で出題する。
+  // チャンクのデータが無い語は、従来どおり例文で出題する。
+  function prepChunkOf(item) {
+    if (typeof PREP_CHUNK_DATA === 'undefined' || !item.category || !item.category.startsWith('prep')) return null;
+    return PREP_CHUNK_DATA[String(item.no)] || null;
+  }
+  function chunkHtml(pc) {
+    const i = pc.chunk.toLowerCase().indexOf(pc.hl.toLowerCase());
+    if (i < 0) return escHtml(pc.chunk);
+    return escHtml(pc.chunk.slice(0, i)) + '<b class="hl">' + escHtml(pc.chunk.slice(i, i + pc.hl.length)) + '</b>' + escHtml(pc.chunk.slice(i + pc.hl.length));
+  }
+
   function showIdiomOrderQuestion(q) {
-    const tokens = tokenize(q.item.ex);
+    const pc = prepChunkOf(q.item);
+    const tokens = tokenize(pc ? pc.chunk : q.item.ex);
     q.orderTokens = tokens;
     q.orderPicked = [];
-    document.getElementById('idiom-order-hint').innerHTML = `<div class="ja">${escHtml(q.item.ja)}</div>`;
+    document.getElementById('idiom-order-hint').innerHTML = `<div class="ja">${escHtml(pc ? pc.ja : q.item.ja)}</div>`;
     document.getElementById('idiom-order-hint').hidden = false;
     const bank = shuffle(tokens.map((t, i) => ({ t, i })).slice());
     q.orderBank = bank;
@@ -3964,12 +3980,13 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     q.resolved = true;
     document.getElementById('idiom-order-submit-btn').disabled = true;
     const answer = q.orderPicked.map(tok => tok.t).join(' ');
-    const ok = !forceGiveUp && answer === tokenize(q.item.ex).join(' ');
+    const pc = prepChunkOf(q.item);
+    const ok = !forceGiveUp && answer === tokenize(pc ? pc.chunk : q.item.ex).join(' ');
     const phraseEl = document.getElementById('idiom-q-phrase');
     phraseEl.textContent = q.item.phrase;
     phraseEl.hidden = false;
     document.getElementById('idiom-order-hint').innerHTML =
-      `<div class="idiom-order-correct-en">${escHtml(q.item.ex)}</div><div class="ja">${escHtml(q.item.ja)}</div>`;
+      `<div class="idiom-order-correct-en">${pc ? chunkHtml(pc) : escHtml(q.item.ex)}</div><div class="ja">${escHtml(pc ? pc.ja : q.item.ja)}</div>`;
     finishIdiomAnswer(q, ok);
   }
   document.getElementById('idiom-order-submit-btn').addEventListener('click', () => {

@@ -3,9 +3,10 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '175'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '176'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
+    window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
     if (htmlBuild !== EXPECTED_BUILD) {
       const banner = document.createElement('div');
       banner.style.cssText = 'position:fixed; top:0; left:0; right:0; z-index:99999; background:#B23A2E; color:#fff; padding:10px 14px; font-size:12.5px; text-align:center; font-family:sans-serif; line-height:1.5;';
@@ -3391,13 +3392,41 @@ document.getElementById('lb-rename-btn').addEventListener('click', () => {
 
 // ===================== トースト =====================
 let toastTimer;
-function toast(msg) {
+function toast(msg, ms) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms || 1800);
 }
+
+// ===================== バージョン表示 =====================
+// ヘッダーに build番号を出し、更新が反映されたかを見分けられるようにする。
+// タップすると、各データファイルの版と収録数を表示する。
+function appVersionDetail() {
+  const b = window.__APP_BUILD || {};
+  const files = [...document.querySelectorAll('script[src]')]
+    .map(s => (s.getAttribute('src').match(/^([\w-]+)\.js\?v=(\d+)/) || []))
+    .filter(m => m[1] && !/^(firebase-config|tts-config|ai-config|app)$/.test(m[1]))
+    .map(m => `${m[1]} v${m[2]}`);
+  const cssLink = document.querySelector('link[href*="style.css"]');
+  const cssV = cssLink && (cssLink.getAttribute('href').match(/\?v=(\d+)/) || [])[1];
+  const counts = `句動詞 ${typeof PV_DATA !== 'undefined' ? PV_DATA.length : '?'}語・熟語 ${typeof IDIOM_DATA !== 'undefined' ? IDIOM_DATA.length : '?'}語`;
+  const mismatch = b.html && b.js && b.html !== b.js ? `\n⚠ HTML ${b.html} / JS ${b.js} が不一致` : '';
+  return `build ${b.js || '?'}${mismatch}\n${files.join(' / ')}${cssV ? ` / style v${cssV}` : ''}\n${counts}`;
+}
+(function initVersionBadge() {
+  const b = window.__APP_BUILD || {};
+  const label = document.getElementById('app-build');
+  const box = document.getElementById('brand-sub');
+  if (!label || !box) return;
+  const mismatch = b.html && b.js && b.html !== b.js;
+  label.textContent = mismatch ? `build ${b.html}≠${b.js}` : `build ${b.js || '?'}`;
+  label.classList.toggle('mismatch', !!mismatch);
+  const show = () => toast(appVersionDetail(), 5000);
+  box.addEventListener('click', show);
+  box.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); show(); } });
+})();
 
 // ===================== Service Worker（一時停止） =====================
 // キャッシュの不整合が続いたため、開発中はオフライン対応を一時停止し、

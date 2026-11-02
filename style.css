@@ -57,6 +57,10 @@ body{
   letter-spacing:.1em; color:var(--gold-soft); opacity:.8; margin-top:1px;
   white-space:nowrap;
 }
+#app-build{color:var(--gold); font-weight:700;}
+#app-build.mismatch{color:#ff8a7a;}
+.brand-sub{cursor:pointer;}
+.toast{white-space:pre-line;}
 .streak{
   font-family:"JetBrains Mono",monospace; font-weight:700; font-size:13px;
   background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18);

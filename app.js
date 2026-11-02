@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '180'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '181'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1408,7 +1408,11 @@ function finishQuestion(ok, method, delay, userAnswer) {
     document.getElementById('choice-grid').hidden = true;
     document.getElementById('hint-btn').hidden = true;
     document.getElementById('choice-btn').hidden = true;
+    document.getElementById('input-style-btn').hidden = true;
     document.getElementById('giveup-btn').hidden = true;
+    // 答えを見る画面では、問題の英文（チャンク）の下に日本語訳を表示する。出題用の案内文は消す
+    document.getElementById('pv-q-hint').textContent = '';
+    if (quizState.mode === 'reverse' && q.chunk) document.getElementById('ja-preview').textContent = q.chunk.ja;
   };
   delay ? setTimeout(run, 350) : run();
 }

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '176'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '177'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -3824,9 +3824,15 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     let picks = pool.slice(0, count);
     if (statusFilter === 'weak') shuffle(picks); // 出題内容は古い順に選ぶが、出す順番自体はランダムにする
     return picks.map(it => {
+      const pc = prepChunkOf(it);
+      if (pc && pc.wrong && pc.wrong.length >= 3) {
+        // 群前置詞：選択肢はチャンクの日本語訳。不正解は同じ名詞で前置詞だけ違う訳にして、
+        // 名詞（駅など）だけで答えが分からないようにする
+        return { item: it, choices: shuffle([pc.ja, ...pc.wrong.slice(0, 3)]), correctText: pc.ja, resolved: false, correct: false };
+      }
       const distractors = pickIdiomDistractors(it, 3);
       const choices = shuffle([it.meaning, ...distractors]);
-      return { item: it, choices, resolved: false, correct: false };
+      return { item: it, choices, correctText: it.meaning, resolved: false, correct: false };
     });
   }
 
@@ -3866,7 +3872,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       showIdiomOrderQuestion(q);
     } else {
       document.getElementById('idiom-q-example').innerHTML = pc
-        ? `<span class="idiom-chunk">${chunkHtml(pc)}</span> <button class="speak-btn" data-text="${escAttr(pc.chunk)}">🔊</button><div class="idiom-chunk-hint">太字の前置詞の意味は？</div>`
+        ? `<span class="idiom-chunk">${chunkHtml(pc)}</span> <button class="speak-btn" data-text="${escAttr(pc.chunk)}">🔊</button><div class="idiom-chunk-hint">日本語にすると？（太字の前置詞に注目）</div>`
         : `${escHtml(q.item.ex)} <button class="speak-btn" data-text="${escAttr(q.item.ex)}">🔊</button>`;
       const group = document.getElementById('idiom-choice-group');
       group.innerHTML = q.choices.map((c, i) => `<button class="choice-btn" data-idx="${i}">${escHtml(c)}</button>`).join('');
@@ -3881,12 +3887,13 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     if (q.resolved) return;
     q.resolved = true;
     const chosen = q.choices[idx];
-    const ok = chosen === q.item.meaning;
+    const correctText = q.correctText || q.item.meaning;
+    const ok = chosen === correctText;
     finishIdiomAnswer(q, ok);
     const group = document.getElementById('idiom-choice-group');
     group.querySelectorAll('.choice-btn').forEach(btn => {
       const btnText = btn.textContent;
-      if (btnText === q.item.meaning) btn.classList.add('correct');
+      if (btnText === correctText) btn.classList.add('correct');
       else if (parseInt(btn.dataset.idx, 10) === idx) btn.classList.add('wrong');
     });
   }

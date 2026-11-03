@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '184'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '185'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -2881,6 +2881,11 @@ function pullAndMergeCloud(nickname) {
     const cloud = snap.val() || {};
     let changed = false;
 
+    // 旧形式のキー（例: "get at"）は、新形式（"n273"）に読み替えて取り込んだあと、クラウドから削除する。
+    // 削除しないと、正解して苦手語から外しても、起動のたびに旧形式のキーから苦手語に復活してしまう。
+    const legacyDeletes = {};
+    const markLegacy = (store, rawKey, key) => { if (rawKey !== key) legacyDeletes[`users/${nickname}/${store}/${sanitizeKey(rawKey)}`] = null; };
+
     if (cloud.weak && typeof cloud.weak === 'object') {
       const localWeak = loadJSON(LS.WEAK, {});
       const byBase = buildBaseFormIndex();
@@ -2888,7 +2893,11 @@ function pullAndMergeCloud(nickname) {
       Object.entries(cloud.weak).forEach(([rawKey, cw]) => {
         if (!cw) return;
         const key = resolveLegacyKey(rawKey, byBase);
-        if (!key || localWeak[key]) return; // あいまい・該当なし、またはローカルに既にあるならスキップ
+        if (!key) return; // あいまい・該当なしの旧形式キーは、どの語か決められないので触らない
+        if (rawKey !== key) markLegacy('weak', rawKey, key); // 読み替えた旧形式キーは、このあと削除する
+        if (localWeak[key]) return; // ローカルに既にあるなら取り込まない
+        // 旧形式キーだけから復活させない: 新形式キーの記録が端末側で既に消えている（＝正解して外した）なら足し戻さない
+        if (rawKey !== key) return;
         localWeak[key] = { hint: cw.hint || 0, choice: cw.choice || 0, wrong: cw.wrong || 0, okStreak: cw.okStreak || 0 };
         sub = true;
       });
@@ -2902,7 +2911,10 @@ function pullAndMergeCloud(nickname) {
       Object.entries(cloud.srs).forEach(([rawKey, cs]) => {
         if (!cs) return;
         const key = resolveLegacyKey(rawKey, byBase);
-        if (!key || localSrs[key]) return;
+        if (!key) return;
+        if (rawKey !== key) markLegacy('srs', rawKey, key);
+        if (localSrs[key]) return;
+        if (rawKey !== key) return; // 旧形式キーから復活させない
         localSrs[key] = { interval: cs.interval || 1, dueDate: cs.dueDate || todayKey(), reps: cs.reps || 0 };
         sub = true;
       });
@@ -2934,6 +2946,10 @@ function pullAndMergeCloud(nickname) {
         if (!ca) return;
         const key = resolveLegacyKey(rawKey, byBase);
         if (!key) return;
+        if (rawKey !== key) {
+          markLegacy('answered', rawKey, key);
+          if (localAnswered[key]) return; // 新形式キー側の記録が既にあるなら、旧形式の古い値で上書き・加算しない
+        }
         const curOk = (localAnswered[key] && localAnswered[key].ok) || 0;
         const curNg = (localAnswered[key] && localAnswered[key].ng) || 0;
         const curTotalNg = (localAnswered[key] && typeof localAnswered[key].totalNg === 'number') ? localAnswered[key].totalNg : ((localAnswered[key] && localAnswered[key].ng) || 0);
@@ -2974,6 +2990,23 @@ function pullAndMergeCloud(nickname) {
     }
 
     if (mergeIdiomFromCloud(cloud, db, nickname)) changed = true;
+
+    // 読み替えて取り込んだ旧形式キーを、クラウドから削除する。
+    // 先に、新形式キーの現在の値をクラウドへ書き込んでから削除する（削除でデータが消えないように）。
+    const legacyPaths = Object.keys(legacyDeletes);
+    if (legacyPaths.length) {
+      const stores = { weak: loadJSON(LS.WEAK, {}), srs: loadJSON(LS.SRS, {}), answered: loadJSON(LS_ANSWERED, {}) };
+      const keep = {};
+      legacyPaths.forEach(p => {
+        const m = p.match(/^users\/[^/]+\/(weak|srs|answered)\//);
+        if (!m) return;
+        // この旧形式キーに対応する新形式キーの値を、クラウドへ書いておく（無ければ書かない＝苦手語などは復活させない）
+        const rawKey = Object.keys(cloud[m[1]] || {}).find(k => `users/${nickname}/${m[1]}/${sanitizeKey(k)}` === p);
+        const newKey = rawKey ? resolveLegacyKey(rawKey, buildBaseFormIndex()) : null;
+        if (newKey && stores[m[1]][newKey]) keep[`users/${nickname}/${m[1]}/${sanitizeKey(newKey)}`] = stores[m[1]][newKey];
+      });
+      db.ref().update(Object.assign({}, keep, legacyDeletes)).catch(() => {});
+    }
 
     if (changed) {
       renderDictProgress();

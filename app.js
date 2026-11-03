@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '182'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '183'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -250,7 +250,11 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn) {
     const pc = pvChunkOf(w);
     if (pc) {
       const blank = blankSentence(pc.chunk, w.verb), hl = highlightVerbInChunk(pc.chunk, w.verb);
-      if (blank && hl) chunk = { blankHtml: blank, hlHtml: hl, ja: pc.ja, choices: shuffle([pc.ja, ...pc.wrong.slice(0, 3)]) };
+      if (blank && hl) {
+        const enOf = {};
+        if (pc.wrongEn) pc.wrong.forEach((jaText, i) => { if (pc.wrongEn[i]) enOf[jaText] = pc.wrongEn[i]; });
+        chunk = { blankHtml: blank, hlHtml: hl, ja: pc.ja, choices: shuffle([pc.ja, ...pc.wrong.slice(0, 3)]), enOf };
+      }
     }
 
     questions.push({
@@ -861,6 +865,7 @@ function showQuestion() {
   document.getElementById('submit-btn').hidden = false;
   document.getElementById('submit-btn').disabled = false;
   document.getElementById('input-style-btn').hidden = true;
+  document.getElementById('pv-wrong-note').hidden = true;
   applyAnswerView(q, pvChoiceViewOn());
 }
 
@@ -1009,6 +1014,9 @@ function resolveChoice(chosen, btnEl) {
     if (b.textContent === correctText) b.classList.add('correct');
     else if (b === btnEl) b.classList.add('wrong');
   });
+  if (!ok && quizState.mode === 'reverse' && q.chunk && q.chunk.enOf && q.chunk.enOf[chosen]) {
+    q.wrongPicked = { ja: chosen, en: q.chunk.enOf[chosen] };
+  }
   const okMethod = quizState.mode === 'listening' ? 'choice' : (q.usedHint ? 'hint' : 'first');
   finishQuestion(ok, ok ? okMethod : 'wrong', true, chosen);
 }
@@ -1418,6 +1426,11 @@ function finishQuestion(ok, method, delay, userAnswer) {
     // 答えを見る画面では、問題の英文（チャンク）の下に日本語訳を表示する。出題用の案内文は消す
     document.getElementById('pv-q-hint').textContent = '';
     if (quizState.mode === 'reverse' && q.chunk) document.getElementById('ja-preview').textContent = q.chunk.ja;
+    if (q.wrongPicked) {
+      const note = document.getElementById('pv-wrong-note');
+      note.innerHTML = 'あなたが選んだ「' + escHtml(q.wrongPicked.ja) + '」は<span class="pwn-en">→ ' + escHtml(q.wrongPicked.en) + '</span>';
+      note.hidden = false;
+    }
   };
   delay ? setTimeout(run, 350) : run();
 }

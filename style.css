@@ -666,3 +666,7 @@ select{
 .my-words-head-row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
 .btn-mini{width:auto; padding:5px 12px; font-size:12px; line-height:1.4;}
 
+/* 句動詞クイズ（逆方向）：間違えた選択肢を英語で見せる */
+.pv-wrong-note{margin-top:12px; padding:9px 12px; border-left:3px solid var(--hanko); background:var(--hanko-soft); border-radius:0 6px 6px 0; font-size:13px; line-height:1.7; color:var(--ink);}
+.pv-wrong-note .pwn-en{display:block; margin-top:2px; font-family:"JetBrains Mono",monospace; font-weight:700; font-size:14px; color:var(--navy);}
+

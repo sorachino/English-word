@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '181'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '182'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -165,7 +165,12 @@ function blankSentence(sentence, verb) {
 
 // 句動詞クイズ用のチャンク（例: pull off a deal）。データが無い語（マイ単語など）は従来どおり例文で出題する。
 function pvChunkOf(w) {
-  if (typeof PV_CHUNK_DATA === 'undefined' || w.mine) return null;
+  if (w.mine) {
+    // マイ単語は端末ごとのデータなので、番号ではなく句動詞名（小文字）で対応づける
+    if (typeof MY_CHUNK_DATA === 'undefined') return null;
+    return MY_CHUNK_DATA[baseForm(w.verb).toLowerCase().trim()] || null;
+  }
+  if (typeof PV_CHUNK_DATA === 'undefined') return null;
   return PV_CHUNK_DATA[String(w.no)] || null;
 }
 // チャンクの中の句動詞（動詞部分と前置詞・副詞部分。間に目的語が入る場合は両方）を強調して返す
@@ -1971,6 +1976,33 @@ document.getElementById('dict-form').addEventListener('submit', e => {
 });
 function val(id) { return document.getElementById(id).value.trim(); }
 
+// ===================== マイ単語の一覧コピー（チャンク作成の依頼用） =====================
+function myWordsCopyText() {
+  const list = myWords();
+  const lines = list.map(w => [baseForm(w.verb), w.meaning || '', (w.ex1 || '').replace(/\s+/g, ' ')].join(' | '));
+  return 'マイ単語' + list.length + '語（句動詞 | 意味 | 例文）\n' + lines.join('\n');
+}
+function copyTextToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+  return new Promise((resolve, reject) => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy') ? resolve() : reject(new Error('copy failed')); } catch (e) { reject(e); }
+    document.body.removeChild(ta);
+  });
+}
+function refreshMyWordsCopyBtn() {
+  const btn = document.getElementById('my-words-copy-btn');
+  if (btn) btn.hidden = myWords().length === 0;
+}
+document.getElementById('my-words-copy-btn').addEventListener('click', () => {
+  const n = myWords().length;
+  copyTextToClipboard(myWordsCopyText())
+    .then(() => toast(n + '語をコピーしました。チャットに貼ってください', 3000))
+    .catch(() => toast('コピーできませんでした。もう一度お試しください'));
+});
+
 // ===================== 新規グループ作成時：既存語からの候補検索（AI） =====================
 function findGroupMatchesAndShowModal(groupId, groupLabel, groupNote) {
   if (typeof AI_WORKER_URL === 'undefined' || !AI_WORKER_URL) return; // Worker未設定なら何もしない
@@ -2479,6 +2511,7 @@ function pushMyDictToCloud() {
 function renderMyWordList() {
   const list = myWords();
   document.getElementById('my-count').textContent = list.length;
+  refreshMyWordsCopyBtn();
   const el = document.getElementById('my-word-list');
   el.innerHTML = '';
   if (!list.length) { el.innerHTML = '<div class="empty-note">まだ追加した単語はありません</div>'; return; }

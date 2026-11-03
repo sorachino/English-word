@@ -670,3 +670,14 @@ select{
 .pv-wrong-note{margin-top:12px; padding:9px 12px; border-left:3px solid var(--hanko); background:var(--hanko-soft); border-radius:0 6px 6px 0; font-size:13px; line-height:1.7; color:var(--ink);}
 .pv-wrong-note .pwn-en{display:block; margin-top:2px; font-family:"JetBrains Mono",monospace; font-weight:700; font-size:14px; color:var(--navy);}
 
+/* 結果の答え合わせ（前後の問題を切り替えるシート）：問題ごとに高さが変わらないよう固定する。
+   内容が短いときは下に空白ができ、長いときはシートの中でスクロールする。 */
+#dd-card{
+  height:82vh; height:82dvh;
+  display:flex; flex-direction:column;
+  overflow-y:hidden;
+}
+#dd-card .dd-head{flex:none;}
+#dd-card .dd-body{flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+#dd-card .dd-swipe-hint{flex:none;}
+

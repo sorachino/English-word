@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '185'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '186'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -104,6 +104,51 @@ const IRREGULAR = {
   try:'tried tries trying',
   wear:'wore worn wearing', win:'won winning', wind:'wound winding',
   write:'wrote written writing',
+  // 過去形・過去分詞が語幹と大きく違う動詞（マイ単語の例文が torn などの形でも空欄化できるようにする）
+  bear:'bore borne bearing',
+  become:'became becoming',
+  begin:'began begun beginning',
+  bind:'bound binding',
+  bleed:'bled bleeding',
+  choose:'chose chosen choosing',
+  cling:'clung clinging',
+  creep:'crept creeping',
+  drink:'drank drunk drinking',
+  drive:'drove driven driving',
+  feed:'fed feeding',
+  fight:'fought fighting',
+  fling:'flung flinging',
+  fly:'flew flown flying',
+  forget:'forgot forgotten forgetting',
+  forgive:'forgave forgiven forgiving',
+  freeze:'froze frozen freezing',
+  grind:'ground grinding',
+  kneel:'knelt kneeling',
+  lead:'led leading',
+  lie:'lay lain lying',
+  overcome:'overcame overcoming',
+  ring:'rang rung ringing',
+  rise:'rose risen rising',
+  seek:'sought seeking',
+  shake:'shook shaken shaking',
+  shrink:'shrank shrunk shrinking',
+  sing:'sang sung singing',
+  sleep:'slept sleeping',
+  sling:'slung slinging',
+  spit:'spat spitting',
+  spring:'sprang sprung springing',
+  steal:'stole stolen stealing',
+  string:'strung stringing',
+  swear:'swore sworn swearing',
+  swim:'swam swum swimming',
+  swing:'swung swinging',
+  tear:'tore torn tearing',
+  undergo:'underwent undergone undergoing',
+  understand:'understood understanding',
+  wake:'woke woken waking',
+  weep:'wept weeping',
+  withdraw:'withdrew withdrawn withdrawing',
+  wring:'wrung wringing',
 };
 function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 function headPattern(head) {

@@ -15,5 +15,19 @@ const MY_CHUNK_DATA = {
    "cancel a pension fund",
    "set up a pension fund"
   ]
+ },
+ "go off of": {
+  "chunk": "go off of rumors",
+  "ja": "うわさに基づいて判断する",
+  "wrong": [
+   "うわさを聞き流す",
+   "うわさを広める",
+   "うわさに反論する"
+  ],
+  "wrongEn": [
+   "brush off rumors",
+   "pass on rumors",
+   "push back against rumors"
+  ]
  }
 };

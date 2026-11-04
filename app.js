@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '186'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '187'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -4081,7 +4081,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       showIdiomOrderQuestion(q);
     } else {
       document.getElementById('idiom-q-example').innerHTML = pc
-        ? `<span class="idiom-chunk">${chunkHtml(pc)}</span> <button class="speak-btn" data-text="${escAttr(pc.chunk)}">🔊</button><div class="idiom-chunk-hint">日本語にすると？（太字の前置詞に注目）</div>`
+        ? `<span class="idiom-chunk">${chunkHtml(pc)}</span> <button class="speak-btn" data-text="${escAttr(pc.chunk)}">🔊</button><div class="idiom-chunk-hint">日本語にすると？（太字の${q.item.category.startsWith('prep') ? '前置詞' : '表現'}に注目）</div>`
         : `${escHtml(q.item.ex)} <button class="speak-btn" data-text="${escAttr(q.item.ex)}">🔊</button>`;
       const group = document.getElementById('idiom-choice-group');
       group.innerHTML = q.choices.map((c, i) => `<button class="choice-btn" data-idx="${i}">${escHtml(c)}</button>`).join('');
@@ -4115,13 +4115,25 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   // 群前置詞は、前置詞とその前後の語を切り出したチャンク（例: two months ahead of us）で出題する。
   // チャンクのデータが無い語は、従来どおり例文で出題する。
   function prepChunkOf(item) {
-    if (typeof PREP_CHUNK_DATA === 'undefined' || !item.category || !item.category.startsWith('prep')) return null;
-    return PREP_CHUNK_DATA[String(item.no)] || null;
+    if (!item.category) return null;
+    // 群前置詞は prep-chunks.js、それ以外の熟語は idiom-chunks.js
+    if (item.category.startsWith('prep')) {
+      return (typeof PREP_CHUNK_DATA !== 'undefined' && PREP_CHUNK_DATA[String(item.no)]) || null;
+    }
+    return (typeof IDIOM_CHUNK_DATA !== 'undefined' && IDIOM_CHUNK_DATA[String(item.no)]) || null;
   }
+  // hl は文字列、または複数か所（動詞と前置詞が離れる型: accuse ... of）の配列。chunkの中で順に探して太字にする
   function chunkHtml(pc) {
-    const i = pc.chunk.toLowerCase().indexOf(pc.hl.toLowerCase());
-    if (i < 0) return escHtml(pc.chunk);
-    return escHtml(pc.chunk.slice(0, i)) + '<b class="hl">' + escHtml(pc.chunk.slice(i, i + pc.hl.length)) + '</b>' + escHtml(pc.chunk.slice(i + pc.hl.length));
+    const segs = Array.isArray(pc.hl) ? pc.hl : [pc.hl];
+    const low = pc.chunk.toLowerCase();
+    let pos = 0, html = '';
+    for (const s of segs) {
+      const i = low.indexOf(String(s).toLowerCase(), pos);
+      if (i < 0) continue;
+      html += escHtml(pc.chunk.slice(pos, i)) + '<b class="hl">' + escHtml(pc.chunk.slice(i, i + s.length)) + '</b>';
+      pos = i + s.length;
+    }
+    return html + escHtml(pc.chunk.slice(pos));
   }
 
   function showIdiomOrderQuestion(q) {

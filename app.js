@@ -37,6 +37,7 @@ const LS = {
 // ページ読み込み時にこれより先にinitFirebase()を呼ぶため、
 // 「宣言前に変数へアクセスした」エラーで以降の処理が全て止まる不具合があった）
 let fbDB = null;
+let fbAuthWatchStarted = false;
 
 function loadJSON(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
@@ -2792,6 +2793,26 @@ function initFirebase() {
   if (typeof FIREBASE_CONFIG === 'undefined' || !FIREBASE_CONFIG.apiKey || !FIREBASE_CONFIG.databaseURL) return null;
   try {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    // DBのルールは「認証済みユーザーのみ」に制限するため、匿名認証でサインインする。
+    // サインインが終わるまでは null を返し、呼び出し側は従来どおり「未接続」として扱う。
+    // 認証状態の復元（再訪時）を待つため、currentUser の即値ではなく onAuthStateChanged で見る。
+    const auth = firebase.auth();
+    if (!auth.currentUser) {
+      if (!fbAuthWatchStarted) {
+        fbAuthWatchStarted = true;
+        auth.onAuthStateChanged(user => {
+          if (user) {
+            // 起動時に未接続で取りこぼしたクラウド同期を、サインイン完了後にやり直す
+            pullGlobalGroupDefs();
+            const nick = getNickname();
+            if (nick) pullAndMergeCloud(nick);
+          } else {
+            auth.signInAnonymously().catch(() => {});
+          }
+        });
+      }
+      return null;
+    }
     fbDB = firebase.database();
   } catch (e) { fbDB = null; }
   return fbDB;

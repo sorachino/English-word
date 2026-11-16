@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '187'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '189'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1053,6 +1053,7 @@ function showSelfGrade(userVal, q) {
 
 function resolveChoice(chosen, btnEl) {
   const q = quizState.questions[quizState.idx];
+  if (q.resolved) return; // 連打などで二重に採点して音が重ならないようにする
   const correctText = quizState.mode === 'reverse' ? (q.chunk ? q.chunk.ja : q.meaning) : q.answer;
   const ok = chosen === correctText;
   document.querySelectorAll('.choice-btn').forEach(b => {
@@ -1097,23 +1098,32 @@ function scheduleChime(ctx, correct) {
     beep(ctx, now + 0.1, 174.61, 0.2, 'square', 0.10);
   }
 }
+let soundSeq = 0;
+let lastChimeAt = 0;
 function playResultSound(correct) {
   if (loadJSON('pv_sound_off', false)) return;
+  const mySeq = ++soundSeq;
+  // 後から来た音があれば古い予約は鳴らさない／ごく短時間の重複も鳴らさない
+  const fire = (c) => {
+    if (mySeq !== soundSeq) return;
+    const nowMs = Date.now();
+    if (nowMs - lastChimeAt < 120) return;
+    lastChimeAt = nowMs;
+    scheduleChime(c, correct);
+  };
   try {
     const ctx = getAudioCtx();
     if (ctx.state === 'running') {
-      scheduleChime(ctx, correct);
+      fire(ctx);
       return;
     }
     // suspended（休止中）や電話の割り込み後などは、復帰を待ってから鳴らす
     ctx.resume().then(() => {
-      try { scheduleChime(ctx, correct); } catch (e) { /* 無視 */ }
+      try { fire(ctx); } catch (e) { /* 無視 */ }
     }).catch(() => {
-      // 復帰に失敗した場合はコンテキストを作り直して一度だけ再挑戦する
       try {
         audioCtx = null;
-        const ctx2 = getAudioCtx();
-        scheduleChime(ctx2, correct);
+        fire(getAudioCtx());
       } catch (e2) { /* それでも駄目なら無音のまま諦める */ }
     });
   } catch (e) { /* AudioContextが使えない環境は無音のまま無視 */ }
@@ -1383,6 +1393,7 @@ refreshSoundToggle();
 
 function finishQuestion(ok, method, delay, userAnswer) {
   const q = quizState.questions[quizState.idx];
+  if (q.resolved) return;
   q.resolved = true; q.method = method;
   const key = wordKey(q.word);
   recordResult(key, ok ? method : 'wrong');

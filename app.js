@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '188'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '190'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1057,6 +1057,7 @@ function showSelfGrade(userVal, q) {
 
 function resolveChoice(chosen, btnEl) {
   const q = quizState.questions[quizState.idx];
+  if (q.resolved) return; // 連打などで二重に採点して音が重ならないようにする
   const correctText = quizState.mode === 'reverse' ? (q.chunk ? q.chunk.ja : q.meaning) : q.answer;
   const ok = chosen === correctText;
   document.querySelectorAll('.choice-btn').forEach(b => {
@@ -1101,23 +1102,32 @@ function scheduleChime(ctx, correct) {
     beep(ctx, now + 0.1, 174.61, 0.2, 'square', 0.10);
   }
 }
+let soundSeq = 0;
+let lastChimeAt = 0;
 function playResultSound(correct) {
   if (loadJSON('pv_sound_off', false)) return;
+  const mySeq = ++soundSeq;
+  // 後から来た音があれば古い予約は鳴らさない／ごく短時間の重複も鳴らさない
+  const fire = (c) => {
+    if (mySeq !== soundSeq) return;
+    const nowMs = Date.now();
+    if (nowMs - lastChimeAt < 120) return;
+    lastChimeAt = nowMs;
+    scheduleChime(c, correct);
+  };
   try {
     const ctx = getAudioCtx();
     if (ctx.state === 'running') {
-      scheduleChime(ctx, correct);
+      fire(ctx);
       return;
     }
     // suspended（休止中）や電話の割り込み後などは、復帰を待ってから鳴らす
     ctx.resume().then(() => {
-      try { scheduleChime(ctx, correct); } catch (e) { /* 無視 */ }
+      try { fire(ctx); } catch (e) { /* 無視 */ }
     }).catch(() => {
-      // 復帰に失敗した場合はコンテキストを作り直して一度だけ再挑戦する
       try {
         audioCtx = null;
-        const ctx2 = getAudioCtx();
-        scheduleChime(ctx2, correct);
+        fire(getAudioCtx());
       } catch (e2) { /* それでも駄目なら無音のまま諦める */ }
     });
   } catch (e) { /* AudioContextが使えない環境は無音のまま無視 */ }
@@ -1387,6 +1397,7 @@ refreshSoundToggle();
 
 function finishQuestion(ok, method, delay, userAnswer) {
   const q = quizState.questions[quizState.idx];
+  if (q.resolved) return;
   q.resolved = true; q.method = method;
   const key = wordKey(q.word);
   recordResult(key, ok ? method : 'wrong');
@@ -1495,6 +1506,7 @@ document.getElementById('next-btn').addEventListener('click', () => {
 });
 
 function finishQuiz() {
+  if (window.__mixAdvance && window.__mixAdvance('pv', quizState)) return; // ミックス中は次の問題へ
   document.getElementById('progress-fill').style.width = '100%';
   document.getElementById('quiz-play').hidden = true;
   document.getElementById('quiz-done').hidden = false;
@@ -3838,6 +3850,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   function poolForContent(content) {
     if (content === 'prep') return IDIOM_DATA.filter(it => PREP_CATEGORIES.includes(it.category));
     if (content === 'other') return IDIOM_DATA.filter(it => !PREP_CATEGORIES.includes(it.category));
+    if (content === 'all') return IDIOM_DATA.slice(); // ミックス用：全カテゴリ
     return [];
   }
 
@@ -3845,8 +3858,9 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   let quizContent = localStorage.getItem('pv_quiz_content') || 'pv';
   function refreshQuizContentUI() {
     document.getElementById('pv-quiz-options').hidden = quizContent !== 'pv';
-    document.getElementById('idiom-quiz-options').hidden = quizContent === 'pv';
-    if (quizContent !== 'pv') refreshIdiomQuickActions();
+    document.getElementById('idiom-quiz-options').hidden = quizContent === 'pv' || quizContent === 'mix';
+    document.getElementById('mix-quiz-options').hidden = quizContent !== 'mix';
+    if (quizContent === 'prep' || quizContent === 'other') refreshIdiomQuickActions();
   }
   document.querySelectorAll('#quiz-content-group .chip').forEach(chip => {
     chip.classList.toggle('active', chip.dataset.content === quizContent);
@@ -4389,12 +4403,131 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   });
 
   function finishIdiomQuiz() {
+    if (mixAdvance('idiom', idiomQuizState)) return; // ミックス中は次の問題へ
     document.getElementById('idiom-quiz-play').hidden = true;
     document.getElementById('idiom-quiz-done').hidden = false;
     document.getElementById('idiom-done-score-num').textContent = idiomQuizState.correctCount;
     document.getElementById('idiom-done-score-total').textContent = idiomQuizState.questions.length;
     refreshIdiomQuickActions();
   }
+
+  // ---------- ミックス（句動詞と熟語を混ぜて出題） ----------
+  // 既存の句動詞クイズ・熟語クイズを1問ずつ呼び出して回す。記録（苦手語・SRS・正解数・ランキング）は各クイズの処理がそのまま行う
+  let mixCount = parseInt(localStorage.getItem('pv_mix_count'), 10) || 20;
+  document.querySelectorAll('#mix-count-group .chip').forEach(chip => {
+    chip.classList.toggle('active', parseInt(chip.dataset.count, 10) === mixCount);
+    chip.addEventListener('click', () => {
+      mixCount = parseInt(chip.dataset.count, 10);
+      document.querySelectorAll('#mix-count-group .chip').forEach(c => c.classList.toggle('active', c === chip));
+      localStorage.setItem('pv_mix_count', String(mixCount));
+    });
+  });
+
+  let mixState = null;
+
+  function startMixQuiz() {
+    const pvCount = allWords().length;
+    const idiomCountAll = IDIOM_DATA.length;
+    // 句動詞・熟語の語数に応じた割合になるよう、全体から無作為に選ぶ
+    const kinds = [];
+    for (let i = 0; i < pvCount; i++) kinds.push('pv');
+    for (let i = 0; i < idiomCountAll; i++) kinds.push('idiom');
+    shuffle(kinds);
+    const picked = kinds.slice(0, Math.min(mixCount, kinds.length));
+    const nPv = picked.filter(k => k === 'pv').length;
+    const nIdiom = picked.length - nPv;
+    const pvQs = nPv ? buildQuiz(0, nPv, false, false, false) : [];
+    const idiomQs = nIdiom ? buildIdiomQuiz(nIdiom, 'all', null) : [];
+    const plan = shuffle([
+      ...pvQs.map(q => ({ type: 'pv', q })),
+      ...idiomQs.map(q => ({ type: 'idiom', q })),
+    ]);
+    if (!plan.length) { toast('出題できる語がありませんでした'); return; }
+    mixState = { plan, idx: 0, correct: 0, results: [], sessionId: Date.now(), cur: null };
+    document.getElementById('quiz-setup').hidden = true;
+    runMixStep();
+  }
+
+  function runMixStep() {
+    const step = mixState.plan[mixState.idx];
+    const total = mixState.plan.length;
+    document.getElementById('quiz-done').hidden = true;
+    document.getElementById('quiz-match').hidden = true;
+    document.getElementById('idiom-quiz-done').hidden = true;
+    const pct = (100 * mixState.idx / total) + '%';
+    if (step.type === 'pv') {
+      quizState = { questions: [step.q], idx: 0, correctCount: 0, results: [], mode: 'normal', sessionId: mixState.sessionId };
+      mixState.cur = quizState;
+      document.getElementById('idiom-quiz-play').hidden = true;
+      document.getElementById('quiz-play').hidden = false;
+      showQuestion();
+      document.getElementById('q-idx').textContent = mixState.idx + 1;
+      document.getElementById('q-total').textContent = total;
+      document.getElementById('progress-fill').style.width = pct;
+    } else {
+      idiomQuizState = { questions: [step.q], idx: 0, correctCount: 0, mode: 'choice', sessionId: mixState.sessionId };
+      mixState.cur = idiomQuizState;
+      document.getElementById('quiz-play').hidden = true;
+      document.getElementById('idiom-quiz-play').hidden = false;
+      showIdiomQuestion();
+      document.getElementById('idiom-q-idx').textContent = mixState.idx + 1;
+      document.getElementById('idiom-q-total').textContent = total;
+      document.getElementById('idiom-progress-fill').style.width = pct;
+    }
+  }
+
+  // 各クイズが「全問終了」に達したときに呼ばれる。ミックス中なら結果を記録して次へ進み、trueを返す
+  function mixAdvance(type, state) {
+    if (!mixState || mixState.cur !== state) return false;
+    const step = mixState.plan[mixState.idx];
+    let ok, label;
+    if (type === 'pv') {
+      const r = state.results[0];
+      ok = !!(r && r.ok);
+      label = r ? r.verb : step.q.answer;
+      mixState.results.push({ type: 'pv', ok, label, word: step.q.word });
+    } else {
+      ok = !!step.q.correct;
+      label = step.q.item.phrase;
+      mixState.results.push({ type: 'idiom', ok, label, item: step.q.item });
+    }
+    if (ok) mixState.correct++;
+    mixState.idx++;
+    if (mixState.idx >= mixState.plan.length) finishMixQuiz();
+    else runMixStep();
+    return true;
+  }
+  window.__mixAdvance = mixAdvance;
+
+  function finishMixQuiz() {
+    const ms = mixState;
+    mixState = null;
+    document.getElementById('quiz-play').hidden = true;
+    document.getElementById('idiom-quiz-play').hidden = true;
+    document.getElementById('quiz-done').hidden = false;
+    document.getElementById('done-score-num').textContent = ms.correct;
+    document.getElementById('done-score-total').textContent = ms.results.length;
+    const list = document.getElementById('done-list');
+    list.innerHTML = '';
+    const pvItems = ms.results.filter(r => r.type === 'pv').map(r => ({ verb: r.label, ok: r.ok, word: r.word }));
+    let pvIdx = 0;
+    ms.results.forEach(r => {
+      const div = document.createElement('div');
+      div.className = 'word-item done-item' + (r.ok ? ' ok' : ' ng');
+      div.innerHTML = `<div class="wi-head"><span class="wi-verb">${escHtml(r.label)}</span><span class="r-mark">${r.ok ? '○' : '×'}</span></div>`;
+      if (r.type === 'pv') {
+        const my = pvIdx++;
+        div.addEventListener('click', () => openDetailModal(pvItems, my));
+      } else {
+        div.addEventListener('click', () => toast(r.item.phrase + '：' + r.item.meaning));
+      }
+      list.appendChild(div);
+    });
+    renderDictProgress();
+    updateStreakPill();
+    refreshIdiomQuickActions();
+  }
+  document.getElementById('mix-start-quiz').addEventListener('click', startMixQuiz);
 
   document.getElementById('idiom-restart-btn').addEventListener('click', () => {
     document.getElementById('idiom-quiz-done').hidden = true;

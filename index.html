@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="188">
+<meta name="build-version" content="190">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -51,6 +51,7 @@
           <button class="chip active" data-content="pv">句動詞</button>
           <button class="chip" data-content="prep">群前置詞</button>
           <button class="chip" data-content="other">それ以外</button>
+          <button class="chip" data-content="mix">ミックス</button>
         </div>
       </div>
       <div id="pv-quiz-options">
@@ -83,6 +84,19 @@
           <button type="button" class="btn-ghost" id="dp-start-unlearned">未学習（<span id="dp-unlearned-num2">0</span>）</button>
         </div>
         <button type="button" class="btn-primary" id="start-matching-btn" hidden>マッチングを始める</button>
+      </div>
+      <div id="mix-quiz-options" hidden>
+        <div class="setup-row">
+          <label>問題数</label>
+          <div class="chip-group" id="mix-count-group">
+            <button class="chip" data-count="10">10</button>
+            <button class="chip active" data-count="20">20</button>
+            <button class="chip" data-count="50">50</button>
+            <button class="chip" data-count="100">100</button>
+          </div>
+        </div>
+        <div class="idiom-chunk-hint">句動詞と熟語（群前置詞を含む全248語）を、語数に応じた割合でランダムに混ぜて出題します。どちらも4択（句動詞は通常モード）です。</div>
+        <button class="btn-primary btn-block" id="mix-start-quiz">クイズをはじめる</button>
       </div>
       <div id="idiom-quiz-options" hidden>
         <div class="setup-row">
@@ -660,14 +674,14 @@
 <script src="firebase-config.js?v=1"></script>
 <script src="tts-config.js?v=2"></script>
 <script src="ai-config.js?v=1"></script>
-<script src="data.js?v=41"></script>
+<script src="data.js?v=42"></script>
 <script src="idioms.js?v=16"></script>
-<script src="dialogues.js?v=30"></script>
-<script src="collocations.js?v=9"></script>
+<script src="dialogues.js?v=31"></script>
+<script src="collocations.js?v=10"></script>
 <script src="prep-chunks.js?v=4"></script>
-<script src="idiom-chunks.js?v=1"></script>
-<script src="pv-chunks.js?v=8"></script>
+<script src="idiom-chunks.js?v=2"></script>
+<script src="pv-chunks.js?v=9"></script>
 <script src="my-chunks.js?v=4"></script>
-<script src="app.js?v=188"></script>
+<script src="app.js?v=190"></script>
 </body>
 </html>

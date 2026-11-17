@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '193'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '194'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -3970,7 +3970,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     });
   });
 
-  let idiomMode = localStorage.getItem('pv_idiom_mode') || 'choice';
+  // 通常＝日本語を見て英語を選ぶ／逆方向＝英語を見て日本語を選ぶ（句動詞クイズと同じ呼び方）／並び替え。
+  // 以前の「4択」（英語→日本語）は、今の「逆方向」と同じ動きなので読み替える。
+  let idiomMode = localStorage.getItem('pv_idiom_mode');
+  if (idiomMode === 'choice') idiomMode = 'reverse';
+  if (!['normal', 'reverse', 'order'].includes(idiomMode)) idiomMode = 'normal';
   document.querySelectorAll('#idiom-mode-group .chip').forEach(chip => {
     chip.classList.toggle('active', chip.dataset.mode === idiomMode);
     chip.addEventListener('click', () => {
@@ -4157,9 +4161,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   }
 
   function startIdiomQuiz(statusFilter) {
-    const qs = buildIdiomQuiz(idiomCount, quizContent, statusFilter);
-    if (!qs.length) { toast('該当する熟語がありませんでした'); return; }
-    idiomQuizState = { questions: qs, idx: 0, correctCount: 0, mode: idiomMode, sessionId: Date.now() };
+    const built = buildIdiomQuiz(idiomCount, quizContent, statusFilter);
+    if (!built.length) { toast('該当する熟語がありませんでした'); return; }
+    // 通常＝日本語→英語。英語の不正解が用意できない語は、英語→日本語のまま出す
+    const qs = idiomMode === 'normal' ? built.map(q => makeIdiomJaEnQuestion(q.item) || q) : built;
+    idiomQuizState = { questions: qs, idx: 0, correctCount: 0, mode: idiomMode === 'order' ? 'order' : 'choice', sessionId: Date.now() };
     document.getElementById('quiz-setup').hidden = true;
     document.getElementById('quiz-play').hidden = true;
     document.getElementById('quiz-done').hidden = true;

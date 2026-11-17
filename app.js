@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '192'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '193'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -4148,6 +4148,14 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     });
   }
 
+  // 日本語を見て英語のチャンクを選ぶ問題（ミックスの「通常」向き）。不正解の英語は chunk の wrongEn を使う。
+  // wrongEn が無い語は作れないので null を返し、呼び出し側は英語→日本語の問題のままにする。
+  function makeIdiomJaEnQuestion(it) {
+    const pc = prepChunkOf(it);
+    if (!pc || !pc.wrongEn || pc.wrongEn.length < 3) return null;
+    return { item: it, dir: 'ja2en', choices: shuffle([pc.chunk, ...pc.wrongEn.slice(0, 3)]), correctText: pc.chunk, resolved: false, correct: false };
+  }
+
   function startIdiomQuiz(statusFilter) {
     const qs = buildIdiomQuiz(idiomCount, quizContent, statusFilter);
     if (!qs.length) { toast('該当する熟語がありませんでした'); return; }
@@ -4176,14 +4184,16 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-q-category').textContent = q.item.categoryLabel;
     const isOrder = idiomQuizState.mode === 'order';
     const pc = prepChunkOf(q.item);
-    document.getElementById('idiom-q-phrase').hidden = isOrder || !!pc;
+    document.getElementById('idiom-q-phrase').hidden = isOrder || !!pc;  // ja2en もチャンクがあるので非表示
     document.getElementById('idiom-q-phrase').textContent = q.item.phrase;
     document.getElementById('idiom-choice-mode-block').hidden = isOrder;
     document.getElementById('idiom-order-mode-block').hidden = !isOrder;
     if (isOrder) {
       showIdiomOrderQuestion(q);
     } else {
-      document.getElementById('idiom-q-example').innerHTML = pc
+      document.getElementById('idiom-q-example').innerHTML = (q.dir === 'ja2en' && pc)
+        ? `<span class="idiom-chunk">${escHtml(pc.ja)}</span><div class="idiom-chunk-hint">英語にすると？</div>`
+        : pc
         ? `<span class="idiom-chunk">${chunkHtml(pc)}</span> <button class="speak-btn" data-text="${escAttr(pc.chunk)}">🔊</button><div class="idiom-chunk-hint">日本語にすると？（太字の${q.item.category.startsWith('prep') ? '前置詞' : '表現'}に注目）</div>`
         : `${escHtml(q.item.ex)} <button class="speak-btn" data-text="${escAttr(q.item.ex)}">🔊</button>`;
       const group = document.getElementById('idiom-choice-group');
@@ -4541,6 +4551,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       document.getElementById('q-total').textContent = total;
       document.getElementById('progress-fill').style.width = pct;
     } else {
+      const idiomDir = mixDir === 'random' ? (Math.random() < 0.5 ? 'reverse' : 'normal') : mixDir;
+      if (idiomDir === 'normal') {
+        const jq = makeIdiomJaEnQuestion(step.q.item);
+        if (jq) step.q = jq;
+      }
       idiomQuizState = { questions: [step.q], idx: 0, correctCount: 0, mode: 'choice', sessionId: mixState.sessionId };
       mixState.cur = idiomQuizState;
       document.getElementById('quiz-play').hidden = true;

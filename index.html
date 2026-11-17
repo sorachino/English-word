@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="190">
+<meta name="build-version" content="191">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -503,6 +503,10 @@
         <span>あなたの表示名：<b id="lb-my-name">未設定</b></span>
         <button class="btn-ghost" id="lb-rename-btn">変更</button>
       </div>
+      <div class="lb-nickname-row" style="gap:8px;flex-wrap:wrap">
+        <button class="btn-ghost" id="lb-pull-btn">クラウドから取り込む</button>
+        <button class="btn-ghost" id="lb-push-btn">この端末の記録をクラウドへ送る</button>
+      </div>
       <div class="lb-list" id="leaderboard-list"></div>
       <div class="empty-note" id="leaderboard-empty" hidden>まだ記録がありません。</div>
       <div class="empty-note" id="leaderboard-setup-note">ランキング機能は設定が完了すると使えるようになります。</div>
@@ -682,6 +686,6 @@
 <script src="idiom-chunks.js?v=2"></script>
 <script src="pv-chunks.js?v=9"></script>
 <script src="my-chunks.js?v=4"></script>
-<script src="app.js?v=190"></script>
+<script src="app.js?v=191"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '190'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '191'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -2955,9 +2955,9 @@ function pushMyWordsToCloud() {
   db.ref(`users/${nickname}/myWords`).set(myWords()).catch(() => {});
 }
 
-function pullAndMergeCloud(nickname) {
+function pullAndMergeCloud(nickname, verbose) {
   const db = initFirebase();
-  if (!db || !nickname) return;
+  if (!db || !nickname) { if (verbose) toast('クラウドに接続中です。数秒後にもう一度押してください', 3000); return; }
 
   db.ref(`users/${nickname}`).get().then(snap => {
     const cloud = snap.val() || {};
@@ -3102,9 +3102,73 @@ function pullAndMergeCloud(nickname) {
       if (mydictView && mydictView.classList.contains('active')) renderMyDictList();
       toast('前回までの記録を引き継ぎました');
       maybeShowStreakCelebration();
+    } else if (verbose) {
+      const days = cloud.log ? Object.keys(cloud.log).length : 0;
+      toast(Object.keys(cloud).length
+        ? `クラウドに新しい記録はありませんでした（クラウド上の記録：${days}日分）`
+        : `クラウドに「${nickname}」の記録がありません`, 4000);
     }
-  }).catch(() => {});
+  }).catch(e => { if (verbose) toast('取り込みに失敗しました：' + ((e && e.message) || e), 5000); });
 }
+
+// この端末の記録を、クラウド上のこの名前の記録へ全部送る（別端末へ引き継ぐための復旧用）。
+// 回答数（日別ログ・回答履歴）は、クラウドと端末の多い方を残す。苦手語・復習データは端末の内容で置き換える。
+function pushAllToCloud(nickname) {
+  const db = initFirebase();
+  if (!db || !nickname) { toast('クラウドに接続中です。数秒後にもう一度押してください', 3000); return; }
+  db.ref(`users/${nickname}`).get().then(snap => {
+    const cloud = snap.val() || {};
+    const updates = {};
+    const base = `users/${nickname}`;
+    const weak = loadJSON(LS.WEAK, {}), srs = loadJSON(LS.SRS, {});
+    Object.keys(weak).forEach(k => { updates[`${base}/weak/${sanitizeKey(k)}`] = weak[k]; });
+    Object.keys(srs).forEach(k => { updates[`${base}/srs/${sanitizeKey(k)}`] = srs[k]; });
+    const mergeAnswered = (local, cl) => {
+      const out = {};
+      Object.keys(local).forEach(k => {
+        const c = (cl && cl[sanitizeKey(k)]) || {};
+        const l = local[k] || {};
+        out[sanitizeKey(k)] = {
+          ok: Math.max(l.ok || 0, c.ok || 0),
+          ng: Math.max(l.ng || 0, c.ng || 0),
+          totalNg: Math.max(typeof l.totalNg === 'number' ? l.totalNg : (l.ng || 0), typeof c.totalNg === 'number' ? c.totalNg : (c.ng || 0)),
+        };
+      });
+      return out;
+    };
+    const ans = mergeAnswered(loadJSON(LS_ANSWERED, {}), cloud.answered);
+    Object.keys(ans).forEach(k => { updates[`${base}/answered/${k}`] = ans[k]; });
+    const log = loadJSON(LS.LOG, {});
+    let logDays = 0;
+    Object.keys(log).forEach(d => {
+      const c = (cloud.log && cloud.log[d]) || {};
+      updates[`${base}/log/${d}`] = { solved: Math.max(log[d].solved || 0, c.solved || 0), correct: Math.max(log[d].correct || 0, c.correct || 0) };
+      logDays++;
+    });
+    const mw = myWords(); if (mw.length) updates[`${base}/myWords`] = mw;
+    const md = myDictWords(); if (md.length) updates[`${base}/myDict`] = md;
+    const iw = loadJSON(LS_IDIOM_WEAK, {}), is = loadJSON(LS_IDIOM_SRS, {});
+    Object.keys(iw).forEach(k => { updates[`${base}/idiomWeak/${sanitizeKey(k)}`] = iw[k]; });
+    Object.keys(is).forEach(k => { updates[`${base}/idiomSrs/${sanitizeKey(k)}`] = is[k]; });
+    const ia = mergeAnswered(loadJSON(LS_IDIOM_ANSWERED, {}), cloud.idiomAnswered);
+    Object.keys(ia).forEach(k => { updates[`${base}/idiomAnswered/${k}`] = ia[k]; });
+    if (!Object.keys(updates).length) { toast('この端末に送る記録がありません'); return; }
+    return db.ref().update(updates).then(() => {
+      toast(`クラウドへ送りました（回答履歴${Object.keys(ans).length + Object.keys(ia).length}語分・${logDays}日分）`, 4000);
+    });
+  }).catch(e => toast('送信に失敗しました：' + ((e && e.message) || e), 5000));
+}
+document.getElementById('lb-push-btn').addEventListener('click', () => {
+  const name = getNickname();
+  if (!name) { toast('先に表示名を設定してください'); return; }
+  if (!window.confirm(`この端末の記録を、クラウド上の「${name}」へ送ります。\n別の端末の苦手語・復習データは、この端末の内容で置き換わります（回答数は多い方を残します）。よろしいですか？`)) return;
+  pushAllToCloud(name);
+});
+document.getElementById('lb-pull-btn').addEventListener('click', () => {
+  const name = getNickname();
+  if (!name) { toast('先に表示名を設定してください'); return; }
+  pullAndMergeCloud(name, true);
+});
 
 function weekKey(d = new Date()) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));

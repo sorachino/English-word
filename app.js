@@ -578,6 +578,10 @@ function pushAnswerLogToCloud(dateKey, entries) {
   const nickname = getNickname();
   if (!nickname) return;
   db.ref(`users/${nickname}/answerLog/${dateKey}`).set(entries).catch(() => {});
+  // 日別の回答数（数字のみ）を公開カウンタにも記録する。
+  // Muse がログインなしでその日の進捗（解いた問題数）を確認するために使う。
+  // 回答内容は含まない。読み取り側は dailyCounts のみ公開ルールで許可される。
+  db.ref(`dailyCounts/${nickname}/${dateKey}`).set(entries.length).catch(() => {});
 }
 function todayKey(offset = 0) {
   const d = new Date();

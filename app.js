@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '191'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '192'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -4487,6 +4487,17 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     });
   });
 
+  let mixDir = localStorage.getItem('pv_mix_dir') || 'normal';
+  if (!['normal', 'reverse', 'random'].includes(mixDir)) mixDir = 'normal';
+  document.querySelectorAll('#mix-dir-group .chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.dir === mixDir);
+    chip.addEventListener('click', () => {
+      mixDir = chip.dataset.dir;
+      document.querySelectorAll('#mix-dir-group .chip').forEach(c => c.classList.toggle('active', c === chip));
+      localStorage.setItem('pv_mix_dir', mixDir);
+    });
+  });
+
   let mixState = null;
 
   function startMixQuiz() {
@@ -4520,7 +4531,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-quiz-done').hidden = true;
     const pct = (100 * mixState.idx / total) + '%';
     if (step.type === 'pv') {
-      quizState = { questions: [step.q], idx: 0, correctCount: 0, results: [], mode: 'normal', sessionId: mixState.sessionId };
+      const pvMode = mixDir === 'random' ? (Math.random() < 0.5 ? 'reverse' : 'normal') : mixDir;
+      quizState = { questions: [step.q], idx: 0, correctCount: 0, results: [], mode: pvMode, sessionId: mixState.sessionId };
       mixState.cur = quizState;
       document.getElementById('idiom-quiz-play').hidden = true;
       document.getElementById('quiz-play').hidden = false;

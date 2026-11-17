@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '191'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '194'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -3970,7 +3970,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     });
   });
 
-  let idiomMode = localStorage.getItem('pv_idiom_mode') || 'choice';
+  // 通常＝日本語を見て英語を選ぶ／逆方向＝英語を見て日本語を選ぶ（句動詞クイズと同じ呼び方）／並び替え。
+  // 以前の「4択」（英語→日本語）は、今の「逆方向」と同じ動きなので読み替える。
+  let idiomMode = localStorage.getItem('pv_idiom_mode');
+  if (idiomMode === 'choice') idiomMode = 'reverse';
+  if (!['normal', 'reverse', 'order'].includes(idiomMode)) idiomMode = 'normal';
   document.querySelectorAll('#idiom-mode-group .chip').forEach(chip => {
     chip.classList.toggle('active', chip.dataset.mode === idiomMode);
     chip.addEventListener('click', () => {
@@ -4148,10 +4152,20 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     });
   }
 
+  // 日本語を見て英語のチャンクを選ぶ問題（ミックスの「通常」向き）。不正解の英語は chunk の wrongEn を使う。
+  // wrongEn が無い語は作れないので null を返し、呼び出し側は英語→日本語の問題のままにする。
+  function makeIdiomJaEnQuestion(it) {
+    const pc = prepChunkOf(it);
+    if (!pc || !pc.wrongEn || pc.wrongEn.length < 3) return null;
+    return { item: it, dir: 'ja2en', choices: shuffle([pc.chunk, ...pc.wrongEn.slice(0, 3)]), correctText: pc.chunk, resolved: false, correct: false };
+  }
+
   function startIdiomQuiz(statusFilter) {
-    const qs = buildIdiomQuiz(idiomCount, quizContent, statusFilter);
-    if (!qs.length) { toast('該当する熟語がありませんでした'); return; }
-    idiomQuizState = { questions: qs, idx: 0, correctCount: 0, mode: idiomMode, sessionId: Date.now() };
+    const built = buildIdiomQuiz(idiomCount, quizContent, statusFilter);
+    if (!built.length) { toast('該当する熟語がありませんでした'); return; }
+    // 通常＝日本語→英語。英語の不正解が用意できない語は、英語→日本語のまま出す
+    const qs = idiomMode === 'normal' ? built.map(q => makeIdiomJaEnQuestion(q.item) || q) : built;
+    idiomQuizState = { questions: qs, idx: 0, correctCount: 0, mode: idiomMode === 'order' ? 'order' : 'choice', sessionId: Date.now() };
     document.getElementById('quiz-setup').hidden = true;
     document.getElementById('quiz-play').hidden = true;
     document.getElementById('quiz-done').hidden = true;
@@ -4176,14 +4190,16 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-q-category').textContent = q.item.categoryLabel;
     const isOrder = idiomQuizState.mode === 'order';
     const pc = prepChunkOf(q.item);
-    document.getElementById('idiom-q-phrase').hidden = isOrder || !!pc;
+    document.getElementById('idiom-q-phrase').hidden = isOrder || !!pc;  // ja2en もチャンクがあるので非表示
     document.getElementById('idiom-q-phrase').textContent = q.item.phrase;
     document.getElementById('idiom-choice-mode-block').hidden = isOrder;
     document.getElementById('idiom-order-mode-block').hidden = !isOrder;
     if (isOrder) {
       showIdiomOrderQuestion(q);
     } else {
-      document.getElementById('idiom-q-example').innerHTML = pc
+      document.getElementById('idiom-q-example').innerHTML = (q.dir === 'ja2en' && pc)
+        ? `<span class="idiom-chunk">${escHtml(pc.ja)}</span><div class="idiom-chunk-hint">英語にすると？</div>`
+        : pc
         ? `<span class="idiom-chunk">${chunkHtml(pc)}</span> <button class="speak-btn" data-text="${escAttr(pc.chunk)}">🔊</button><div class="idiom-chunk-hint">日本語にすると？（太字の${q.item.category.startsWith('prep') ? '前置詞' : '表現'}に注目）</div>`
         : `${escHtml(q.item.ex)} <button class="speak-btn" data-text="${escAttr(q.item.ex)}">🔊</button>`;
       const group = document.getElementById('idiom-choice-group');
@@ -4487,6 +4503,17 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     });
   });
 
+  let mixDir = localStorage.getItem('pv_mix_dir') || 'normal';
+  if (!['normal', 'reverse', 'random'].includes(mixDir)) mixDir = 'normal';
+  document.querySelectorAll('#mix-dir-group .chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.dir === mixDir);
+    chip.addEventListener('click', () => {
+      mixDir = chip.dataset.dir;
+      document.querySelectorAll('#mix-dir-group .chip').forEach(c => c.classList.toggle('active', c === chip));
+      localStorage.setItem('pv_mix_dir', mixDir);
+    });
+  });
+
   let mixState = null;
 
   function startMixQuiz() {
@@ -4520,7 +4547,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-quiz-done').hidden = true;
     const pct = (100 * mixState.idx / total) + '%';
     if (step.type === 'pv') {
-      quizState = { questions: [step.q], idx: 0, correctCount: 0, results: [], mode: 'normal', sessionId: mixState.sessionId };
+      const pvMode = mixDir === 'random' ? (Math.random() < 0.5 ? 'reverse' : 'normal') : mixDir;
+      quizState = { questions: [step.q], idx: 0, correctCount: 0, results: [], mode: pvMode, sessionId: mixState.sessionId };
       mixState.cur = quizState;
       document.getElementById('idiom-quiz-play').hidden = true;
       document.getElementById('quiz-play').hidden = false;
@@ -4529,6 +4557,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       document.getElementById('q-total').textContent = total;
       document.getElementById('progress-fill').style.width = pct;
     } else {
+      const idiomDir = mixDir === 'random' ? (Math.random() < 0.5 ? 'reverse' : 'normal') : mixDir;
+      if (idiomDir === 'normal') {
+        const jq = makeIdiomJaEnQuestion(step.q.item);
+        if (jq) step.q = jq;
+      }
       idiomQuizState = { questions: [step.q], idx: 0, correctCount: 0, mode: 'choice', sessionId: mixState.sessionId };
       mixState.cur = idiomQuizState;
       document.getElementById('quiz-play').hidden = true;

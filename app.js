@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '196'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '197'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -3929,6 +3929,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-quiz-options').hidden = quizContent === 'pv' || quizContent === 'mix';
     document.getElementById('mix-quiz-options').hidden = quizContent !== 'mix';
     if (quizContent === 'prep' || quizContent === 'other') refreshIdiomQuickActions();
+    if (quizContent === 'mix' && window.refreshMixQuickActions) window.refreshMixQuickActions();
   }
   document.querySelectorAll('#quiz-content-group .chip').forEach(chip => {
     chip.classList.toggle('active', chip.dataset.content === quizContent);
@@ -3960,6 +3961,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   // クラウドから熟語の記録を取り込んだ後に、表示中の画面を更新する
   window.refreshIdiomUI = function () {
     refreshIdiomQuickActions();
+    if (window.refreshMixQuickActions) window.refreshMixQuickActions();
     const wrap = document.getElementById('idiom-list-wrap');
     if (wrap && !wrap.hidden) renderIdiomList();
   };
@@ -4523,24 +4525,55 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
 
   let mixState = null;
 
-  function startMixQuiz() {
-    const pvCount = allWords().length;
-    const idiomCountAll = IDIOM_DATA.length;
-    // 句動詞・熟語の語数に応じた割合になるよう、全体から無作為に選ぶ
+  // 苦手語・復習・未学習の語の数（句動詞・熟語それぞれ）。出題の絞り込みと同じ条件で数える
+  function mixPoolCounts() {
+    const pv = { weak: 0, review: 0, unlearned: 0, all: 0 };
+    const id = { weak: 0, review: 0, unlearned: 0, all: 0 };
+    const pvWeak = loadJSON(LS.WEAK, {});
+    allWords().forEach(w => {
+      const k = wordKey(w);
+      pv.all++;
+      if (pvWeak[k]) pv.weak++;
+      const s = srsScore(k); if (s !== null && s <= 0) pv.review++;
+      if (isNewWord(k)) pv.unlearned++;
+    });
+    const idWeak = loadJSON(LS_IDIOM_WEAK, {});
+    IDIOM_DATA.forEach(it => {
+      const k = idiomKey(it);
+      id.all++;
+      if (idWeak[k]) id.weak++;
+      const s = idiomSrsScore(k); if (s !== null && s <= 0) id.review++;
+      if (isNewIdiom(k)) id.unlearned++;
+    });
+    return { pv, id };
+  }
+  function refreshMixQuickActions() {
+    const c = mixPoolCounts();
+    document.getElementById('mix-weak-num').textContent = c.pv.weak + c.id.weak;
+    document.getElementById('mix-review-num').textContent = c.pv.review + c.id.review;
+    document.getElementById('mix-unlearned-num').textContent = c.pv.unlearned + c.id.unlearned;
+  }
+  window.refreshMixQuickActions = refreshMixQuickActions;
+
+  // kind: 'weak' | 'review' | 'unlearned'（通常のクイズの絞り込みと同じ）。無指定なら全体から出す
+  function startMixQuiz(kind) {
+    const c = mixPoolCounts();
+    const key = kind || 'all';
+    // 句動詞・熟語の語数に応じた割合になるよう、対象の語から無作為に選ぶ
     const kinds = [];
-    for (let i = 0; i < pvCount; i++) kinds.push('pv');
-    for (let i = 0; i < idiomCountAll; i++) kinds.push('idiom');
+    for (let i = 0; i < c.pv[key]; i++) kinds.push('pv');
+    for (let i = 0; i < c.id[key]; i++) kinds.push('idiom');
     shuffle(kinds);
     const picked = kinds.slice(0, Math.min(mixCount, kinds.length));
     const nPv = picked.filter(k => k === 'pv').length;
     const nIdiom = picked.length - nPv;
-    const pvQs = nPv ? buildQuiz(0, nPv, false, false, false) : [];
-    const idiomQs = nIdiom ? buildIdiomQuiz(nIdiom, 'all', null) : [];
+    const pvQs = nPv ? buildQuiz(0, nPv, kind === 'weak', kind === 'review', kind === 'unlearned') : [];
+    const idiomQs = nIdiom ? buildIdiomQuiz(nIdiom, 'all', kind || null) : [];
     const plan = shuffle([
       ...pvQs.map(q => ({ type: 'pv', q })),
       ...idiomQs.map(q => ({ type: 'idiom', q })),
     ]);
-    if (!plan.length) { toast('出題できる語がありませんでした'); return; }
+    if (!plan.length) { toast(kind ? '該当する語がありませんでした' : '出題できる語がありませんでした'); return; }
     mixState = { plan, idx: 0, correct: 0, results: [], sessionId: Date.now(), cur: null };
     document.getElementById('quiz-setup').hidden = true;
     runMixStep();
@@ -4630,8 +4663,13 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     renderDictProgress();
     updateStreakPill();
     refreshIdiomQuickActions();
+    refreshMixQuickActions();
+    refreshMixQuickActions();
   }
-  document.getElementById('mix-start-quiz').addEventListener('click', startMixQuiz);
+  document.getElementById('mix-start-quiz').addEventListener('click', () => startMixQuiz());
+  document.getElementById('mix-start-weak').addEventListener('click', () => startMixQuiz('weak'));
+  document.getElementById('mix-start-review').addEventListener('click', () => startMixQuiz('review'));
+  document.getElementById('mix-start-unlearned').addEventListener('click', () => startMixQuiz('unlearned'));
 
   document.getElementById('idiom-restart-btn').addEventListener('click', () => {
     document.getElementById('idiom-quiz-done').hidden = true;

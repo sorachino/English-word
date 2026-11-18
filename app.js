@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '195'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '196'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -3760,8 +3760,9 @@ const LS_IDIOM_SRS = 'pv_idiom_srs';
 function idiomKey(it) { return 'i' + it.no; }
 function recordIdiomAnswered(key, ok) {
   const data = loadJSON(LS_IDIOM_ANSWERED, {});
-  if (!data[key]) data[key] = { ok: 0, ng: 0 };
-  if (ok) { data[key].ok++; data[key].ng = 0; } else { data[key].ng++; }
+  if (!data[key]) data[key] = { ok: 0, ng: 0, totalNg: 0 };
+  if (typeof data[key].totalNg !== 'number') data[key].totalNg = data[key].ng || 0; // 旧データ互換：現在の連続誤答分だけは救済
+  if (ok) { data[key].ok++; data[key].ng = 0; } else { data[key].ng++; data[key].totalNg++; }
   data[key].lastAt = Date.now(); // 最後に解答した日時（苦手語クイズの出題順に使う）
   saveJSON(LS_IDIOM_ANSWERED, data);
 }
@@ -3800,7 +3801,7 @@ function idiomStatusClass(key) {
 function idiomAnswerStatsHtml(key) {
   const rec = loadJSON(LS_IDIOM_ANSWERED, {})[key];
   const ok = rec ? (rec.ok || 0) : 0;
-  const ng = rec ? (rec.ng || 0) : 0;
+  const ng = rec ? (typeof rec.totalNg === 'number' ? rec.totalNg : (rec.ng || 0)) : 0; // 句動詞と同じく、これまでの誤答の合計
   return `これまで<span class="stat-ok">○${ok}回</span>／<span class="stat-ng">×${ng}回</span>`;
 }
 
@@ -3867,8 +3868,11 @@ function mergeIdiomFromCloud(cloud, db, nickname) {
     // 連続誤答数は「より新しく解答した側」を採用（片方で正解済みなのに誤答が残らないように）
     const newer = (ca.lastAt || 0) > (cur.lastAt || 0) ? ca : cur;
     const ng = (cur.lastAt && ca.lastAt) ? (newer.ng || 0) : Math.max(cur.ng || 0, ca.ng || 0);
-    if (ok !== (cur.ok || 0) || ng !== (cur.ng || 0) || lastAt !== (cur.lastAt || 0)) {
-      localAns[k] = lastAt ? { ok, ng, lastAt } : { ok, ng };
+    const curTotalNg = typeof cur.totalNg === 'number' ? cur.totalNg : (cur.ng || 0);
+    const caTotalNg = typeof ca.totalNg === 'number' ? ca.totalNg : (ca.ng || 0);
+    const totalNg = Math.max(curTotalNg, caTotalNg);
+    if (ok !== (cur.ok || 0) || ng !== (cur.ng || 0) || lastAt !== (cur.lastAt || 0) || totalNg !== curTotalNg) {
+      localAns[k] = lastAt ? { ok, ng, totalNg, lastAt } : { ok, ng, totalNg };
       aChanged = true;
     }
   });
@@ -4402,6 +4406,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
 
     document.getElementById('idiom-reveal-phrase').textContent = q.item.phrase;
+    document.getElementById('idiom-reveal-answer-stats').innerHTML = idiomAnswerStatsHtml(key);
     document.getElementById('idiom-reveal-category').textContent = q.item.categoryLabel;
     document.getElementById('idiom-reveal-meaning').textContent = q.item.meaning;
     const nuanceEl = document.getElementById('idiom-reveal-nuance');
@@ -4433,7 +4438,9 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     if (!answered[key]) answered[key] = { ok: 0, ng: 0 };
     answered[key].ok = Math.max(0, (answered[key].ok || 0) - 1);
     answered[key].ng = (answered[key].ng || 0) + 1;
+    answered[key].totalNg = (typeof answered[key].totalNg === 'number' ? answered[key].totalNg : ((answered[key].ng || 1) - 1)) + 1;
     saveJSON(LS_IDIOM_ANSWERED, answered);
+    document.getElementById('idiom-reveal-answer-stats').innerHTML = idiomAnswerStatsHtml(key);
 
     recordIdiomResult(key, false);
     updateIdiomSrs(key, false);

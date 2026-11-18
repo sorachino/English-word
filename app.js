@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '199'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '200'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1552,7 +1552,7 @@ function closeDoneDetail() {
 }
 function renderDoneDetail() {
   const it = ddItems[ddIndex];
-  const w = it.word;
+  const w = it.word || {};
   document.getElementById('dd-idx').textContent = ddIndex + 1;
   document.getElementById('dd-total').textContent = ddItems.length;
   document.getElementById('dd-prev').disabled = ddIndex === 0;
@@ -1561,6 +1561,7 @@ function renderDoneDetail() {
   if (it.ok === true) markHtml = '<div class="dd-mark ok">○ 正解</div>';
   else if (it.ok === false) markHtml = '<div class="dd-mark ng">× 不正解</div>';
   else markHtml = `<div class="dd-mark ng">★ 苦手な語${it.sub ? '（' + escHtml(it.sub) + '）' : ''}</div>`;
+  if (it.html) { document.getElementById('dd-body').innerHTML = markHtml + it.html; return; }
   document.getElementById('dd-body').innerHTML = `
     ${markHtml}
     <div class="dd-verb">${escHtml(it.verb)}</div>
@@ -4171,7 +4172,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     if (!built.length) { toast('該当する熟語がありませんでした'); return; }
     // 通常＝日本語→英語。英語の不正解が用意できない語は、英語→日本語のまま出す
     const qs = idiomMode === 'normal' ? built.map(q => makeIdiomJaEnQuestion(q.item) || q) : built;
-    idiomQuizState = { questions: qs, idx: 0, correctCount: 0, mode: idiomMode === 'order' ? 'order' : 'choice', sessionId: Date.now() };
+    idiomQuizState = { questions: qs, idx: 0, correctCount: 0, mode: idiomMode === 'order' ? 'order' : 'choice', sessionId: Date.now(), results: [] };
     document.getElementById('quiz-setup').hidden = true;
     document.getElementById('quiz-play').hidden = true;
     document.getElementById('quiz-done').hidden = true;
@@ -4400,6 +4401,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   function finishIdiomAnswer(q, ok) {
     q.correct = ok;
     if (ok) idiomQuizState.correctCount++;
+    if (idiomQuizState.results) idiomQuizState.results.push({ item: q.item, ok });
     const key = idiomKey(q.item);
     recordIdiomAnswered(key, ok);
     recordIdiomResult(key, ok);
@@ -4498,12 +4500,37 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     }
   });
 
+  // 結果一覧から開く詳細（句動詞と同じモーダル）に入れる熟語の中身
+  function idiomDetailItem(item, ok) {
+    const pc = prepChunkOf(item);
+    let html = `<div class="dd-verb">${escHtml(item.phrase)}</div>`;
+    if (pc) html += `<div class="ex">${escHtml(pc.chunk)} <button class="speak-btn" data-text="${escAttr(pc.chunk)}">🔊</button></div><div class="ja">${escHtml(pc.ja || '')}</div>`;
+    if (item.ex) html += `<div class="ex">${escHtml(item.ex)} <button class="speak-btn" data-text="${escAttr(item.ex)}">🔊</button></div><div class="ja">${escHtml(item.ja || '')}</div>`;
+    html += `<div class="def">${escHtml(item.meaning || '')}</div>`;
+    if (item.nuance) html += `<div class="def">💡 ${escHtml(item.nuance)}</div>`;
+    if (item.etymology) html += `<div class="etym-box">${etymHtml(item.etymology, '')}</div>`;
+    return { verb: item.phrase, ok, html };
+  }
+  function renderIdiomDoneList(results) {
+    const list = document.getElementById('idiom-done-list');
+    list.innerHTML = '';
+    const items = results.map(r => idiomDetailItem(r.item, r.ok));
+    results.forEach((r, i) => {
+      const div = document.createElement('div');
+      div.className = 'word-item done-item' + (r.ok ? ' ok' : ' ng');
+      div.innerHTML = `<div class="wi-head"><span class="wi-verb">${escHtml(r.item.phrase)}</span><span class="r-mark">${r.ok ? '○' : '×'}</span></div>`;
+      div.addEventListener('click', () => openDetailModal(items, i));
+      list.appendChild(div);
+    });
+  }
+
   function finishIdiomQuiz() {
     if (mixAdvance('idiom', idiomQuizState)) return; // ミックス中は次の問題へ
     document.getElementById('idiom-quiz-play').hidden = true;
     document.getElementById('idiom-quiz-done').hidden = false;
     document.getElementById('idiom-done-score-num').textContent = idiomQuizState.correctCount;
     document.getElementById('idiom-done-score-total').textContent = idiomQuizState.questions.length;
+    renderIdiomDoneList(idiomQuizState.results || []);
     refreshIdiomQuickActions();
   }
 
@@ -4653,18 +4680,14 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('done-score-total').textContent = ms.results.length;
     const list = document.getElementById('done-list');
     list.innerHTML = '';
-    const pvItems = ms.results.filter(r => r.type === 'pv').map(r => ({ verb: r.label, ok: r.ok, word: r.word }));
-    let pvIdx = 0;
-    ms.results.forEach(r => {
+    const allItems = ms.results.map(r => r.type === 'pv'
+      ? { verb: r.label, ok: r.ok, word: r.word }
+      : idiomDetailItem(r.item, r.ok));
+    ms.results.forEach((r, ri) => {
       const div = document.createElement('div');
       div.className = 'word-item done-item' + (r.ok ? ' ok' : ' ng');
       div.innerHTML = `<div class="wi-head"><span class="wi-verb">${escHtml(r.label)}</span><span class="r-mark">${r.ok ? '○' : '×'}</span></div>`;
-      if (r.type === 'pv') {
-        const my = pvIdx++;
-        div.addEventListener('click', () => openDetailModal(pvItems, my));
-      } else {
-        div.addEventListener('click', () => toast(r.item.phrase + '：' + r.item.meaning));
-      }
+      div.addEventListener('click', () => openDetailModal(allItems, ri));
       list.appendChild(div);
     });
     renderDictProgress();

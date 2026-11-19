@@ -622,12 +622,12 @@ function populateStageSelects() {
   if (savedStage && [...sel1.options].some(o => o.value === savedStage)) sel1.value = savedStage;
 }
 populateStageSelects();
-document.getElementById('quiz-stage').addEventListener('change', saveQuizSettings);
+document.getElementById('quiz-stage').addEventListener('change', () => { saveQuizSettings(); if (typeof renderDictProgress === 'function') renderDictProgress(); });
 (() => {
   const sel = document.getElementById('quiz-freq');
   const saved = localStorage.getItem('pv_quiz_freq');
   if (saved && [...sel.options].some(o => o.value === saved)) sel.value = saved;
-  sel.addEventListener('change', () => localStorage.setItem('pv_quiz_freq', sel.value));
+  sel.addEventListener('change', () => { localStorage.setItem('pv_quiz_freq', sel.value); if (typeof renderDictProgress === 'function') renderDictProgress(); });
 })();
 
 let quizCount = parseInt(localStorage.getItem('pv_quiz_count'), 10);
@@ -1671,9 +1671,19 @@ function renderDictProgress() {
   document.getElementById('dp-seg-ng').style.width = (100 * ngCount / total) + '%';
   document.getElementById('dp-seg-unlearned').style.width = (100 * unlearnedCount / total) + '%';
 
-  document.getElementById('dp-weak-num').textContent = ngCount;
-  document.getElementById('dp-review-num').textContent = srsDuePool(words).length;
-  document.getElementById('dp-unlearned-num2').textContent = unlearnedCount;
+  // 苦手・復習・未学習ボタンの語数は、クイズの範囲・使用頻度の設定に合わせて数える
+  const qStage = parseInt(document.getElementById('quiz-stage').value, 10) || 0;
+  const qFreq = document.getElementById('quiz-freq').value;
+  const qWords = words.filter(w => (!qStage || w.stage === qStage) && (qFreq === 'all' || w.freq === qFreq));
+  let qWeak = 0, qNew = 0;
+  qWords.forEach(w => {
+    const key = wordKey(w);
+    if (isNewWord(key)) qNew++;
+    else if (weak[key]) qWeak++;
+  });
+  document.getElementById('dp-weak-num').textContent = qWeak;
+  document.getElementById('dp-review-num').textContent = srsDuePool(qWords).length;
+  document.getElementById('dp-unlearned-num2').textContent = qNew;
 }
 
 // 辞書タブの苦手語／復習／未学習ボタンから、設定画面を経由せず即座にクイズを開始する

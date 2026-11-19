@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '202'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '203'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -240,7 +240,7 @@ function highlightVerbInChunk(chunk, verb) {
 // ===================== クイズエンジン =====================
 let quizState = null;
 
-function buildQuiz(stageFilter, count, weakOn, srsOn, newOn) {
+function buildQuiz(stageFilter, count, weakOn, srsOn, newOn, freq) {
   const words = allWords();
   const weak = loadJSON(LS.WEAK, {});
   const weakKeys = Object.keys(weak);
@@ -249,6 +249,7 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn) {
   const isNew = w => isNewWord(wordKey(w));
 
   let pool = stageFilter ? words.filter(w => w.stage === stageFilter) : words.slice();
+  if (freq && freq !== 'all') pool = pool.filter(w => w.freq === freq);
 
   // 苦手語・復習・未学習のいずれかがONなら、チェックした条件の語だけから100%出題する（優先度の概念なし）
   const anyFilterOn = weakOn || srsOn || newOn;
@@ -622,6 +623,12 @@ function populateStageSelects() {
 }
 populateStageSelects();
 document.getElementById('quiz-stage').addEventListener('change', saveQuizSettings);
+(() => {
+  const sel = document.getElementById('quiz-freq');
+  const saved = localStorage.getItem('pv_quiz_freq');
+  if (saved && [...sel.options].some(o => o.value === saved)) sel.value = saved;
+  sel.addEventListener('change', () => localStorage.setItem('pv_quiz_freq', sel.value));
+})();
 
 let quizCount = parseInt(localStorage.getItem('pv_quiz_count'), 10) || 10;
 document.querySelectorAll('#quiz-count-group .chip').forEach(chip => {
@@ -664,7 +671,8 @@ let matchState = null;
 function startMatchingGame() {
   const raw = document.getElementById('quiz-stage').value;
   const stage = parseInt(raw, 10) || 0;
-  const words = allWords().filter(w => !stage || w.stage === stage);
+  const freqSel = document.getElementById('quiz-freq').value;
+  const words = allWords().filter(w => (!stage || w.stage === stage) && (freqSel === 'all' || w.freq === freqSel));
   if (words.length < 2) { toast('この範囲では作れませんでした'); return; }
   const roundSize = Math.min(6, words.length);
 
@@ -1674,7 +1682,7 @@ function quickStartQuiz(kind) {
   const srsOn = kind === 'review';
   const newOn = kind === 'unlearned';
   const stage = parseInt(document.getElementById('quiz-stage').value, 10) || 0;
-  const qs = buildQuiz(stage, quizCount, weakOn, srsOn, newOn);
+  const qs = buildQuiz(stage, quizCount, weakOn, srsOn, newOn, document.getElementById('quiz-freq').value);
   if (!qs.length) { toast('該当する語がありませんでした'); return; }
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelector('.tab[data-tab="quiz"]').classList.add('active');

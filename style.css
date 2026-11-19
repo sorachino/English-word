@@ -682,3 +682,8 @@ select{
 #dd-card .dd-body{flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;}
 #dd-card .dd-swipe-hint{flex:none;}
 
+
+.wi-freq{display:inline-block; margin-left:8px; padding:1px 7px; border-radius:999px; font-size:11px; font-weight:700; vertical-align:middle; border:1px solid currentColor;}
+.wi-freq-high{color:#2f6b4a;}
+.wi-freq-mid{color:#8a6d1f;}
+.wi-freq-low{color:#7a7a7a;}

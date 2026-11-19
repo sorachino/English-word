@@ -552,6 +552,7 @@ select{
 .idiom-example{font-size:13.5px; color:var(--ink-soft); margin-bottom:16px; line-height:1.6;}
 .idiom-example .ja{margin-top:4px;}
 #idiom-choice-group{display:flex; flex-direction:column; gap:8px;}
+#idiom-choice-group[hidden]{display:none;}
 #idiom-choice-group .choice-btn{width:100%; text-align:left;}
 .idiom-list-wrap .word-item{margin-bottom:10px;}
 

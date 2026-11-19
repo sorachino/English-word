@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '197'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '198'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -4209,6 +4209,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
         ? `<span class="idiom-chunk">${chunkHtml(pc)}</span> <button class="speak-btn" data-text="${escAttr(pc.chunk)}">🔊</button><div class="idiom-chunk-hint">日本語にすると？（太字の${q.item.category.startsWith('prep') ? '前置詞' : '表現'}に注目）</div>`
         : `${escHtml(q.item.ex)} <button class="speak-btn" data-text="${escAttr(q.item.ex)}">🔊</button>`;
       const group = document.getElementById('idiom-choice-group');
+      group.hidden = false;
       group.innerHTML = q.choices.map((c, i) => `<button class="choice-btn" data-idx="${i}">${escHtml(c)}</button>`).join('');
       group.querySelectorAll('.choice-btn').forEach(btn => {
         btn.addEventListener('click', () => onIdiomAnswer(parseInt(btn.dataset.idx, 10)));
@@ -4230,6 +4231,12 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       if (btnText === correctText) btn.classList.add('correct');
       else if (parseInt(btn.dataset.idx, 10) === idx) btn.classList.add('wrong');
     });
+    // 句動詞クイズと同じく、解答後は選択肢を隠す（正誤の色を一瞬見せてから）
+    setTimeout(() => {
+      if (idiomQuizState.questions[idiomQuizState.idx] !== q) return;
+      group.hidden = true;
+      group.innerHTML = '';
+    }, 350);
   }
 
   // ---------- 並び替えモード ----------

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '208'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '209'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -3940,6 +3940,17 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     return [];
   }
 
+  function idiomFreqOf(id) {
+    const el = document.getElementById(id);
+    return el ? el.value : 'all';
+  }
+  function bindFreqSelect(id, key, onChange) {
+    const el = document.getElementById(id);
+    const saved = localStorage.getItem(key);
+    if (saved && [...el.options].some(o => o.value === saved)) el.value = saved;
+    el.addEventListener('change', () => { localStorage.setItem(key, el.value); if (onChange) onChange(); });
+  }
+
   // ---------- クイズタブ：出題内容の切り替え ----------
   let quizContent = localStorage.getItem('pv_quiz_content') || 'pv';
   function refreshQuizContentUI() {
@@ -3961,7 +3972,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   refreshQuizContentUI();
 
   function refreshIdiomQuickActions() {
-    const pool = poolForContent(quizContent);
+    const fq = idiomFreqOf('idiom-quiz-freq');
+    const pool = poolForContent(quizContent).filter(it => fq === 'all' || it.freq === fq);
     const weak = loadJSON(LS_IDIOM_WEAK, {});
     let weakN = 0, reviewN = 0, unlearnedN = 0;
     pool.forEach(it => {
@@ -3976,6 +3988,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-dp-unlearned-num2').textContent = unlearnedN;
   }
   window.refreshIdiomQuickActions = refreshIdiomQuickActions;
+  bindFreqSelect('idiom-quiz-freq', 'pv_idiom_freq', refreshIdiomQuickActions);
   // クラウドから熟語の記録を取り込んだ後に、表示中の画面を更新する
   window.refreshIdiomUI = function () {
     refreshIdiomQuickActions();
@@ -4069,6 +4082,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     const cat = document.getElementById('idiom-category-filter').value;
     const markedOnly = document.getElementById('idiom-marked-only-toggle').checked;
     let items = cat === '0' ? IDIOM_DATA.slice() : IDIOM_DATA.filter(it => it.category === cat);
+    const lf = document.getElementById('idiom-list-freq-filter').value;
+    if (lf !== 'all') items = items.filter(it => it.freq === lf);
     if (q) items = items.filter(it => it.phrase.toLowerCase().includes(q) || it.meaning.includes(q));
     if (idiomStatusFilter !== 'all') {
       const weak = loadJSON(LS_IDIOM_WEAK, {});
@@ -4090,7 +4105,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       return `
       <div class="word-item${idiomStatusClass(key)}" data-idiom-key="${escAttr(key)}">
         <div class="wi-head">
-          <span class="wi-verb">${escHtml(it.phrase)}</span>
+          <span class="wi-verb">${escHtml(it.phrase)}</span>${FREQ_LABEL[it.freq] ? `<span class="wi-freq wi-freq-${it.freq}">${FREQ_LABEL[it.freq]}</span>` : ''}
           <div class="wi-right">
             <button class="wi-mark${isMarked ? ' on' : ''}" type="button" aria-label="マーク">${isMarked ? '★' : '☆'}</button>
             <span class="wi-stage">${escHtml(it.categoryLabel)}</span>
@@ -4122,6 +4137,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     renderIdiomProgress();
   }
   document.getElementById('idiom-search').addEventListener('input', renderIdiomList);
+  document.getElementById('idiom-list-freq-filter').addEventListener('change', renderIdiomList);
   document.getElementById('idiom-marked-only-toggle').addEventListener('change', renderIdiomList);
   document.getElementById('idiom-category-filter').addEventListener('change', renderIdiomList);
 
@@ -4143,8 +4159,9 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   // ---------- 4択クイズ本体（クイズタブから起動） ----------
   let idiomQuizState = null;
 
-  function buildIdiomQuiz(count, content, statusFilter) {
+  function buildIdiomQuiz(count, content, statusFilter, freq) {
     let pool = poolForContent(content);
+    if (freq && freq !== 'all') pool = pool.filter(it => it.freq === freq);
     if (statusFilter) {
       const weak = loadJSON(LS_IDIOM_WEAK, {});
       pool = pool.filter(it => {
@@ -4186,7 +4203,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   }
 
   function startIdiomQuiz(statusFilter) {
-    const built = buildIdiomQuiz(idiomCount, quizContent, statusFilter);
+    const built = buildIdiomQuiz(idiomCount, quizContent, statusFilter, idiomFreqOf('idiom-quiz-freq'));
     if (!built.length) { toast('該当する熟語がありませんでした'); return; }
     // 通常＝日本語→英語。英語の不正解が用意できない語は、英語→日本語のまま出す
     const qs = idiomMode === 'normal' ? built.map(q => makeIdiomJaEnQuestion(q.item) || q) : built;
@@ -4583,7 +4600,9 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     const pv = { weak: 0, review: 0, unlearned: 0, all: 0 };
     const id = { weak: 0, review: 0, unlearned: 0, all: 0 };
     const pvWeak = loadJSON(LS.WEAK, {});
+    const fq = idiomFreqOf('mix-quiz-freq');
     allWords().forEach(w => {
+      if (fq !== 'all' && w.freq !== fq) return;
       const k = wordKey(w);
       pv.all++;
       if (pvWeak[k]) pv.weak++;
@@ -4592,6 +4611,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     });
     const idWeak = loadJSON(LS_IDIOM_WEAK, {});
     IDIOM_DATA.forEach(it => {
+      if (fq !== 'all' && it.freq !== fq) return;
       const k = idiomKey(it);
       id.all++;
       if (idWeak[k]) id.weak++;
@@ -4600,6 +4620,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     });
     return { pv, id };
   }
+  bindFreqSelect('mix-quiz-freq', 'pv_mix_freq', () => refreshMixQuickActions());
   function refreshMixQuickActions() {
     const c = mixPoolCounts();
     document.getElementById('mix-weak-num').textContent = c.pv.weak + c.id.weak;
@@ -4620,8 +4641,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     const picked = kinds.slice(0, Math.min(mixCount, kinds.length));
     const nPv = picked.filter(k => k === 'pv').length;
     const nIdiom = picked.length - nPv;
-    const pvQs = nPv ? buildQuiz(0, nPv, kind === 'weak', kind === 'review', kind === 'unlearned') : [];
-    const idiomQs = nIdiom ? buildIdiomQuiz(nIdiom, 'all', kind || null) : [];
+    const pvQs = nPv ? buildQuiz(0, nPv, kind === 'weak', kind === 'review', kind === 'unlearned', idiomFreqOf('mix-quiz-freq')) : [];
+    const idiomQs = nIdiom ? buildIdiomQuiz(nIdiom, 'all', kind || null, idiomFreqOf('mix-quiz-freq')) : [];
     const plan = shuffle([
       ...pvQs.map(q => ({ type: 'pv', q })),
       ...idiomQs.map(q => ({ type: 'idiom', q })),

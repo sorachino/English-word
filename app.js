@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '200'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '201'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -299,7 +299,7 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn) {
       if (blank && hl) {
         const enOf = {};
         if (pc.wrongEn) pc.wrong.forEach((jaText, i) => { if (pc.wrongEn[i]) enOf[jaText] = pc.wrongEn[i]; });
-        chunk = { blankHtml: blank, hlHtml: hl, ja: pc.ja, choices: shuffle([pc.ja, ...pc.wrong.slice(0, 3)]), enOf };
+        chunk = { blankHtml: blank, hlHtml: hl, en: pc.chunk, ja: pc.ja, choices: shuffle([pc.ja, ...pc.wrong.slice(0, 3)]), enOf };
       }
     }
 
@@ -888,6 +888,7 @@ function showQuestion() {
     if (q.chunk) document.getElementById('question-text').innerHTML = '<span class="pv-chunk">' + q.chunk.hlHtml + '</span>';
     else document.getElementById('question-text').textContent = q.answer;
     replayBtn.hidden = true;
+    speak(q.chunk ? q.chunk.en : q.answer); // 英文が問題として見えているときだけ自動で読み上げる
   } else {
     document.getElementById('question-text').innerHTML = q.chunk ? '<span class="pv-chunk">' + q.chunk.blankHtml + '</span>' : q.questionHtml;
     replayBtn.hidden = true;
@@ -4209,6 +4210,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
         : pc
         ? `<span class="idiom-chunk">${chunkHtml(pc)}</span> <button class="speak-btn" data-text="${escAttr(pc.chunk)}">🔊</button><div class="idiom-chunk-hint">日本語にすると？（太字の${q.item.category.startsWith('prep') ? '前置詞' : '表現'}に注目）</div>`
         : `${escHtml(q.item.ex)} <button class="speak-btn" data-text="${escAttr(q.item.ex)}">🔊</button>`;
+      if (q.dir !== 'ja2en') speak(pc ? pc.chunk : q.item.ex); // 英文が見えている出題だけ自動で読み上げる
       const group = document.getElementById('idiom-choice-group');
       group.hidden = false;
       group.innerHTML = q.choices.map((c, i) => `<button class="choice-btn" data-idx="${i}">${escHtml(c)}</button>`).join('');

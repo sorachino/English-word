@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '201'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '202'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1703,6 +1703,8 @@ function renderWordList() {
 
   let words = allWords();
   if (stage) words = words.filter(w => w.stage === stage);
+  const freqSel = document.getElementById('list-freq-filter').value;
+  if (freqSel !== 'all') words = words.filter(w => w.freq === freqSel);
   if (q) words = words.filter(w => w.verb.toLowerCase().includes(q) || (w.meaning || '').includes(q));
   if (markedOnly) words = words.filter(w => marked.has(baseForm(w.verb)));
   if (statusFilter !== 'all') {
@@ -1722,6 +1724,9 @@ function renderWordList() {
     words.sort((a, b) => baseForm(a.verb).toLowerCase().localeCompare(baseForm(b.verb).toLowerCase()));
   } else if (sortMode === 'za') {
     words.sort((a, b) => baseForm(b.verb).toLowerCase().localeCompare(baseForm(a.verb).toLowerCase()));
+  } else if (sortMode === 'freq') {
+    const rank = { high: 0, mid: 1, low: 2 };
+    words.sort((a, b) => (rank[a.freq] ?? 3) - (rank[b.freq] ?? 3) || (a.no - b.no));
   } else if (sortMode === 'marked') {
     words.sort((a, b) => {
       const am = marked.has(baseForm(a.verb)) ? 1 : 0;
@@ -1735,6 +1740,7 @@ function renderWordList() {
   if (!words.length) { el.innerHTML = '<div class="empty-note">該当する語がありません</div>'; return; }
   words.forEach(w => el.appendChild(wordItemEl(w)));
 }
+const FREQ_LABEL = { high: '頻度:高', mid: '頻度:中', low: '頻度:低' };
 function wordItemEl(w) {
   const div = document.createElement('div');
   const verbKey = baseForm(w.verb); // マーク機能は従来通り表記ベース（マイ単語含め安定IDが無いため）
@@ -1743,7 +1749,7 @@ function wordItemEl(w) {
   const marked = loadMarked().has(verbKey);
   div.innerHTML = `
     <div class="wi-head">
-      <div><span class="wi-verb">${escHtml(baseForm(w.verb))}</span>${w.mine ? '<span class="wi-badge-mine">マイ単語</span>' : ''}</div>
+      <div><span class="wi-verb">${escHtml(baseForm(w.verb))}</span>${w.mine ? '<span class="wi-badge-mine">マイ単語</span>' : ''}${FREQ_LABEL[w.freq] ? `<span class="wi-freq wi-freq-${w.freq}">${FREQ_LABEL[w.freq]}</span>` : ''}</div>
       <div class="wi-right">
         <button class="wi-mark${marked ? ' on' : ''}" type="button" aria-label="マーク">${marked ? '★' : '☆'}</button>
         <span class="wi-stage">${w.mine ? 'MY' : 'ST.' + w.stage}</span>
@@ -1782,6 +1788,7 @@ function escHtml(s) { const d = document.createElement('div'); d.textContent = s
 document.getElementById('list-search').addEventListener('input', renderWordList);
 document.getElementById('list-stage-filter').addEventListener('change', renderWordList);
 document.getElementById('list-sort').addEventListener('change', renderWordList);
+document.getElementById('list-freq-filter').addEventListener('change', renderWordList);
 document.getElementById('marked-only-toggle').addEventListener('change', renderWordList);
 
 // ===================== UI: 辞書に追加 =====================

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '207'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '208'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -630,7 +630,8 @@ document.getElementById('quiz-stage').addEventListener('change', saveQuizSetting
   sel.addEventListener('change', () => localStorage.setItem('pv_quiz_freq', sel.value));
 })();
 
-let quizCount = parseInt(localStorage.getItem('pv_quiz_count'), 10) || 10;
+let quizCount = parseInt(localStorage.getItem('pv_quiz_count'), 10);
+if (![10, 20, 50, 100].includes(quizCount)) quizCount = 20;
 document.querySelectorAll('#quiz-count-group .chip').forEach(chip => {
   chip.classList.toggle('active', parseInt(chip.dataset.count, 10) === quizCount);
   chip.addEventListener('click', () => {
@@ -3983,7 +3984,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     if (wrap && !wrap.hidden) renderIdiomList();
   };
 
-  let idiomCount = parseInt(localStorage.getItem('pv_idiom_count'), 10) || 10;
+  let idiomCount = parseInt(localStorage.getItem('pv_idiom_count'), 10);
+  if (![10, 20, 50, 100].includes(idiomCount)) idiomCount = 20;
   document.querySelectorAll('#idiom-count-group .chip').forEach(chip => {
     chip.classList.toggle('active', parseInt(chip.dataset.count, 10) === idiomCount);
     chip.addEventListener('click', () => {

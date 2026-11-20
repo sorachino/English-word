@@ -1444,7 +1444,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
     extraRow.hidden = true;
   }
   const nuanceEl = document.getElementById('reveal-nuance');
-  if (q.word.nuance) { nuanceEl.hidden = false; nuanceEl.textContent = '💡 ' + q.word.nuance; } else { nuanceEl.hidden = true; }
+  if (q.word.nuance) { nuanceEl.hidden = false; nuanceEl.innerHTML = '💡 ' + escHtml(q.word.nuance) + (q.word.alt ? `<div class="nuance-alt">🔁 もっとよく使う言い方：${escHtml(q.word.alt)}</div>` : ''); } else { nuanceEl.hidden = true; }
   document.getElementById('reveal-structure').innerHTML = structureHtml(q.answer, q.word.ex1, q.word.ex2);
   const noteEl = document.getElementById('reveal-note');
   if (q.note) { noteEl.hidden = false; noteEl.textContent = '※ ' + q.note; } else { noteEl.hidden = true; }
@@ -1777,7 +1777,7 @@ function wordItemEl(w) {
     <div class="wi-meaning">${escHtml(w.meaning || '')}</div>
     <div class="wi-detail">
       <div class="wi-answer-stats">${answerStatsHtml(trackKey)}</div>
-      ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}</div>` : ''}
+      ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}${w.alt ? `<div class="nuance-alt">🔁 もっとよく使う言い方：${escHtml(w.alt)}</div>` : ''}</div>` : ''}
       ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
       ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
       ${w.def ? `<div class="def">${escHtml(w.def)}</div>` : ''}

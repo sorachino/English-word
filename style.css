@@ -687,3 +687,5 @@ select{
 .wi-freq-high{color:#2f6b4a;}
 .wi-freq-mid{color:#8a6d1f;}
 .wi-freq-low{color:#7a7a7a;}
+
+.nuance-alt{margin-top:8px; padding-top:8px; border-top:1px dashed rgba(0,0,0,.18); font-size:.95em;}

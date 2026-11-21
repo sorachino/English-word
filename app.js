@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '210'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '211'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -573,16 +573,72 @@ function recordAnswerLog(mode, word, ok, sessionId) {
   saveJSON(LS.ANSWER_LOG, log);
   pushAnswerLogToCloud(dateKey, log[dateKey]);
 }
+// ---------- クラウド送信の取りこぼし対策 ----------
+// 機内モードなど回線が無い間に書いた記録は、Firebase の送信待ちとしてアプリのメモリにしか残らない。
+// その間にアプリが終了すると届かないので、送信が完了するまで「未送信」の印を端末に残し、
+// 次の起動・回線復帰・画面に戻った時に、端末側の記録からその分だけ送り直す。
+const PENDING_KEY = 'pv_cloud_pending';
+const pendingInflight = {}; // 今のセッションで送信待ち・送信中の件数（id → 件数）。これは自動で送られるので再送しない
+function loadPending() { try { return JSON.parse(localStorage.getItem(PENDING_KEY)) || {}; } catch (e) { return {}; } }
+function savePending(p) { try { localStorage.setItem(PENDING_KEY, JSON.stringify(p)); } catch (e) {} }
+function trackCloudWrite(type, key, promise) {
+  const id = type + ':' + key;
+  const p = loadPending(); p[id] = 1; savePending(p);
+  pendingInflight[id] = (pendingInflight[id] || 0) + 1;
+  const done = (ok) => {
+    pendingInflight[id]--;
+    if (pendingInflight[id] <= 0) {
+      delete pendingInflight[id];
+      if (ok) { const q = loadPending(); delete q[id]; savePending(q); }
+    }
+  };
+  Promise.resolve(promise).then(() => done(true), () => done(false));
+}
+let flushingPending = false;
+function flushPendingCloud() {
+  if (flushingPending || navigator.onLine === false) return;
+  const nickname = getNickname();
+  if (!nickname) return;
+  const ids = Object.keys(loadPending()).filter(id => !pendingInflight[id]);
+  if (!ids.length) return;
+  const db = initFirebase();
+  if (!db) return;
+  flushingPending = true;
+  setTimeout(() => { flushingPending = false; }, 3000);
+  ids.forEach(id => {
+    const i = id.indexOf(':');
+    const type = id.slice(0, i), key = id.slice(i + 1);
+    if (type === 'w') pushWordStateByKey(key);
+    else if (type === 'i') pushIdiomStateToCloud(key);
+    else if (type === 'a') {
+      const entries = (loadJSON(LS.ANSWER_LOG, {}))[key];
+      if (entries) pushAnswerLogToCloud(key, entries); else { const q = loadPending(); delete q[id]; savePending(q); }
+    } else if (type === 'l') {
+      // 日別の回答数は、クラウドと端末の大きいほうを採用する（二重に数えない）
+      const local = (loadJSON(LS.LOG, {}))[key];
+      if (!local) { const q = loadPending(); delete q[id]; savePending(q); return; }
+      const base = `users/${nickname}/log/${key}`;
+      trackCloudWrite('l', key, db.ref(base).get().then(snap => {
+        const c = snap.val() || {};
+        return db.ref(base).set({ solved: Math.max(local.solved || 0, c.solved || 0), correct: Math.max(local.correct || 0, c.correct || 0) });
+      }));
+    }
+  });
+}
+window.addEventListener('online', flushPendingCloud);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') flushPendingCloud(); });
+
 function pushAnswerLogToCloud(dateKey, entries) {
   const db = initFirebase();
   if (!db) return;
   const nickname = getNickname();
   if (!nickname) return;
-  db.ref(`users/${nickname}/answerLog/${dateKey}`).set(entries).catch(() => {});
+  const pAl = [db.ref(`users/${nickname}/answerLog/${dateKey}`).set(entries)];
   // 日別の回答数（数字のみ）を公開カウンタにも記録する。
   // Muse がログインなしでその日の進捗（解いた問題数）を確認するために使う。
   // 回答内容は含まない。読み取り側は dailyCounts のみ公開ルールで許可される。
-  db.ref(`dailyCounts/${nickname}/${dateKey}`).set(entries.length).catch(() => {});
+  pAl.push(db.ref(`dailyCounts/${nickname}/${dateKey}`).set(entries.length));
+  trackCloudWrite('a', dateKey, Promise.all(pAl));
 }
 function todayKey(offset = 0) {
   const d = new Date();
@@ -3237,7 +3293,10 @@ function syncLeaderboard(word, ok) {
     updates[`users/${nickname}/srs/${safeVerb}`] = srs[key] || null;
   }
   updates[`users/${nickname}/myWords`] = myWords();
-  db.ref().update(updates).catch(() => {});
+  const pLb = db.ref().update(updates);
+  pLb.catch(() => {});
+  trackCloudWrite('l', today, pLb);
+  if (word) trackCloudWrite('w', wordKey(word), pLb);
 }
 
 let lbPeriod = 'day';
@@ -3248,19 +3307,23 @@ function isDateInCurrentWeek(dateStr) {
   return weekKey(new Date(y, m - 1, d)) === weekKey();
 }
 
-function pushWordStateToCloud(word) {
+function pushWordStateToCloud(word) { pushWordStateByKey(wordKey(word)); }
+function pushWordStateByKey(key) {
   const db = initFirebase();
   if (!db) return;
   const nickname = getNickname();
   if (!nickname) return;
-  const key = wordKey(word);
   const safeVerb = sanitizeKey(key);
   const weak = loadJSON(LS.WEAK, {});
   const answered = loadJSON(LS_ANSWERED, {});
+  const srs = loadJSON(LS.SRS, {});
   const updates = {};
   updates[`users/${nickname}/weak/${safeVerb}`] = weak[key] || null;
   updates[`users/${nickname}/answered/${safeVerb}`] = answered[key] || null;
-  db.ref().update(updates).catch(() => {});
+  updates[`users/${nickname}/srs/${safeVerb}`] = srs[key] || null;
+  const p = db.ref().update(updates);
+  p.catch(() => {});
+  trackCloudWrite('w', key, p);
 }
 
 function markCurrentAsWrong() {
@@ -3696,7 +3759,7 @@ updateLbNameDisplay();
 // 名前が設定されていれば、起動のたびにクラウド側の記録で足りない分を補う（既存データは上書きしない）
 (() => {
   const nick = getNickname();
-  if (nick) pullAndMergeCloud(nick);
+  if (nick) { flushPendingCloud(); pullAndMergeCloud(nick); }
 })();
 
 document.querySelectorAll('#lb-period-group .chip').forEach(chip => {
@@ -3869,7 +3932,9 @@ function pushIdiomStateToCloud(key) {
   updates[`users/${nickname}/idiomWeak/${safe}`] = loadJSON(LS_IDIOM_WEAK, {})[key] || null;
   updates[`users/${nickname}/idiomAnswered/${safe}`] = loadJSON(LS_IDIOM_ANSWERED, {})[key] || null;
   updates[`users/${nickname}/idiomSrs/${safe}`] = loadJSON(LS_IDIOM_SRS, {})[key] || null;
-  db.ref().update(updates).catch(() => {});
+  const p = db.ref().update(updates);
+  p.catch(() => {});
+  trackCloudWrite('i', key, p);
 }
 // クラウドの熟語記録をローカルへ取り込み、クラウドに無いローカル分はクラウドへ書き上げる。
 // 何か変わったらtrueを返す。

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '211'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '214'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -252,12 +252,18 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn, freq) {
   if (freq && freq !== 'all') pool = pool.filter(w => w.freq === freq);
 
   // 苦手語・復習・未学習のいずれかがONなら、チェックした条件の語だけから100%出題する（優先度の概念なし）
-  const anyFilterOn = weakOn || srsOn || newOn;
+  // 「未学習」ボタン単独のときは絞り込まず、解答回数が少ない語から順に出す（0回の語が先、足りなければ1回、2回…）
+  const fewestFirst = newOn && !weakOn && !srsOn;
+  const anyFilterOn = (weakOn || srsOn || newOn) && !fewestFirst;
   if (anyFilterOn) {
     pool = pool.filter(w => (weakOn && isWeak(w)) || (srsOn && isDue(w)) || (newOn && isNew(w)));
   }
 
   shuffle(pool);
+  if (fewestFirst) {
+    const ansAll = loadJSON(LS_ANSWERED, {});
+    pool.sort((x, y) => attemptsOf(ansAll, wordKey(x)) - attemptsOf(ansAll, wordKey(y))); // 同じ回数の中は、シャッフルした順のまま
+  }
   // 苦手語モードだけは、最後に解答した日時が古い語を優先して出題する
   // （長く放置している苦手語ほど忘れているはずなので、そちらを優先的に復習させる）
   if (weakOn) {
@@ -397,6 +403,11 @@ function isNewWord(key) {
   const srs = loadSrs();
   const answered = loadJSON(LS_ANSWERED, {});
   return !srs[key] && !answered[key];
+}
+// 解答回数（正解＋不正解の合計）。「未学習」ボタンは、この回数が少ない語から順に出す
+function attemptsOf(answeredMap, key) {
+  const e = answeredMap[key];
+  return e ? (e.ok || 0) + (e.ng || 0) : 0;
 }
 function srsDuePool(words) {
   return words.filter(w => {
@@ -4242,13 +4253,17 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       pool = pool.filter(it => {
         const key = idiomKey(it);
         if (statusFilter === 'weak') return !!weak[key];
-        if (statusFilter === 'unlearned') return isNewIdiom(key);
+        if (statusFilter === 'unlearned') return true; // 絞り込まず、下で解答回数の少ない順に並べる
         if (statusFilter === 'review') { const s = idiomSrsScore(key); return s !== null && s <= 0; }
         return true;
       });
     }
     pool = pool.slice();
     shuffle(pool);
+    if (statusFilter === 'unlearned') {
+      const ansAll = loadJSON(LS_IDIOM_ANSWERED, {});
+      pool.sort((x, y) => attemptsOf(ansAll, idiomKey(x)) - attemptsOf(ansAll, idiomKey(y)));
+    }
     // 苦手語モードだけは、最後に解答した日時が古い語を優先して出題する
     if (statusFilter === 'weak') {
       const answered = loadJSON(LS_IDIOM_ANSWERED, {});
@@ -4709,11 +4724,24 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     const c = mixPoolCounts();
     const key = kind || 'all';
     // 句動詞・熟語の語数に応じた割合になるよう、対象の語から無作為に選ぶ
-    const kinds = [];
+    let kinds = [];
     for (let i = 0; i < c.pv[key]; i++) kinds.push('pv');
     for (let i = 0; i < c.id[key]; i++) kinds.push('idiom');
     shuffle(kinds);
-    const picked = kinds.slice(0, Math.min(mixCount, kinds.length));
+    let picked;
+    if (kind === 'unlearned') {
+      // 句動詞・熟語をまとめて、解答回数の少ない順に選ぶ（絞り込まない）
+      const fq = idiomFreqOf('mix-quiz-freq');
+      const pvAns = loadJSON(LS_ANSWERED, {}), idAns = loadJSON(LS_IDIOM_ANSWERED, {});
+      const all = [];
+      allWords().forEach(w => { if (fq === 'all' || w.freq === fq) all.push({ t: 'pv', n: attemptsOf(pvAns, wordKey(w)) }); });
+      IDIOM_DATA.forEach(it => { if (fq === 'all' || it.freq === fq) all.push({ t: 'idiom', n: attemptsOf(idAns, idiomKey(it)) }); });
+      shuffle(all);
+      all.sort((x, y) => x.n - y.n);
+      picked = all.slice(0, Math.min(mixCount, all.length)).map(x => x.t);
+    } else {
+      picked = kinds.slice(0, Math.min(mixCount, kinds.length));
+    }
     const nPv = picked.filter(k => k === 'pv').length;
     const nIdiom = picked.length - nPv;
     const pvQs = nPv ? buildQuiz(0, nPv, kind === 'weak', kind === 'review', kind === 'unlearned', idiomFreqOf('mix-quiz-freq')) : [];

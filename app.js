@@ -4306,7 +4306,6 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-quiz-play').hidden = false;
     showIdiomQuestion();
   }
-  document.getElementById('idiom-start-quiz').addEventListener('click', () => startIdiomQuiz(null));
   document.getElementById('idiom-dp-start-weak').addEventListener('click', () => startIdiomQuiz('weak'));
   document.getElementById('idiom-dp-start-review').addEventListener('click', () => startIdiomQuiz('review'));
   document.getElementById('idiom-dp-start-unlearned').addEventListener('click', () => startIdiomQuiz('unlearned'));
@@ -4847,7 +4846,6 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     refreshMixQuickActions();
     refreshMixQuickActions();
   }
-  document.getElementById('mix-start-quiz').addEventListener('click', () => startMixQuiz());
   document.getElementById('mix-start-weak').addEventListener('click', () => startMixQuiz('weak'));
   document.getElementById('mix-start-review').addEventListener('click', () => startMixQuiz('review'));
   document.getElementById('mix-start-unlearned').addEventListener('click', () => startMixQuiz('unlearned'));

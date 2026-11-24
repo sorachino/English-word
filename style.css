@@ -693,5 +693,7 @@ select{
 .idiom-chunk-hint.idiom-chunk-answer{margin-top:8px; font-size:13.5px; font-weight:400; color:var(--ink-soft);}
 
 /* 再生ボタンが、強調の下線に重ならないよう、行の下に余白をあけて置く */
-.pv-q-speak{display:block; margin:10px 0 0;}
-#idiom-q-example .speak-btn{display:inline-block; margin:10px 0 0 6px; vertical-align:middle;}
+.pv-q-speak{display:block; margin:8px 0 0;}
+/* 再生ボタンが出ている間は、出題文の最小の高さをなくして、文とボタンの間をあけすぎない */
+.question-text:has(+ .pv-q-speak:not([hidden])){min-height:0;}
+#idiom-q-example .speak-btn{display:inline-block; margin:8px 0 0 6px; vertical-align:middle;}

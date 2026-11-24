@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '217'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '222'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -685,8 +685,8 @@ function populateStageSelects() {
     const o1 = document.createElement('option'); o1.value = s; o1.textContent = 'Stage ' + s; sel1.appendChild(o1);
     const o2 = document.createElement('option'); o2.value = s; o2.textContent = 'Stage ' + s; sel2.appendChild(o2);
   }
-  const savedStage = localStorage.getItem('pv_quiz_stage');
-  if (savedStage && [...sel1.options].some(o => o.value === savedStage)) sel1.value = savedStage;
+  // クイズの「範囲」は廃止（常に全ステージ）。以前保存した範囲が効かないよう、保存値を消す
+  try { localStorage.removeItem('pv_quiz_stage'); } catch (e) {}
 }
 populateStageSelects();
 document.getElementById('quiz-stage').addEventListener('change', () => { saveQuizSettings(); if (typeof renderDictProgress === 'function') renderDictProgress(); });
@@ -4730,6 +4730,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('mix-unlearned-num').textContent = c.pv.unlearned + c.id.unlearned;
   }
   window.refreshMixQuickActions = refreshMixQuickActions;
+  refreshMixQuickActions(); // 起動時にミックスが選択済みでも、苦手・復習の件数を出す（上の初期描画では未定義だった）
 
   // kind: 'weak' | 'review' | 'unlearned'（通常のクイズの絞り込みと同じ）。無指定なら全体から出す
   function startMixQuiz(kind) {

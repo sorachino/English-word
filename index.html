@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="217">
+<meta name="build-version" content="222">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -64,7 +64,7 @@
             <button class="chip" data-mode="matching">マッチング</button>
           </div>
         </div>
-        <div class="setup-row">
+        <div class="setup-row" hidden>
           <label>範囲</label>
           <select id="quiz-stage">
             <option value="0">全ステージ</option>
@@ -74,9 +74,9 @@
           <label>使用頻度</label>
           <select id="quiz-freq">
             <option value="all">すべて</option>
-            <option value="high">頻度:高</option>
-            <option value="mid">頻度:中</option>
-            <option value="low">頻度:低</option>
+            <option value="high">高</option>
+            <option value="mid">中</option>
+            <option value="low">低</option>
           </select>
         </div>
         <div class="setup-row">
@@ -100,9 +100,9 @@
           <label>使用頻度</label>
           <select id="mix-quiz-freq">
             <option value="all">すべて</option>
-            <option value="high">頻度:高</option>
-            <option value="mid">頻度:中</option>
-            <option value="low">頻度:低</option>
+            <option value="high">高</option>
+            <option value="mid">中</option>
+            <option value="low">低</option>
           </select>
         </div>
         <div class="setup-row">
@@ -133,9 +133,9 @@
           <label>使用頻度</label>
           <select id="idiom-quiz-freq">
             <option value="all">すべて</option>
-            <option value="high">頻度:高</option>
-            <option value="mid">頻度:中</option>
-            <option value="low">頻度:低</option>
+            <option value="high">高</option>
+            <option value="mid">中</option>
+            <option value="low">低</option>
           </select>
         </div>
         <div class="setup-row">
@@ -349,9 +349,9 @@
     <div class="list-controls-row2">
       <select id="list-freq-filter">
         <option value="all">全頻度</option>
-        <option value="high">頻度:高</option>
-        <option value="mid">頻度:中</option>
-        <option value="low">頻度:低</option>
+        <option value="high">高</option>
+        <option value="mid">中</option>
+        <option value="low">低</option>
       </select>
     </div>
     <label class="switch list-marked-toggle"><input type="checkbox" id="marked-only-toggle"><span>マークした語だけ表示</span></label>
@@ -400,9 +400,9 @@
       <div class="list-controls-row2">
         <select id="idiom-list-freq-filter">
           <option value="all">全頻度</option>
-          <option value="high">頻度:高</option>
-          <option value="mid">頻度:中</option>
-          <option value="low">頻度:低</option>
+          <option value="high">高</option>
+          <option value="mid">中</option>
+          <option value="low">低</option>
         </select>
       </div>
       <label class="switch list-marked-toggle"><input type="checkbox" id="idiom-marked-only-toggle"><span>マークした語だけ表示</span></label>
@@ -745,6 +745,6 @@
 <script src="idiom-chunks.js?v=6"></script>
 <script src="pv-chunks.js?v=12"></script>
 <script src="my-chunks.js?v=4"></script>
-<script src="app.js?v=217"></script>
+<script src="app.js?v=222"></script>
 </body>
 </html>

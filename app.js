@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '225'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '226'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -650,6 +650,35 @@ function pushAnswerLogToCloud(dateKey, entries) {
   // 回答内容は含まない。読み取り側は dailyCounts のみ公開ルールで許可される。
   pAl.push(db.ref(`dailyCounts/${nickname}/${dateKey}`).set(entries.length));
   trackCloudWrite('a', dateKey, Promise.all(pAl));
+}
+// ---------- 公開カウンタ(dailyCounts)の過去分バックフィル ----------
+// dailyCounts は 2026-11-16 から記録し始めたため、それ以前に解いた日は公開カウンタに無い。
+// 起動時のクラウド取り込みのついでに、回答ログ(クラウド+端末)の件数から過去分を補う。
+// dailyCounts に入れるのは「その日に解いた問題数」だけ。回答内容は含めない。
+let dailyCountsBackfilled = false;
+function backfillDailyCounts(nickname, cloudAnswerLog) {
+  if (dailyCountsBackfilled || !nickname) return;
+  dailyCountsBackfilled = true;
+  const db = initFirebase();
+  if (!db) return;
+  const counts = {};
+  if (cloudAnswerLog && typeof cloudAnswerLog === 'object') {
+    Object.entries(cloudAnswerLog).forEach(([date, entries]) => {
+      if (Array.isArray(entries)) counts[date] = entries.length;
+    });
+  }
+  const localLog = loadJSON(LS.ANSWER_LOG, {});
+  Object.entries(localLog).forEach(([date, entries]) => {
+    if (Array.isArray(entries)) counts[date] = Math.max(counts[date] || 0, entries.length);
+  });
+  const dates = Object.keys(counts);
+  if (!dates.length) return;
+  db.ref(`dailyCounts/${nickname}`).get().then(snap => {
+    const cur = snap.val() || {};
+    const updates = {};
+    dates.forEach(date => { if (cur[date] !== counts[date]) updates[date] = counts[date]; });
+    if (Object.keys(updates).length) db.ref(`dailyCounts/${nickname}`).update(updates).catch(() => {});
+  }).catch(() => {});
 }
 function todayKey(offset = 0) {
   const d = new Date();
@@ -3061,6 +3090,7 @@ function pullAndMergeCloud(nickname, verbose) {
 
   db.ref(`users/${nickname}`).get().then(snap => {
     const cloud = snap.val() || {};
+    backfillDailyCounts(nickname, cloud.answerLog);
     let changed = false;
 
     // 旧形式のキー（例: "get at"）は、新形式（"n273"）に読み替えて取り込んだあと、クラウドから削除する。

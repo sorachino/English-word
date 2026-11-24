@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '224'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '225'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -3356,9 +3356,16 @@ function markCurrentAsWrong() {
 
   const answered = loadJSON(LS_ANSWERED, {});
   if (!answered[key]) answered[key] = { ok: 0, ng: 0, totalNg: 0 };
+  // 正解として数えた分を取り消す（熟語側と同じ。ここが抜けていると正解回数が1多いままになる）
+  answered[key].ok = Math.max(0, (answered[key].ok || 0) - 1);
   answered[key].ng = (answered[key].ng || 0) + 1;
   answered[key].totalNg = (answered[key].totalNg || 0) + 1;
   saveJSON(LS_ANSWERED, answered);
+  const statsEl = document.getElementById('reveal-answer-stats');
+  if (statsEl) statsEl.innerHTML = answerStatsHtml(key);
+
+  // 復習間隔も「間違えた」扱いに戻す（正解で伸ばした間隔をリセット）
+  updateSrs(key, false, false);
 
   const last = quizState.results[quizState.results.length - 1];
   if (last && last.verb === verb && last.ok) {
@@ -3377,6 +3384,17 @@ function markCurrentAsWrong() {
   const nickname = getNickname();
   if (db && nickname) {
     db.ref(`users/${nickname}/log/${today}/correct`).set(firebase.database.ServerValue.increment(-1)).catch(() => {});
+  }
+
+  // 個別の回答履歴（記録タブの集計）も不正解に訂正する
+  const answerLog = loadJSON(LS.ANSWER_LOG, {});
+  const todayEntries = answerLog[today];
+  if (todayEntries) {
+    for (let i = todayEntries.length - 1; i >= 0; i--) {
+      if (todayEntries[i].k === key && todayEntries[i].ok) { todayEntries[i].ok = false; break; }
+    }
+    saveJSON(LS.ANSWER_LOG, answerLog);
+    pushAnswerLogToCloud(today, todayEntries);
   }
 
   renderDictProgress();

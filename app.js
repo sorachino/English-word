@@ -372,7 +372,7 @@ function updateSrs(key, ok, usedHelp) {
     entry.reps = (entry.reps || 0) + 1;
     entry.interval = entry.reps <= 1 ? 1 : Math.min(60, entry.interval * 2);
   } else if (ok && usedHelp) {
-    entry.interval = entry.interval || 1; // ヒント/4択正解は間隔を伸ばさず据え置き
+    entry.interval = entry.interval || 1; // ヒント使用の正解は間隔を伸ばさず据え置き
   } else {
     entry.interval = 1;
     entry.reps = 0;
@@ -1467,7 +1467,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
   q.resolved = true; q.method = method;
   const key = wordKey(q.word);
   recordResult(key, ok ? method : 'wrong');
-  updateSrs(key, ok, method === 'hint' || method === 'choice');
+  updateSrs(key, ok, method === 'hint'); // 4択（choice）の正解も間隔を伸ばす。ヒント使用時だけ据え置き
   recordAnswered(key, ok);
   logToday(ok);
   recordAnswerLog('quiz', q.word, ok, quizState.sessionId);

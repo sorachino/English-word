@@ -4542,6 +4542,14 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     stamp.hidden = false;
     stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
 
+    // 解答後は選択肢が消えるので、出題文の反対側（英文→日本語／日本語→英文）をカードに表示する
+    const pcR = prepChunkOf(q.item);
+    const hintEl = document.querySelector('#idiom-q-example .idiom-chunk-hint');
+    if (pcR && hintEl && idiomQuizState.mode !== 'order') {
+      const other = q.dir === 'ja2en' ? pcR.chunk : pcR.ja;
+      if (other) { hintEl.textContent = other; hintEl.classList.add('idiom-chunk-answer'); }
+    }
+
     document.getElementById('idiom-reveal-phrase').textContent = q.item.phrase;
     document.getElementById('idiom-reveal-answer-stats').innerHTML = idiomAnswerStatsHtml(key);
     document.getElementById('idiom-reveal-category').textContent = q.item.categoryLabel;

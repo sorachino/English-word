@@ -969,6 +969,10 @@ function showQuestion() {
     document.getElementById('question-text').innerHTML = q.chunk ? '<span class="pv-chunk">' + q.chunk.blankHtml + '</span>' : q.questionHtml;
     replayBtn.hidden = true;
   }
+  // 英文が問題として見えている（逆方向）ときだけ、英文の再生ボタンを出す。通常方向は解答後に出す
+  const pvSpeak = document.getElementById('pv-q-speak');
+  pvSpeak.hidden = !(q.chunk && quizState.mode === 'reverse');
+  pvSpeak.dataset.text = q.chunk ? q.chunk.en : '';
   document.getElementById('ja-preview').textContent =
     (quizState.mode === 'reverse' || quizState.mode === 'listening') ? '' : (q.chunk ? q.chunk.ja : q.ja);
   document.getElementById('answer-input').placeholder = quizState.mode === 'reverse' ? '意味を日本語で入力' : '句動詞を入力';
@@ -1563,6 +1567,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
     document.getElementById('giveup-btn').hidden = true;
     // 答えを見る画面では、問題の英文（チャンク）の下に日本語訳を表示する。出題用の案内文は消す
     document.getElementById('pv-q-hint').textContent = '';
+    if (q.chunk) { const sp = document.getElementById('pv-q-speak'); sp.hidden = false; sp.dataset.text = q.chunk.en; }
     if (quizState.mode === 'reverse' && q.chunk) document.getElementById('ja-preview').textContent = q.chunk.ja;
     if (q.wrongPicked) {
       const note = document.getElementById('pv-wrong-note');

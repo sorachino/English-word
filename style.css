@@ -690,4 +690,8 @@ select{
 
 .nuance-alt{margin-top:8px; padding-top:8px; border-top:1px dashed rgba(0,0,0,.18); font-size:.95em;}
 
-.idiom-chunk-hint.idiom-chunk-answer{margin-top:8px; font-size:15px; color:var(--ink); font-weight:600;}
+.idiom-chunk-hint.idiom-chunk-answer{margin-top:8px; font-size:13.5px; font-weight:400; color:var(--ink-soft);}
+
+/* 再生ボタンが、強調の下線に重ならないよう、行の下に余白をあけて置く */
+.pv-q-speak{display:block; margin:10px 0 0;}
+#idiom-q-example .speak-btn{display:inline-block; margin:10px 0 0 6px; vertical-align:middle;}

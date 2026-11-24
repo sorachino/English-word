@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="222">
+<meta name="build-version" content="223">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -56,6 +56,15 @@
       </div>
       <div id="pv-quiz-options">
         <div class="setup-row">
+          <label>使用頻度</label>
+          <select id="quiz-freq">
+            <option value="all">すべて</option>
+            <option value="high">高</option>
+            <option value="mid">中</option>
+            <option value="low">低</option>
+          </select>
+        </div>
+        <div class="setup-row">
           <label>出題モード</label>
           <div class="chip-group" id="quiz-mode-group">
             <button class="chip active" data-mode="normal">通常</button>
@@ -68,15 +77,6 @@
           <label>範囲</label>
           <select id="quiz-stage">
             <option value="0">全ステージ</option>
-          </select>
-        </div>
-        <div class="setup-row">
-          <label>使用頻度</label>
-          <select id="quiz-freq">
-            <option value="all">すべて</option>
-            <option value="high">高</option>
-            <option value="mid">中</option>
-            <option value="low">低</option>
           </select>
         </div>
         <div class="setup-row">
@@ -106,20 +106,20 @@
           </select>
         </div>
         <div class="setup-row">
+          <label>出題モード</label>
+          <div class="chip-group" id="mix-dir-group">
+            <button class="chip active" data-dir="normal">通常</button>
+            <button class="chip" data-dir="reverse">逆方向</button>
+            <button class="chip" data-dir="random">ランダム</button>
+          </div>
+        </div>
+        <div class="setup-row">
           <label>問題数</label>
           <div class="chip-group" id="mix-count-group">
             <button class="chip" data-count="10">10</button>
             <button class="chip active" data-count="20">20</button>
             <button class="chip" data-count="50">50</button>
             <button class="chip" data-count="100">100</button>
-          </div>
-        </div>
-        <div class="setup-row">
-          <label>出題の向き</label>
-          <div class="chip-group" id="mix-dir-group">
-            <button class="chip active" data-dir="normal">通常</button>
-            <button class="chip" data-dir="reverse">逆方向</button>
-            <button class="chip" data-dir="random">ランダム</button>
           </div>
         </div>
         <div class="dp-quick-actions" id="mix-quick-actions">
@@ -745,6 +745,6 @@
 <script src="idiom-chunks.js?v=6"></script>
 <script src="pv-chunks.js?v=12"></script>
 <script src="my-chunks.js?v=4"></script>
-<script src="app.js?v=222"></script>
+<script src="app.js?v=223"></script>
 </body>
 </html>

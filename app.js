@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '226'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '227'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -656,7 +656,7 @@ function pushAnswerLogToCloud(dateKey, entries) {
 // 起動時のクラウド取り込みのついでに、回答ログ(クラウド+端末)の件数から過去分を補う。
 // dailyCounts に入れるのは「その日に解いた問題数」だけ。回答内容は含めない。
 let dailyCountsBackfilled = false;
-function backfillDailyCounts(nickname, cloudAnswerLog) {
+function backfillDailyCounts(nickname, cloudAnswerLog, cloudDailyLog) {
   if (dailyCountsBackfilled || !nickname) return;
   dailyCountsBackfilled = true;
   const db = initFirebase();
@@ -671,6 +671,17 @@ function backfillDailyCounts(nickname, cloudAnswerLog) {
   Object.entries(localLog).forEach(([date, entries]) => {
     if (Array.isArray(entries)) counts[date] = Math.max(counts[date] || 0, entries.length);
   });
+  // 日別ログ（デイリーチャンピオン等の集計元）は回答ログより古い日（2026年8月など）も
+  // 残っているので、そちらも候補にする。solved が「その日に解いた問題数」。
+  const mergeDailyLog = (dailyLog) => {
+    if (!dailyLog || typeof dailyLog !== 'object') return;
+    Object.entries(dailyLog).forEach(([date, d]) => {
+      const solved = (d && d.solved) || 0;
+      if (solved > 0) counts[date] = Math.max(counts[date] || 0, solved);
+    });
+  };
+  mergeDailyLog(cloudDailyLog);
+  mergeDailyLog(loadJSON(LS.LOG, {}));
   const dates = Object.keys(counts);
   if (!dates.length) return;
   db.ref(`dailyCounts/${nickname}`).get().then(snap => {
@@ -3090,7 +3101,7 @@ function pullAndMergeCloud(nickname, verbose) {
 
   db.ref(`users/${nickname}`).get().then(snap => {
     const cloud = snap.val() || {};
-    backfillDailyCounts(nickname, cloud.answerLog);
+    backfillDailyCounts(nickname, cloud.answerLog, cloud.log);
     let changed = false;
 
     // 旧形式のキー（例: "get at"）は、新形式（"n273"）に読み替えて取り込んだあと、クラウドから削除する。

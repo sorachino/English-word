@@ -272,7 +272,7 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn, freq) {
   }
   let picks = pool.slice(0, count);
   if (weakOn) shuffle(picks); // 出題内容は古い順に選ぶが、出す順番自体はランダムにする
-  picks = declusterByGroup(picks);
+  if (!fewestFirst) picks = declusterByGroup(picks); // 回数順のときは、並びを崩さない
 
   const allVerbs = [...new Set(words.map(w => baseForm(w.verb)))];
   const questions = [];
@@ -4757,6 +4757,12 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       ...pvQs.map(q => ({ type: 'pv', q })),
       ...idiomQs.map(q => ({ type: 'idiom', q })),
     ]);
+    if (kind === 'unlearned') {
+      // 回数順：句動詞・熟語をまとめて、解答回数の少ない順に並べる（同じ回数の中はシャッフル順のまま）
+      const pvAns = loadJSON(LS_ANSWERED, {}), idAns = loadJSON(LS_IDIOM_ANSWERED, {});
+      const att = s => s.type === 'pv' ? attemptsOf(pvAns, wordKey(s.q.word)) : attemptsOf(idAns, idiomKey(s.q.item));
+      plan.sort((x, y) => att(x) - att(y));
+    }
     if (!plan.length) { toast(kind ? '該当する語がありませんでした' : '出題できる語がありませんでした'); return; }
     mixState = { plan, idx: 0, correct: 0, results: [], sessionId: Date.now(), cur: null };
     document.getElementById('quiz-setup').hidden = true;

@@ -701,3 +701,8 @@ select{
 #idiom-q-example .speak-btn{display:inline-block; margin:8px 0 0 6px; vertical-align:middle;}
 
 .weak-breakdown{margin-left:8px; font-size:11.5px; font-weight:500; color:var(--ink-soft); letter-spacing:0;}
+
+.reveal-freq{margin:0 0 8px;}
+.reveal-freq .wi-freq,.idiom-category-tag + .wi-freq,#idiom-reveal-freq .wi-freq{margin-left:0;}
+#idiom-reveal-freq .wi-freq,.dd-reveal .idiom-category-tag + .wi-freq{margin-left:6px; margin-bottom:10px;}
+#idiom-reveal-freq .wi-freq,.dd-reveal .idiom-category-tag + .wi-freq{vertical-align:top; margin-top:2px;}

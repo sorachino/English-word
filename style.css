@@ -721,3 +721,7 @@ select{
 .freq-pop-title .wi-freq{margin:0; cursor:default;}
 .freq-pop-body{font-size:14.5px; line-height:1.7; color:var(--ink); margin-bottom:16px;}
 .freq-pop-close{width:100%; margin:0;}
+
+/* 別語義の注：押すと同じ表記の別の語義を開く */
+.note-sense{cursor:pointer;}
+.note-sense-arrow{display:inline-block;margin-left:.3em;font-weight:700;text-decoration:underline;text-underline-offset:2px;white-space:nowrap;}

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '252'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '253'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -281,6 +281,11 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn, freq) {
   if (weakOn) shuffle(picks); // 出題内容は古い順に選ぶが、出す順番自体はランダムにする
   if (!fewestFirst) picks = declusterByGroup(picks); // 回数順のときは、並びを崩さない
 
+  return makeQuestions(picks, words);
+}
+
+// picks（語の配列）から実際の問題オブジェクトを組み立てる（通常・ミックス・鬼門で共用）
+function makeQuestions(picks, words) {
   const allVerbs = [...new Set(words.map(w => baseForm(w.verb)))];
   const questions = [];
   for (const w of picks) {
@@ -327,6 +332,118 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn, freq) {
   }
   return questions;
 }
+
+// ===================== 鬼門（未正解・繰り返し誤答）と卒業 =====================
+// 鬼門の定義: ①一度も正解していないのに2回以上間違えた語 ②今3回以上連続で間違えている語。
+// 一度鬼門に入った語は「セッションをまたいで2回連続正解」するまで鬼門のまま追跡し、達成したら卒業。
+// 追跡状態は pv_kimon に { key: {streak: 連続正解数} } で持つ（端末ローカル）。
+const LS_KIMON = 'pv_kimon';
+function kimonPredicate(rec) {
+  if (!rec) return false;
+  return (rec.ok === 0 && (rec.totalNg || 0) >= 2) || (rec.ng || 0) >= 3;
+}
+function loadKimon() { return loadJSON(LS_KIMON, {}); }
+function saveKimon(k) { saveJSON(LS_KIMON, k); }
+// 条件を満たした語を鬼門として新規登録する（追跡中の語はそのまま）。登録済みマップを返す
+function syncKimonRegistry() {
+  const answered = loadJSON(LS_ANSWERED, {});
+  const kimon = loadKimon();
+  let changed = false;
+  Object.keys(answered).forEach(key => {
+    if (!(key in kimon) && kimonPredicate(answered[key])) { kimon[key] = { streak: 0 }; changed = true; }
+  });
+  if (changed) saveKimon(kimon);
+  return kimon;
+}
+
+// 直近の「誤答があった日」の誤答語キー集合（前回の誤答）。同日の後半セッションでは当日の誤答も含む
+function lastMissKeys() {
+  const log = loadJSON(LS.ANSWER_LOG, {});
+  const keys = new Set();
+  const byVerb = {};
+  allWords().forEach(w => { const b = baseForm(w.verb); if (!byVerb[b]) byVerb[b] = w; });
+  Object.keys(log).sort().reverse().forEach(d => {
+    if (keys.size) return; // 直近の誤答日ぶんだけ
+    (log[d] || []).forEach(e => {
+      if (!e || e.m !== 'quiz' || e.ok) return;
+      if (e.k) keys.add(e.k);
+      else if (e.v && byVerb[e.v]) keys.add(wordKey(byVerb[e.v])); // 旧形式（k無し）は表記から引く
+    });
+  });
+  return keys;
+}
+
+// ===================== おまかせミックス =====================
+// セッションを優先度つきに合体する: 鬼門 → 前回の誤答 → 復習期限 → 苦手 → 通常。
+// 復習系（鬼門〜苦手）は全体の最大4割まで。ただし鬼門だけは枠を超えても全量優先する。
+const MIX_TIER_NAMES = { 1: '鬼門', 2: '前回の誤答', 3: '復習期限', 4: '苦手', 5: '通常' };
+function classifyMixPool(stageFilter, freq) {
+  const words = allWords();
+  const kimon = syncKimonRegistry();
+  const weak = loadJSON(LS.WEAK, {});
+  const answered = loadJSON(LS_ANSWERED, {});
+  const missKeys = lastMissKeys();
+  const isDue = w => { const s = srsScore(wordKey(w)); return s !== null && s <= 0; };
+  let pool = stageFilter ? words.filter(w => w.stage === stageFilter) : words.slice();
+  if (freq && freq !== 'all') pool = pool.filter(w => w.freq === freq);
+  const tiers = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+  pool.forEach(w => {
+    const key = wordKey(w);
+    if (key in kimon) tiers[1].push(w);
+    else if (missKeys.has(key)) tiers[2].push(w);
+    else if (isDue(w)) tiers[3].push(w);
+    else if (weak[key]) tiers[4].push(w);
+    else tiers[5].push(w);
+  });
+  tiers[3].sort((a, b) => srsScore(wordKey(a)) - srsScore(wordKey(b))); // 期限切れが長い順
+  tiers[4].sort((a, b) => (answered[wordKey(a)]?.lastAt || 0) - (answered[wordKey(b)]?.lastAt || 0)); // 放置が長い順
+  shuffle(tiers[1]); shuffle(tiers[2]);
+  tiers[5].sort((a, b) => attemptsOf(answered, wordKey(a)) - attemptsOf(answered, wordKey(b))); // 解答回数が少ない順
+  return tiers;
+}
+function selectMixPicks(tiers, count) {
+  const budget = Math.max(Math.ceil(count * 0.4), Math.min(tiers[1].length, count));
+  const picked = [];
+  const used = new Set();
+  const take = (arr, tier, limit) => {
+    for (const w of arr) {
+      if (picked.length >= count || picked.length >= limit) break;
+      if (used.has(w)) continue;
+      used.add(w); picked.push({ w, tier });
+    }
+  };
+  take(tiers[1], 1, count);          // 鬼門は全量（問題数が上限）
+  take(tiers[2], 2, budget);         // ここからは復習枠（budget）まで
+  take(tiers[3], 3, budget);
+  take(tiers[4], 4, budget);
+  take(tiers[5], 5, count);          // 残りは通常プール
+  // 出題順: 鬼門＋前回の誤答を冒頭に置き、残りはシャッフルして同じグループが固まらないよう並べ替える
+  const head = picked.filter(p => p.tier <= 2);
+  const tailPicks = picked.filter(p => p.tier > 2);
+  const tierByWord = new Map(tailPicks.map(p => [p.w, p.tier]));
+  const tail = declusterByGroup(shuffle(tailPicks.map(p => p.w))).map(w => ({ w, tier: tierByWord.get(w) }));
+  return head.concat(tail);
+}
+function buildMixedQuiz(stageFilter, count, freq) {
+  const picked = selectMixPicks(classifyMixPool(stageFilter, freq), count);
+  const qs = makeQuestions(picked.map(p => p.w), allWords());
+  const tierByWord = new Map(picked.map(p => [p.w, p.tier]));
+  qs.forEach(q => { q.tier = tierByWord.get(q.word); });
+  return qs;
+}
+function buildKimonQuiz(stageFilter, count, freq) {
+  const kimon = syncKimonRegistry();
+  const answered = loadJSON(LS_ANSWERED, {});
+  let pool = allWords().filter(w => wordKey(w) in kimon);
+  if (stageFilter) pool = pool.filter(w => w.stage === stageFilter);
+  if (freq && freq !== 'all') pool = pool.filter(w => w.freq === freq);
+  pool.sort((a, b) => (answered[wordKey(a)]?.lastAt || 0) - (answered[wordKey(b)]?.lastAt || 0)); // 放置が長い順に選ぶ
+  const picks = shuffle(pool.slice(0, count)); // 出す順番はランダム
+  const qs = makeQuestions(picks, allWords());
+  qs.forEach(q => { q.tier = 1; });
+  return qs;
+}
+
 // 同じ意味グループ（例: back系）の語が出題順で連続しないよう並べ替える。
 // groupの多い方から交互に配置する貪欲法（タスクスケジューラ問題と同じ考え方）。
 // 1グループが全体の半数を超える場合は数学的に完全回避できないため、その分は諦めて最善を尽くす。
@@ -765,6 +882,8 @@ function saveQuizSettings() {
 function refreshQuizActionVisibility() {
   const isMatching = quizMode === 'matching';
   document.getElementById('dp-quick-actions').hidden = isMatching;
+  document.getElementById('dp-start-mix').hidden = isMatching;
+  document.getElementById('mix-preview').hidden = isMatching;
   document.getElementById('start-matching-btn').hidden = !isMatching;
 }
 document.querySelectorAll('#quiz-mode-group .chip').forEach(chip => {
@@ -1531,6 +1650,20 @@ function finishQuestion(ok, method, delay, userAnswer) {
   recordResult(key, ok ? method : 'wrong');
   updateSrs(key, ok, method === 'hint'); // 4択（choice）の正解も間隔を伸ばす。ヒント使用時だけ据え置き
   recordAnswered(key, ok);
+  // 鬼門の連続正解（卒業）管理: 2回連続正解で卒業、間違えたら振り出し
+  const kimon = loadKimon();
+  if (key in kimon) {
+    if (ok) {
+      kimon[key].streak = (kimon[key].streak || 0) + 1;
+      if (kimon[key].streak >= 2) {
+        delete kimon[key];
+        (quizState.graduated = quizState.graduated || []).push(q.answer);
+      }
+    } else {
+      kimon[key].streak = 0;
+    }
+    saveKimon(kimon);
+  }
   logToday(ok);
   recordAnswerLog('quiz', q.word, ok, quizState.sessionId);
   playResultSound(ok);
@@ -1642,6 +1775,26 @@ function finishQuiz() {
   document.getElementById('quiz-done').hidden = false;
   document.getElementById('done-score-num').textContent = quizState.correctCount;
   document.getElementById('done-score-total').textContent = quizState.questions.length;
+  // ミックス/鬼門セッションのときは内訳と卒業を表示する
+  const sumEl = document.getElementById('done-mix-summary');
+  if (sumEl) {
+    const parts = [];
+    if (quizState.results.some(r => r.q.tier)) {
+      const byTier = {};
+      quizState.results.forEach(r => {
+        const t = r.q.tier || 5;
+        if (!byTier[t]) byTier[t] = { total: 0, ok: 0 };
+        byTier[t].total++; if (r.ok) byTier[t].ok++;
+      });
+      const line = Object.keys(byTier).sort().map(t => `${MIX_TIER_NAMES[t]} ${byTier[t].ok}/${byTier[t].total}`).join(' ・ ');
+      parts.push('内訳（正解/出題）: ' + line);
+    }
+    if (quizState.graduated && quizState.graduated.length) {
+      parts.push('🎓 鬼門卒業: ' + quizState.graduated.join('、'));
+    }
+    sumEl.innerHTML = parts.map(p => escHtml(p)).join('<br>');
+    sumEl.hidden = !parts.length;
+  }
   const list = document.getElementById('done-list');
   list.innerHTML = '';
   quizState.results.forEach((r, i) => list.appendChild(doneItemEl(r, i)));
@@ -1814,16 +1967,27 @@ function renderDictProgress() {
   document.getElementById('dp-weak-num').textContent = qWeak;
   document.getElementById('dp-review-num').textContent = srsDuePool(qWords).length;
   document.getElementById('dp-unlearned-num2').textContent = qNew;
+  const kimonMap = syncKimonRegistry();
+  document.getElementById('dp-kimon-num').textContent = qWords.filter(w => wordKey(w) in kimonMap).length;
+  // おまかせミックスの内訳プレビュー（実際に出題される構成をそのまま数える）
+  const previewPicks = selectMixPicks(classifyMixPool(qStage, qFreq), quizCount);
+  const cnt = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  previewPicks.forEach(p => { cnt[p.tier]++; });
+  document.getElementById('mix-preview').textContent =
+    `今日の内訳（${previewPicks.length}問）: 鬼門 ${cnt[1]} ・ 前回の誤答 ${cnt[2]} ・ 復習期限 ${cnt[3]} ・ 苦手 ${cnt[4]} ・ 通常 ${cnt[5]}`;
 }
 
 // 辞書タブの苦手語／復習／未学習ボタンから、設定画面を経由せず即座にクイズを開始する
 function quickStartQuiz(kind) {
-  if (quizMode === 'matching') { toast('マッチングモードでは苦手語/復習/未学習の絞り込みは使えません。別のモードを選んでください'); return; }
+  if (quizMode === 'matching') { toast('マッチングモードでは絞り込み出題は使えません。別のモードを選んでください'); return; }
   const weakOn = kind === 'weak';
   const srsOn = kind === 'review';
   const newOn = kind === 'unlearned';
   const stage = parseInt(document.getElementById('quiz-stage').value, 10) || 0;
-  const qs = buildQuiz(stage, quizCount, weakOn, srsOn, newOn, document.getElementById('quiz-freq').value);
+  const freq = document.getElementById('quiz-freq').value;
+  const qs = kind === 'mix' ? buildMixedQuiz(stage, quizCount, freq)
+    : kind === 'kimon' ? buildKimonQuiz(stage, quizCount, freq)
+    : buildQuiz(stage, quizCount, weakOn, srsOn, newOn, freq);
   if (!qs.length) { toast('該当する語がありませんでした'); return; }
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelector('.tab[data-tab="quiz"]').classList.add('active');
@@ -1841,6 +2005,8 @@ function quickStartQuiz(kind) {
 document.getElementById('dp-start-weak').addEventListener('click', () => quickStartQuiz('weak'));
 document.getElementById('dp-start-review').addEventListener('click', () => quickStartQuiz('review'));
 document.getElementById('dp-start-unlearned').addEventListener('click', () => quickStartQuiz('unlearned'));
+document.getElementById('dp-start-kimon').addEventListener('click', () => quickStartQuiz('kimon'));
+document.getElementById('dp-start-mix').addEventListener('click', () => quickStartQuiz('mix'));
 
 function renderWordList() {
   renderDictProgress();

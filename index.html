@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="252">
+<meta name="build-version" content="253">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -14,6 +14,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=102">
+<style>
+  .mix-preview { margin: 8px 2px 2px; font-size: 12.5px; line-height: 1.6; opacity: .75; }
+  .done-mix-summary { margin: 6px 0 10px; font-size: 13.5px; line-height: 1.7; text-align: center; }
+</style>
 </head>
 <body>
 
@@ -37,7 +41,7 @@
   <button class="tab" data-tab="mydict"><span class="tab-idx">03</span>MY辞書</button>
   <button class="tab" data-tab="nuance"><span class="tab-idx">04</span>使い分け</button>
   <button class="tab" data-tab="stats"><span class="tab-idx">05</span>記録</button>
-  <button class="tab" data-tab="shadow"><span class="tab-idx">06</span>音読</button>
+  <button class="tab" data-tab="shadow" hidden><span class="tab-idx">06</span>音読</button>
 </nav>
 
 <main id="views">
@@ -88,7 +92,10 @@
             <button class="chip" data-count="100">100</button>
           </div>
         </div>
+        <button type="button" class="btn-primary btn-block" id="dp-start-mix">おまかせミックスで始める</button>
+        <div class="mix-preview" id="mix-preview"></div>
         <div class="dp-quick-actions" id="dp-quick-actions">
+          <button type="button" class="btn-ghost" id="dp-start-kimon">鬼門（<span id="dp-kimon-num">0</span>）</button>
           <button type="button" class="btn-ghost" id="dp-start-weak">苦手語（<span id="dp-weak-num">0</span>）</button>
           <button type="button" class="btn-ghost" id="dp-start-review">復習（<span id="dp-review-num">0</span>）</button>
           <button type="button" class="btn-ghost" id="dp-start-unlearned">回数順<span id="dp-unlearned-num2" hidden>0</span></button>
@@ -240,6 +247,7 @@
     <div class="quiz-done card" id="quiz-done" hidden>
       <div class="done-stamp">済</div>
       <div class="done-score"><span id="done-score-num">0</span> / <span id="done-score-total">10</span> 正解</div>
+      <div class="done-mix-summary" id="done-mix-summary" hidden></div>
       <div class="done-list" id="done-list"></div>
       <button class="btn-primary" id="restart-btn">もう一度</button>
     </div>
@@ -752,7 +760,7 @@
 <script src="idiom-chunks.js?v=7"></script>
 <script src="pv-chunks.js?v=14"></script>
 <script src="my-chunks.js?v=5"></script>
-<script src="app.js?v=252"></script>
+<script src="app.js?v=253"></script>
 <div class="freq-pop" id="freq-pop" hidden>
   <div class="freq-pop-backdrop"></div>
   <div class="freq-pop-card" role="dialog" aria-modal="true">

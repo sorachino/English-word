@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '229'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '230'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -2892,8 +2892,8 @@ function renderStats() {
   }
   function buildWeakChip(e) {
     const chip = document.createElement('span');
-    chip.className = 'weak-chip' + (e.heavy ? '' : ' hint');
-    chip.textContent = (e.type === 'id' ? '［熟］' : '') + e.label + ' ×' + e.sub;
+    chip.className = 'weak-chip' + (e.type === 'id' ? ' weak-chip-idiom' : (e.heavy ? '' : ' hint'));
+    chip.textContent = e.label + ' ×' + e.sub;
     chip.addEventListener('click', () => {
       if (entries.some(x => x.type === 'id') && !window.__idiomDetailItem) { toast('読み込み中です。少し待ってからもう一度お試しください'); return; }
       const items = detailItems();

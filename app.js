@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '235'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '236'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1598,6 +1598,11 @@ function finishQuestion(ok, method, delay, userAnswer) {
     markWrongBtn.hidden = true;
   }
 
+  // 日本語訳・英文の再生ボタンは、正解／不正解のスタンプと同じタイミングで出す（4択の遅延 run には含めない）
+  document.getElementById('pv-q-hint').textContent = '';
+  if (q.chunk) { const sp = document.getElementById('pv-q-speak'); sp.hidden = false; sp.dataset.text = q.chunk.en; }
+  if (quizState.mode === 'reverse' && q.chunk) document.getElementById('ja-preview').textContent = q.chunk.ja;
+
   const run = () => {
     reveal.hidden = false;
     document.getElementById('answer-form').hidden = true;
@@ -1607,10 +1612,6 @@ function finishQuestion(ok, method, delay, userAnswer) {
     document.getElementById('choice-btn').hidden = true;
     document.getElementById('input-style-btn').hidden = true;
     document.getElementById('giveup-btn').hidden = true;
-    // 答えを見る画面では、問題の英文（チャンク）の下に日本語訳を表示する。出題用の案内文は消す
-    document.getElementById('pv-q-hint').textContent = '';
-    if (q.chunk) { const sp = document.getElementById('pv-q-speak'); sp.hidden = false; sp.dataset.text = q.chunk.en; }
-    if (quizState.mode === 'reverse' && q.chunk) document.getElementById('ja-preview').textContent = q.chunk.ja;
     if (q.wrongPicked) {
       const note = document.getElementById('pv-wrong-note');
       note.innerHTML = 'あなたが選んだ「' + escHtml(q.wrongPicked.ja) + '」は<span class="pwn-en">→ ' + escHtml(q.wrongPicked.en) + '</span>';
@@ -4662,6 +4663,10 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     if (pcR && hintEl && idiomQuizState.mode !== 'order') {
       const other = q.dir === 'ja2en' ? pcR.chunk : pcR.ja;
       if (other) { hintEl.textContent = other; hintEl.classList.add('idiom-chunk-answer'); }
+    } else if (!pcR && idiomQuizState.mode !== 'order' && q.item.ja) {
+      // 例文が出題文になっている熟語も、スタンプと同時に日本語訳を英文の下へ出す（チャンクのある熟語と同じ位置）
+      const exEl = document.getElementById('idiom-q-example');
+      if (exEl && !exEl.querySelector('.idiom-chunk-hint')) exEl.insertAdjacentHTML('beforeend', `<div class="idiom-chunk-hint idiom-chunk-answer">${escHtml(q.item.ja)}</div>`);
     }
 
     document.getElementById('idiom-reveal-phrase').textContent = q.item.phrase;

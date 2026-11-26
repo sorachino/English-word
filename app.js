@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '232'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '234'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1539,7 +1539,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
   document.getElementById('reveal-verb').textContent = q.answer;
   document.getElementById('reveal-meaning').textContent = q.meaning || '';
   const rf = document.getElementById('reveal-freq');
-  rf.innerHTML = freqBadgeHtml(q.word.freq); rf.hidden = !rf.innerHTML;
+  rf.innerHTML = freqBadgeHtml(q.word.freq, 'pv', q.word.no); rf.hidden = !rf.innerHTML;
   document.getElementById('reveal-answer-stats').innerHTML = answerStatsHtml(key);
   document.getElementById('reveal-sentence').textContent = q.full;
   document.getElementById('reveal-speak-btn').dataset.text = q.full || '';
@@ -1693,7 +1693,7 @@ function renderDoneDetail() {
     ${markHtml}
     <div class="reveal-box dd-reveal">
       <div class="reveal-title-row"><div class="reveal-verb">${escHtml(it.verb)}</div>　　<div class="reveal-answer-stats">${answerStatsHtml(key)}</div></div>
-      ${freqBadgeHtml(w.freq) ? `<div class="reveal-freq">${freqBadgeHtml(w.freq)}</div>` : ''}
+      ${freqBadgeHtml(w.freq, 'pv', w.no) ? `<div class="reveal-freq">${freqBadgeHtml(w.freq, 'pv', w.no)}</div>` : ''}
       <div class="reveal-meaning">${escHtml(w.meaning || '')}</div>
       ${w.def ? `<div class="reveal-def">${escHtml(w.def)}</div>` : ''}
       ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}${w.alt ? `<div class="nuance-alt">🔁 もっとよく使う言い方：${escHtml(w.alt)}</div>` : ''}</div>` : ''}
@@ -1883,7 +1883,32 @@ function renderWordList() {
   words.forEach(w => el.appendChild(wordItemEl(w)));
 }
 const FREQ_LABEL = { high: '頻度:高', mid: '頻度:中', low: '頻度:低' };
-const freqBadgeHtml = f => FREQ_LABEL[f] ? `<span class="wi-freq wi-freq-${f}">${FREQ_LABEL[f]}</span>` : '';
+// kind: 'pv' | 'id'、no: データの番号。押すと、その語の頻度の根拠（freqWhy）を出す
+const freqBadgeHtml = (f, kind, no) => FREQ_LABEL[f] ? `<span class="wi-freq wi-freq-${f} wi-freq-tap" role="button" tabindex="0" data-fq-kind="${kind || ''}" data-fq-no="${no == null ? '' : no}">${FREQ_LABEL[f]}</span>` : '';
+function showFreqWhy(kind, no) {
+  const src = kind === 'id' ? (typeof IDIOM_DATA !== 'undefined' ? IDIOM_DATA : []) : PV_DATA;
+  const it = src.find(x => String(x.no) === String(no));
+  if (!it || !it.freqWhy) return;
+  document.getElementById('freq-pop-title').innerHTML = `<span class="freq-pop-name">${escHtml(kind === 'id' ? it.phrase : baseForm(it.verb))}</span>${freqBadgeHtml(it.freq)}`;
+  document.getElementById('freq-pop-body').textContent = it.freqWhy;
+  document.getElementById('freq-pop').hidden = false;
+}
+// 頻度バッジは、一覧・解説カード・詳細のどこでも同じ動きにする（一覧の行を開く動きより先に受ける）
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('.wi-freq-tap');
+  if (!b || !b.dataset.fqKind) return;
+  e.stopPropagation(); e.preventDefault();
+  showFreqWhy(b.dataset.fqKind, b.dataset.fqNo);
+}, true);
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const b = e.target.closest && e.target.closest('.wi-freq-tap');
+  if (b && b.dataset.fqKind) { e.preventDefault(); showFreqWhy(b.dataset.fqKind, b.dataset.fqNo); }
+});
+document.addEventListener('click', e => {
+  const pop = document.getElementById('freq-pop');
+  if (pop && !pop.hidden && (e.target.closest('.freq-pop-close') || e.target.classList.contains('freq-pop-backdrop'))) pop.hidden = true;
+});
 function wordItemEl(w) {
   const div = document.createElement('div');
   const verbKey = baseForm(w.verb); // マーク機能は従来通り表記ベース（マイ単語含め安定IDが無いため）
@@ -1892,7 +1917,7 @@ function wordItemEl(w) {
   const marked = loadMarked().has(verbKey);
   div.innerHTML = `
     <div class="wi-head">
-      <div><span class="wi-verb">${escHtml(baseForm(w.verb))}</span>${w.mine ? '<span class="wi-badge-mine">マイ単語</span>' : ''}${FREQ_LABEL[w.freq] ? `<span class="wi-freq wi-freq-${w.freq}">${FREQ_LABEL[w.freq]}</span>` : ''}</div>
+      <div><span class="wi-verb">${escHtml(baseForm(w.verb))}</span>${w.mine ? '<span class="wi-badge-mine">マイ単語</span>' : ''}${freqBadgeHtml(w.freq, 'pv', w.no)}</div>
       <div class="wi-right">
         <button class="wi-mark${marked ? ' on' : ''}" type="button" aria-label="マーク">${marked ? '★' : '☆'}</button>
         <span class="wi-stage">${w.mine ? 'MY' : 'ST.' + w.stage}</span>
@@ -4280,7 +4305,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
       return `
       <div class="word-item${idiomStatusClass(key)}" data-idiom-key="${escAttr(key)}">
         <div class="wi-head">
-          <span class="wi-verb">${escHtml(it.phrase)}</span>${FREQ_LABEL[it.freq] ? `<span class="wi-freq wi-freq-${it.freq}">${FREQ_LABEL[it.freq]}</span>` : ''}
+          <span class="wi-verb">${escHtml(it.phrase)}</span>${freqBadgeHtml(it.freq, 'id', it.no)}
           <div class="wi-right">
             <button class="wi-mark${isMarked ? ' on' : ''}" type="button" aria-label="マーク">${isMarked ? '★' : '☆'}</button>
             <span class="wi-stage">${escHtml(it.categoryLabel)}</span>
@@ -4641,7 +4666,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-reveal-phrase').textContent = q.item.phrase;
     document.getElementById('idiom-reveal-answer-stats').innerHTML = idiomAnswerStatsHtml(key);
     document.getElementById('idiom-reveal-category').textContent = q.item.categoryLabel;
-    document.getElementById('idiom-reveal-freq').innerHTML = freqBadgeHtml(q.item.freq);
+    document.getElementById('idiom-reveal-freq').innerHTML = freqBadgeHtml(q.item.freq, 'id', q.item.no);
     document.getElementById('idiom-reveal-meaning').textContent = q.item.meaning;
     const nuanceEl = document.getElementById('idiom-reveal-nuance');
     if (q.item.nuance) { nuanceEl.textContent = '💡 ' + q.item.nuance; nuanceEl.hidden = false; }
@@ -4730,7 +4755,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     // 熟語の解答後の解説と同じ並び：見出し(＋これまでの回数) → 分類 → 意味 → ニュアンス → 例文 → 語源
     let html = `<div class="reveal-box dd-reveal">`;
     html += `<div class="reveal-title-row"><div class="reveal-verb">${escHtml(item.phrase)}</div>　　<div class="reveal-answer-stats">${idiomAnswerStatsHtml(idiomKey(item))}</div></div>`;
-    if (item.categoryLabel || freqBadgeHtml(item.freq)) html += `<div class="idiom-tag-row">${item.categoryLabel ? `<div class="idiom-category-tag">${escHtml(item.categoryLabel)}</div>` : ''}${freqBadgeHtml(item.freq)}</div>`;
+    if (item.categoryLabel || freqBadgeHtml(item.freq, 'id', item.no)) html += `<div class="idiom-tag-row">${item.categoryLabel ? `<div class="idiom-category-tag">${escHtml(item.categoryLabel)}</div>` : ''}${freqBadgeHtml(item.freq, 'id', item.no)}</div>`;
     html += `<div class="reveal-meaning">${escHtml(item.meaning || '')}</div>`;
     if (item.nuance) html += `<div class="reveal-nuance">💡 ${escHtml(item.nuance)}</div>`;
     if (pc) html += sentRow(pc.chunk, pc.ja);

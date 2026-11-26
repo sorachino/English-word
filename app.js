@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '248'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '249'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1604,13 +1604,12 @@ function finishQuestion(ok, method, delay, userAnswer) {
     markWrongBtn.hidden = true;
   }
 
-  // 日本語訳・英文の再生ボタンは、正解／不正解のスタンプと同じタイミングで出す（4択の遅延 run には含めない）
-  document.getElementById('pv-q-hint').textContent = '';
-  if (q.chunk) { const sp = document.getElementById('pv-q-speak'); sp.hidden = false; sp.dataset.text = q.chunk.en; }
-  if (quizState.mode === 'reverse' && q.chunk) document.getElementById('ja-preview').textContent = q.chunk.ja;
-
   const run = () => {
     reveal.hidden = false;
+    // 日本語訳・英文の再生ボタンは、解説カードが出るのと同じタイミングで出す（スタンプだけ先に出す）
+    document.getElementById('pv-q-hint').textContent = '';
+    if (q.chunk) { const sp = document.getElementById('pv-q-speak'); sp.hidden = false; sp.dataset.text = q.chunk.en; }
+    if (quizState.mode === 'reverse' && q.chunk) document.getElementById('ja-preview').textContent = q.chunk.ja;
     document.getElementById('answer-form').hidden = true;
     document.getElementById('submit-btn').hidden = true;
     document.getElementById('choice-grid').hidden = true;

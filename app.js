@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '251'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '252'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -49,7 +49,8 @@ function saveJSON(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 function myWords() { return loadJSON(LS.MY_WORDS, []); }
 function allWords() {
   const mine = myWords().map((w, i) => {
-    const o = { ...w, stage: 0, no: 'M' + (i + 1), mine: true };
+    // ステージが無いマイ単語は Stage 9 として扱う（範囲「Stage 9」の出題や辞書の絞り込みに含まれる。表示は「マイ単語」「MY」のまま）
+    const o = { ...w, stage: 9, no: 'M' + (i + 1), mine: true };
     // 頻度・ほかによく使う言い方・頻度の理由は、本人が入力した値を優先し、無ければ my-chunks.js の句動詞名対応データで補う
     const x = typeof MY_CHUNK_DATA !== 'undefined' ? MY_CHUNK_DATA[baseForm(o.verb || '').toLowerCase().trim()] : null;
     if (x) { for (const k of ['freq', 'alt', 'freqWhy']) if (!o[k] && x[k]) o[k] = x[k]; }

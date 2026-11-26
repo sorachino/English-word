@@ -709,3 +709,15 @@ select{
 .idiom-tag-row .idiom-category-tag{margin:0; padding:3px 10px; line-height:1.4; border:1px solid transparent;}
 .idiom-tag-row .wi-freq{margin:0; padding:3px 9px; line-height:1.4; vertical-align:baseline;}
 #idiom-reveal-freq{display:contents;}
+
+/* 頻度バッジを押すと根拠を出す */
+.wi-freq-tap{cursor:pointer; -webkit-tap-highlight-color:transparent;}
+.freq-pop{position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:24px;}
+.freq-pop[hidden]{display:none;}
+.freq-pop-backdrop{position:absolute; inset:0; background:rgba(14,24,38,.55);}
+.freq-pop-card{position:relative; width:100%; max-width:340px; background:var(--paper-raised, #FBF9F5); border:1px solid var(--line, #D9D2C3); border-radius:18px; padding:20px 20px 16px; box-shadow:0 12px 32px rgba(14,24,38,.28);}
+.freq-pop-title{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+.freq-pop-name{font-weight:800; font-size:18px; color:var(--navy);}
+.freq-pop-title .wi-freq{margin:0; cursor:default;}
+.freq-pop-body{font-size:14.5px; line-height:1.7; color:var(--ink); margin-bottom:16px;}
+.freq-pop-close{width:100%; margin:0;}

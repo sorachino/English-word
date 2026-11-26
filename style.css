@@ -458,6 +458,7 @@ select{
 .dd-body .dd-mark{font-weight:900; font-size:14px; margin-bottom:6px;}
 .dd-body .dd-mark.ok{color:var(--ok);}
 .dd-body .dd-mark.ng{color:var(--hanko);}
+.dd-body .dd-reveal{box-shadow:none; margin-top:4px;}
 .dd-body .dd-verb{font-weight:900; font-size:20px; color:var(--navy); margin-bottom:8px;}
 .dd-body .ex{color:var(--ink); font-size:14.5px; margin-bottom:2px;}
 .dd-body .ja{color:var(--ink-soft); font-size:13px; margin-bottom:10px;}

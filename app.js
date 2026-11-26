@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '227'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '228'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1684,14 +1684,22 @@ function renderDoneDetail() {
   else if (it.ok === false) markHtml = '<div class="dd-mark ng">× 不正解</div>';
   else markHtml = `<div class="dd-mark ng">★ 苦手な語${it.sub ? '（' + escHtml(it.sub) + '）' : ''}</div>`;
   if (it.html) { document.getElementById('dd-body').innerHTML = markHtml + it.html; return; }
+  const sentRow = (en, ja) => en ? `<div class="reveal-sentence-row"><div class="reveal-sentence">${escHtml(en)}</div><button class="speak-btn" type="button" data-text="${escAttr(en)}" aria-label="読み上げ">🔊</button></div><div class="reveal-ja">${escHtml(ja || '')}</div>` : '';
+  const key = it.key || wordKey(w);
+  // 解答後の解説と同じ並び・同じ見た目：見出し(＋これまでの回数) → 意味 → 定義 → ニュアンス → 例文 → 構文 → 注 → 語源
   document.getElementById('dd-body').innerHTML = `
     ${markHtml}
-    <div class="dd-verb">${escHtml(it.verb)}</div>
-    ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
-    ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
-    <div class="def">${escHtml(w.meaning || '')}${w.def ? '／' + escHtml(w.def) : ''}</div>
-    ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
-    ${w.etymology ? `<div class="etym-box">${etymHtml(w.etymology, w.illustration)}</div>` : ''}
+    <div class="reveal-box dd-reveal">
+      <div class="reveal-title-row"><div class="reveal-verb">${escHtml(it.verb)}</div>　　<div class="reveal-answer-stats">${answerStatsHtml(key)}</div></div>
+      <div class="reveal-meaning">${escHtml(w.meaning || '')}</div>
+      ${w.def ? `<div class="reveal-def">${escHtml(w.def)}</div>` : ''}
+      ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}${w.alt ? `<div class="nuance-alt">🔁 もっとよく使う言い方：${escHtml(w.alt)}</div>` : ''}</div>` : ''}
+      ${sentRow(w.ex1, w.ja1)}
+      ${w.ex2 ? `<div class="reveal-extra-ex-row">${sentRow(w.ex2, w.ja2)}</div>` : ''}
+      ${structureHtml(it.verb, w.ex1, w.ex2) ? `<div class="reveal-structure">${structureHtml(it.verb, w.ex1, w.ex2)}</div>` : ''}
+      ${w.note ? `<div class="reveal-note">※ ${escHtml(w.note)}</div>` : ''}
+      ${w.etymology ? `<div class="etym-box">${etymHtml(w.etymology, w.illustration)}</div>` : ''}
+    </div>
   `;
 }
 function ddGo(delta) {
@@ -4700,12 +4708,17 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   // 結果一覧から開く詳細（句動詞と同じモーダル）に入れる熟語の中身
   function idiomDetailItem(item, ok) {
     const pc = prepChunkOf(item);
-    let html = `<div class="dd-verb">${escHtml(item.phrase)}</div>`;
-    if (pc) html += `<div class="ex">${escHtml(pc.chunk)} <button class="speak-btn" data-text="${escAttr(pc.chunk)}">🔊</button></div><div class="ja">${escHtml(pc.ja || '')}</div>`;
-    if (item.ex) html += `<div class="ex">${escHtml(item.ex)} <button class="speak-btn" data-text="${escAttr(item.ex)}">🔊</button></div><div class="ja">${escHtml(item.ja || '')}</div>`;
-    html += `<div class="def">${escHtml(item.meaning || '')}</div>`;
-    if (item.nuance) html += `<div class="def">💡 ${escHtml(item.nuance)}</div>`;
+    const sentRow = (en, ja) => `<div class="reveal-sentence-row"><div class="reveal-sentence">${escHtml(en)}</div><button class="speak-btn" type="button" data-text="${escAttr(en)}" aria-label="読み上げ">🔊</button></div><div class="reveal-ja">${escHtml(ja || '')}</div>`;
+    // 熟語の解答後の解説と同じ並び：見出し(＋これまでの回数) → 分類 → 意味 → ニュアンス → 例文 → 語源
+    let html = `<div class="reveal-box dd-reveal">`;
+    html += `<div class="reveal-title-row"><div class="reveal-verb">${escHtml(item.phrase)}</div>　　<div class="reveal-answer-stats">${idiomAnswerStatsHtml(idiomKey(item))}</div></div>`;
+    if (item.categoryLabel) html += `<div class="idiom-category-tag">${escHtml(item.categoryLabel)}</div>`;
+    html += `<div class="reveal-meaning">${escHtml(item.meaning || '')}</div>`;
+    if (item.nuance) html += `<div class="reveal-nuance">💡 ${escHtml(item.nuance)}</div>`;
+    if (pc) html += sentRow(pc.chunk, pc.ja);
+    if (item.ex) html += (pc ? '<div class="reveal-extra-ex-row">' : '') + sentRow(item.ex, item.ja) + (pc ? '</div>' : '');
     if (item.etymology) html += `<div class="etym-box">${etymHtml(item.etymology, '')}</div>`;
+    html += `</div>`;
     return { verb: item.phrase, ok, html };
   }
   function renderIdiomDoneList(results) {

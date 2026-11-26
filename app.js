@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '249'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '250'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1526,10 +1526,6 @@ function finishQuestion(ok, method, delay, userAnswer) {
   const q = quizState.questions[quizState.idx];
   if (q.resolved) return;
   q.resolved = true; q.method = method;
-  // スタンプは記録・同期・効果音などの処理より先に出す（処理が重い語でも、押した瞬間に出るように）
-  const stamp = document.getElementById('stamp-result');
-  stamp.hidden = false;
-  stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
   const key = wordKey(q.word);
   recordResult(key, ok ? method : 'wrong');
   updateSrs(key, ok, method === 'hint'); // 4択（choice）の正解も間隔を伸ばす。ヒント使用時だけ据え置き
@@ -1605,8 +1601,11 @@ function finishQuestion(ok, method, delay, userAnswer) {
   }
 
   const run = () => {
+    // 正解／不正解のスタンプ・日本語訳・英文の再生ボタンは、解説カードが出るのと同じタイミングでそろえて出す
+    const stamp = document.getElementById('stamp-result');
+    stamp.hidden = false;
+    stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
     reveal.hidden = false;
-    // 日本語訳・英文の再生ボタンは、解説カードが出るのと同じタイミングで出す（スタンプだけ先に出す）
     document.getElementById('pv-q-hint').textContent = '';
     if (q.chunk) { const sp = document.getElementById('pv-q-speak'); sp.hidden = false; sp.dataset.text = q.chunk.en; }
     if (quizState.mode === 'reverse' && q.chunk) document.getElementById('ja-preview').textContent = q.chunk.ja;

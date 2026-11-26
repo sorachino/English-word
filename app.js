@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '254'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '255'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -903,7 +903,6 @@ function refreshQuizActionVisibility() {
   const isMatching = quizMode === 'matching';
   document.getElementById('dp-quick-actions').hidden = isMatching;
   document.getElementById('dp-start-mix').hidden = isMatching;
-  document.getElementById('mix-preview').hidden = isMatching;
   document.getElementById('start-matching-btn').hidden = !isMatching;
 }
 document.querySelectorAll('#quiz-mode-group .chip').forEach(chip => {
@@ -2005,12 +2004,6 @@ function renderDictProgress() {
   document.getElementById('dp-unlearned-num2').textContent = qNew;
   const kimonMap = syncKimonRegistry();
   document.getElementById('dp-kimon-num').textContent = qWords.filter(w => wordKey(w) in kimonMap).length;
-  // おまかせミックスの内訳プレビュー（実際に出題される構成をそのまま数える）
-  const previewPicks = selectMixPicks(classifyMixPool(qStage, qFreq, qParticle), quizCount);
-  const cnt = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  previewPicks.forEach(p => { cnt[p.tier]++; });
-  document.getElementById('mix-preview').textContent =
-    `今日の内訳（${previewPicks.length}問）: 鬼門 ${cnt[1]} ・ 前回の誤答 ${cnt[2]} ・ 復習期限 ${cnt[3]} ・ 苦手 ${cnt[4]} ・ 通常 ${cnt[5]}`;
 }
 
 // 辞書タブの苦手語／復習／未学習ボタンから、設定画面を経由せず即座にクイズを開始する
@@ -2026,6 +2019,10 @@ function quickStartQuiz(kind) {
     : kind === 'kimon' ? buildKimonQuiz(stage, quizCount, freq, particle)
     : buildQuiz(stage, quizCount, weakOn, srsOn, newOn, freq, particle);
   if (!qs.length) { toast('該当する語がありませんでした'); return; }
+  launchPvQuiz(qs);
+}
+// 句動詞クイズのセッションを開始する（クイック開始・使い分けグループから共用）
+function launchPvQuiz(qs) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelector('.tab[data-tab="quiz"]').classList.add('active');
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -2038,6 +2035,13 @@ function quickStartQuiz(kind) {
   const idiomDone = document.getElementById('idiom-quiz-done'); if (idiomDone) idiomDone.hidden = true;
   document.getElementById('quiz-play').hidden = false;
   showQuestion();
+}
+// 使い分けグループの語だけでクイズを始める
+function startGroupQuiz(members) {
+  if (quizMode === 'matching') { toast('マッチングモードでは使えません'); return; }
+  const qs = makeQuestions(shuffle(members.slice()), allWords());
+  if (!qs.length) { toast('出題できる語がありませんでした'); return; }
+  launchPvQuiz(qs);
 }
 document.getElementById('dp-start-weak').addEventListener('click', () => quickStartQuiz('weak'));
 document.getElementById('dp-start-review').addEventListener('click', () => quickStartQuiz('review'));
@@ -2739,7 +2743,12 @@ function renderNuanceList() {
 
   const allGroupIds = [...new Set([...Object.keys(GROUP_INFO), ...Object.keys(customGroups)])];
   const groupIds = allGroupIds.filter(gid => (byGroup[gid] || []).length >= 2);
-  groupIds.sort((a, b) => labelOf(a).localeCompare(labelOf(b), 'ja'));
+  // 苦手・鬼門の語を含むグループを先に並べる（同じならラベル順）
+  const answeredMap = loadJSON(LS_ANSWERED, {});
+  const weakMap = loadJSON(LS.WEAK, {});
+  const kimonMap = syncKimonRegistry();
+  const weakishOf = gid => (byGroup[gid] || []).filter(w => { const k = wordKey(w); return (k in kimonMap) || weakMap[k]; }).length;
+  groupIds.sort((a, b) => (weakishOf(b) - weakishOf(a)) || labelOf(a).localeCompare(labelOf(b), 'ja'));
 
   const filtered = groupIds.filter(gid => {
     if (!q) return true;
@@ -2754,7 +2763,13 @@ function renderNuanceList() {
     const members = byGroup[gid];
     const card = document.createElement('div');
     card.className = 'nuance-card';
-    const verbsHtml = members.map(w => `<span class="nuance-verb-chip">${escHtml(baseForm(w.verb))}</span>`).join('');
+    const verbsHtml = members.map(w => {
+      const k = wordKey(w);
+      const rec = answeredMap[k];
+      const cnt = rec ? ` <span class="nv-counts">○${rec.ok || 0} ×${typeof rec.totalNg === 'number' ? rec.totalNg : (rec.ng || 0)}</span>` : '';
+      const cls = (k in kimonMap) ? ' st-kimon' : (weakMap[k] ? ' st-weak' : '');
+      return `<span class="nuance-verb-chip${cls}">${escHtml(baseForm(w.verb))}${cnt}</span>`;
+    }).join('');
     const isCustom = !!customGroups[gid];
     const editableBase = baseNoteOf(gid);
     const editableExtra = extraNotes[gid] || '';
@@ -2779,12 +2794,25 @@ function renderNuanceList() {
         </div>`;
 
     card.innerHTML = `
-      <div class="nuance-label">${escHtml(labelOf(gid))}</div>
+      <div class="nuance-label nuance-head">${escHtml(labelOf(gid))}<span class="nuance-toggle">▽</span></div>
       <div class="nuance-verbs">${verbsHtml}</div>
-      <div class="nuance-note nuance-note-display">${escHtml(noteOf(gid))}</div>
-      <button type="button" class="btn-ghost btn-block nuance-edit-btn">解説を編集する</button>
-      ${editAreaHtml}
+      <div class="nuance-body" hidden>
+        <div class="nuance-note nuance-note-display">${escHtml(noteOf(gid))}</div>
+        <button type="button" class="btn-primary btn-block nuance-quiz-btn">このグループでクイズ（${members.length}語）</button>
+        <button type="button" class="btn-ghost btn-block nuance-edit-btn">解説を編集する</button>
+        ${editAreaHtml}
+      </div>
     `;
+    const bodyEl = card.querySelector('.nuance-body');
+    const toggleEl = card.querySelector('.nuance-toggle');
+    card.querySelector('.nuance-head').addEventListener('click', () => {
+      bodyEl.hidden = !bodyEl.hidden;
+      toggleEl.textContent = bodyEl.hidden ? '▽' : '▼';
+    });
+    card.querySelector('.nuance-quiz-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      startGroupQuiz(members);
+    });
     const editBtn = card.querySelector('.nuance-edit-btn');
     const editArea = card.querySelector('.nuance-edit-area');
     const baseTextarea = card.querySelector('.nuance-edit-base');
@@ -4442,6 +4470,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-dp-weak-num').textContent = weakN;
     document.getElementById('idiom-dp-review-num').textContent = reviewN;
     document.getElementById('idiom-dp-unlearned-num2').textContent = unlearnedN;
+    document.getElementById('idiom-dp-kimon-num').textContent = pool.filter(it => idiomKey(it) in syncIdiomKimonRegistry()).length;
   }
   window.refreshIdiomQuickActions = refreshIdiomQuickActions;
   bindFreqSelect('idiom-quiz-freq', 'pv_idiom_freq', refreshIdiomQuickActions);
@@ -4641,6 +4670,11 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     }
     let picks = pool.slice(0, count);
     if (statusFilter === 'weak') shuffle(picks); // 出題内容は古い順に選ぶが、出す順番自体はランダムにする
+    return makeIdiomQuestions(picks);
+  }
+
+  // 熟語の問題オブジェクトを組み立てる（通常・ミックス・鬼門で共用）
+  function makeIdiomQuestions(picks) {
     return picks.map(it => {
       const pc = prepChunkOf(it);
       if (pc && pc.wrong && pc.wrong.length >= 3) {
@@ -4654,6 +4688,93 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     });
   }
 
+  // ---------- 熟語の鬼門とおまかせミックス（句動詞と同じ仕組み・定義も共通） ----------
+  const LS_IDIOM_KIMON = 'pv_idiom_kimon';
+  function loadIdiomKimon() { return loadJSON(LS_IDIOM_KIMON, {}); }
+  function syncIdiomKimonRegistry() {
+    const answered = loadJSON(LS_IDIOM_ANSWERED, {});
+    const kimon = loadIdiomKimon();
+    let changed = false;
+    Object.keys(answered).forEach(key => {
+      if (!(key in kimon) && kimonPredicate(answered[key])) { kimon[key] = { streak: 0 }; changed = true; }
+    });
+    if (changed) saveJSON(LS_IDIOM_KIMON, kimon);
+    return kimon;
+  }
+  function idiomLastMissKeys() {
+    const log = loadJSON(LS.ANSWER_LOG, {});
+    const keys = new Set();
+    Object.keys(log).sort().reverse().forEach(d => {
+      if (keys.size) return; // 直近の誤答日ぶんだけ
+      (log[d] || []).forEach(e => {
+        if (e && (e.m === 'idiom-choice' || e.m === 'idiom-order') && !e.ok && e.k) keys.add(e.k);
+      });
+    });
+    return keys;
+  }
+  function classifyIdiomMixPool(content, freq) {
+    const kimon = syncIdiomKimonRegistry();
+    const weak = loadJSON(LS_IDIOM_WEAK, {});
+    const answered = loadJSON(LS_IDIOM_ANSWERED, {});
+    const missKeys = idiomLastMissKeys();
+    let pool = poolForContent(content);
+    if (freq && freq !== 'all') pool = pool.filter(it => it.freq === freq);
+    const tiers = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+    pool.forEach(it => {
+      const key = idiomKey(it);
+      if (key in kimon) tiers[1].push(it);
+      else if (missKeys.has(key)) tiers[2].push(it);
+      else {
+        const s = idiomSrsScore(key);
+        if (s !== null && s <= 0) tiers[3].push(it);
+        else if (weak[key]) tiers[4].push(it);
+        else tiers[5].push(it);
+      }
+    });
+    tiers[3].sort((a, b) => idiomSrsScore(idiomKey(a)) - idiomSrsScore(idiomKey(b))); // 期限切れが長い順
+    tiers[4].sort((a, b) => (answered[idiomKey(a)]?.lastAt || 0) - (answered[idiomKey(b)]?.lastAt || 0)); // 放置が長い順
+    shuffle(tiers[1]); shuffle(tiers[2]);
+    tiers[5].sort((a, b) => attemptsOf(answered, idiomKey(a)) - attemptsOf(answered, idiomKey(b))); // 解答回数が少ない順
+    return tiers;
+  }
+  function selectIdiomMixPicks(tiers, count) {
+    const budget = Math.max(Math.ceil(count * 0.4), Math.min(tiers[1].length, count));
+    const picked = [];
+    const used = new Set();
+    const take = (arr, tier, limit) => {
+      for (const it of arr) {
+        if (picked.length >= count || picked.length >= limit) break;
+        if (used.has(it)) continue;
+        used.add(it); picked.push({ it, tier });
+      }
+    };
+    take(tiers[1], 1, count);          // 鬼門は全量（問題数が上限）
+    take(tiers[2], 2, budget);         // ここからは復習枠（budget）まで
+    take(tiers[3], 3, budget);
+    take(tiers[4], 4, budget);
+    take(tiers[5], 5, count);          // 残りは通常プール
+    const head = picked.filter(p => p.tier <= 2); // 鬼門＋前回の誤答を冒頭に
+    const tail = shuffle(picked.filter(p => p.tier > 2));
+    return head.concat(tail);
+  }
+  function buildIdiomMixedQuiz(count, content, freq) {
+    const picked = selectIdiomMixPicks(classifyIdiomMixPool(content, freq), count);
+    const qs = makeIdiomQuestions(picked.map(p => p.it));
+    const tierByItem = new Map(picked.map(p => [p.it, p.tier]));
+    qs.forEach(q => { q.tier = tierByItem.get(q.item); });
+    return qs;
+  }
+  function buildIdiomKimonQuiz(count, content, freq) {
+    const kimon = syncIdiomKimonRegistry();
+    const answered = loadJSON(LS_IDIOM_ANSWERED, {});
+    let pool = poolForContent(content).filter(it => idiomKey(it) in kimon);
+    if (freq && freq !== 'all') pool = pool.filter(it => it.freq === freq);
+    pool.sort((a, b) => (answered[idiomKey(a)]?.lastAt || 0) - (answered[idiomKey(b)]?.lastAt || 0)); // 放置が長い順に選ぶ
+    const qs = makeIdiomQuestions(shuffle(pool.slice(0, count))); // 出す順番はランダム
+    qs.forEach(q => { q.tier = 1; });
+    return qs;
+  }
+
   // 日本語を見て英語のチャンクを選ぶ問題（ミックスの「通常」向き）。不正解の英語は chunk の wrongEn を使う。
   // wrongEn が無い語は作れないので null を返し、呼び出し側は英語→日本語の問題のままにする。
   function makeIdiomJaEnQuestion(it) {
@@ -4663,10 +4784,13 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   }
 
   function startIdiomQuiz(statusFilter) {
-    const built = buildIdiomQuiz(idiomCount, quizContent, statusFilter, idiomFreqOf('idiom-quiz-freq'));
+    const fq = idiomFreqOf('idiom-quiz-freq');
+    const built = statusFilter === 'mix' ? buildIdiomMixedQuiz(idiomCount, quizContent, fq)
+      : statusFilter === 'kimon' ? buildIdiomKimonQuiz(idiomCount, quizContent, fq)
+      : buildIdiomQuiz(idiomCount, quizContent, statusFilter, fq);
     if (!built.length) { toast('該当する熟語がありませんでした'); return; }
     // 通常＝日本語→英語。英語の不正解が用意できない語は、英語→日本語のまま出す
-    const qs = idiomMode === 'normal' ? built.map(q => makeIdiomJaEnQuestion(q.item) || q) : built;
+    const qs = idiomMode === 'normal' ? built.map(q => { const jq = makeIdiomJaEnQuestion(q.item); if (jq) { jq.tier = q.tier; return jq; } return q; }) : built;
     idiomQuizState = { questions: qs, idx: 0, correctCount: 0, mode: idiomMode === 'order' ? 'order' : 'choice', sessionId: Date.now(), results: [] };
     document.getElementById('quiz-setup').hidden = true;
     document.getElementById('quiz-play').hidden = true;
@@ -4679,6 +4803,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   document.getElementById('idiom-dp-start-weak').addEventListener('click', () => startIdiomQuiz('weak'));
   document.getElementById('idiom-dp-start-review').addEventListener('click', () => startIdiomQuiz('review'));
   document.getElementById('idiom-dp-start-unlearned').addEventListener('click', () => startIdiomQuiz('unlearned'));
+  document.getElementById('idiom-dp-start-kimon').addEventListener('click', () => startIdiomQuiz('kimon'));
+  document.getElementById('idiom-dp-start-mix').addEventListener('click', () => startIdiomQuiz('mix'));
 
   function showIdiomQuestion() {
     const q = idiomQuizState.questions[idiomQuizState.idx];
@@ -4890,9 +5016,23 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   function finishIdiomAnswer(q, ok, delay) {
     q.correct = ok;
     if (ok) idiomQuizState.correctCount++;
-    if (idiomQuizState.results) idiomQuizState.results.push({ item: q.item, ok });
+    if (idiomQuizState.results) idiomQuizState.results.push({ item: q.item, ok, tier: q.tier });
     const key = idiomKey(q.item);
     recordIdiomAnswered(key, ok);
+    // 鬼門の連続正解（卒業）管理: 2回連続正解で卒業、間違えたら振り出し
+    const ikimon = loadIdiomKimon();
+    if (key in ikimon) {
+      if (ok) {
+        ikimon[key].streak = (ikimon[key].streak || 0) + 1;
+        if (ikimon[key].streak >= 2) {
+          delete ikimon[key];
+          (idiomQuizState.graduated = idiomQuizState.graduated || []).push(q.item.phrase);
+        }
+      } else {
+        ikimon[key].streak = 0;
+      }
+      saveJSON(LS_IDIOM_KIMON, ikimon);
+    }
     recordIdiomResult(key, ok);
     updateIdiomSrs(key, ok);
     pushIdiomStateToCloud(key);
@@ -5047,6 +5187,26 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-quiz-done').hidden = false;
     document.getElementById('idiom-done-score-num').textContent = idiomQuizState.correctCount;
     document.getElementById('idiom-done-score-total').textContent = idiomQuizState.questions.length;
+    // ミックス/鬼門セッションのときは内訳と卒業を表示する
+    const sumEl = document.getElementById('idiom-done-mix-summary');
+    if (sumEl) {
+      const parts = [];
+      const res = idiomQuizState.results || [];
+      if (res.some(r => r.tier)) {
+        const byTier = {};
+        res.forEach(r => {
+          const t = r.tier || 5;
+          if (!byTier[t]) byTier[t] = { total: 0, ok: 0 };
+          byTier[t].total++; if (r.ok) byTier[t].ok++;
+        });
+        parts.push('内訳（正解/出題）: ' + Object.keys(byTier).sort().map(t => `${MIX_TIER_NAMES[t]} ${byTier[t].ok}/${byTier[t].total}`).join(' ・ '));
+      }
+      if (idiomQuizState.graduated && idiomQuizState.graduated.length) {
+        parts.push('🎓 鬼門卒業: ' + idiomQuizState.graduated.join('、'));
+      }
+      sumEl.innerHTML = parts.map(p => escHtml(p)).join('<br>');
+      sumEl.hidden = !parts.length;
+    }
     renderIdiomDoneList(idiomQuizState.results || []);
     refreshIdiomQuickActions();
   }
@@ -5078,23 +5238,27 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
 
   // 苦手語・復習・未学習の語の数（句動詞・熟語それぞれ）。出題の絞り込みと同じ条件で数える
   function mixPoolCounts() {
-    const pv = { weak: 0, review: 0, unlearned: 0, all: 0 };
-    const id = { weak: 0, review: 0, unlearned: 0, all: 0 };
+    const pv = { weak: 0, review: 0, unlearned: 0, all: 0, kimon: 0 };
+    const id = { weak: 0, review: 0, unlearned: 0, all: 0, kimon: 0 };
     const pvWeak = loadJSON(LS.WEAK, {});
+    const pvKimon = syncKimonRegistry();
     const fq = idiomFreqOf('mix-quiz-freq');
     allWords().forEach(w => {
       if (fq !== 'all' && w.freq !== fq) return;
       const k = wordKey(w);
       pv.all++;
+      if (pvKimon[k]) pv.kimon++;
       if (pvWeak[k]) pv.weak++;
       const s = srsScore(k); if (s !== null && s <= 0) pv.review++;
       if (isNewWord(k)) pv.unlearned++;
     });
     const idWeak = loadJSON(LS_IDIOM_WEAK, {});
+    const idKimon = syncIdiomKimonRegistry();
     IDIOM_DATA.forEach(it => {
       if (fq !== 'all' && it.freq !== fq) return;
       const k = idiomKey(it);
       id.all++;
+      if (idKimon[k]) id.kimon++;
       if (idWeak[k]) id.weak++;
       const s = idiomSrsScore(k); if (s !== null && s <= 0) id.review++;
       if (isNewIdiom(k)) id.unlearned++;
@@ -5107,6 +5271,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('mix-weak-num').textContent = c.pv.weak + c.id.weak;
     document.getElementById('mix-review-num').textContent = c.pv.review + c.id.review;
     document.getElementById('mix-unlearned-num').textContent = c.pv.unlearned + c.id.unlearned;
+    document.getElementById('mix-kimon-num').textContent = c.pv.kimon + c.id.kimon;
   }
   window.refreshMixQuickActions = refreshMixQuickActions;
   refreshMixQuickActions(); // 起動時にミックスが選択済みでも、苦手・復習の件数を出す（上の初期描画では未定義だった）
@@ -5114,7 +5279,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   // kind: 'weak' | 'review' | 'unlearned'（通常のクイズの絞り込みと同じ）。無指定なら全体から出す
   function startMixQuiz(kind) {
     const c = mixPoolCounts();
-    const key = kind || 'all';
+    const key = kind === 'mix' ? 'all' : (kind || 'all'); // おまかせは全体から割合を決め、内訳は各ビルダーが付ける
     // 句動詞・熟語の語数に応じた割合になるよう、対象の語から無作為に選ぶ
     let kinds = [];
     for (let i = 0; i < c.pv[key]; i++) kinds.push('pv');
@@ -5136,8 +5301,13 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     }
     const nPv = picked.filter(k => k === 'pv').length;
     const nIdiom = picked.length - nPv;
-    const pvQs = nPv ? buildQuiz(0, nPv, kind === 'weak', kind === 'review', kind === 'unlearned', idiomFreqOf('mix-quiz-freq')) : [];
-    const idiomQs = nIdiom ? buildIdiomQuiz(nIdiom, 'all', kind || null, idiomFreqOf('mix-quiz-freq')) : [];
+    const mixFq = idiomFreqOf('mix-quiz-freq');
+    const pvQs = nPv ? (kind === 'kimon' ? buildKimonQuiz(0, nPv, mixFq, 'all')
+      : kind === 'mix' ? buildMixedQuiz(0, nPv, mixFq, 'all')
+      : buildQuiz(0, nPv, kind === 'weak', kind === 'review', kind === 'unlearned', mixFq)) : [];
+    const idiomQs = nIdiom ? (kind === 'kimon' ? buildIdiomKimonQuiz(nIdiom, 'all', mixFq)
+      : kind === 'mix' ? buildIdiomMixedQuiz(nIdiom, 'all', mixFq)
+      : buildIdiomQuiz(nIdiom, 'all', kind || null, mixFq)) : [];
     const plan = shuffle([
       ...pvQs.map(q => ({ type: 'pv', q })),
       ...idiomQs.map(q => ({ type: 'idiom', q })),
@@ -5240,6 +5410,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   document.getElementById('mix-start-weak').addEventListener('click', () => startMixQuiz('weak'));
   document.getElementById('mix-start-review').addEventListener('click', () => startMixQuiz('review'));
   document.getElementById('mix-start-unlearned').addEventListener('click', () => startMixQuiz('unlearned'));
+  document.getElementById('mix-start-kimon').addEventListener('click', () => startMixQuiz('kimon'));
+  document.getElementById('mix-start-mix').addEventListener('click', () => startMixQuiz('mix'));
 
   document.getElementById('idiom-restart-btn').addEventListener('click', () => {
     document.getElementById('idiom-quiz-done').hidden = true;

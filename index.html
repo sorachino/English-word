@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="254">
+<meta name="build-version" content="255">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -15,8 +15,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=102">
 <style>
-  .mix-preview { margin: 8px 2px 2px; font-size: 12.5px; line-height: 1.6; opacity: .75; }
   .done-mix-summary { margin: 6px 0 10px; font-size: 13.5px; line-height: 1.7; text-align: center; }
+  .nuance-verb-chip .nv-counts { font-size: 10.5px; opacity: .7; }
+  .nuance-verb-chip.st-weak { color: #c0392b; border-color: #c0392b; font-weight: 700; }
+  .nuance-verb-chip.st-kimon { background: #c0392b; border-color: #c0392b; color: #fff; font-weight: 700; }
+  .nuance-verb-chip.st-kimon .nv-counts { opacity: .9; }
+  .nuance-head { cursor: pointer; }
+  .nuance-toggle { float: right; opacity: .55; font-size: 12px; }
+  .nuance-body { margin-top: 8px; }
+  .nuance-quiz-btn { margin: 8px 0 6px; }
 </style>
 </head>
 <body>
@@ -99,10 +106,9 @@
           </div>
         </div>
         <button type="button" class="btn-primary btn-block" id="dp-start-mix">おまかせミックスで始める</button>
-        <div class="mix-preview" id="mix-preview"></div>
         <div class="dp-quick-actions" id="dp-quick-actions">
           <button type="button" class="btn-ghost" id="dp-start-kimon">鬼門（<span id="dp-kimon-num">0</span>）</button>
-          <button type="button" class="btn-ghost" id="dp-start-weak">苦手語（<span id="dp-weak-num">0</span>）</button>
+          <button type="button" class="btn-ghost" id="dp-start-weak">苦手（<span id="dp-weak-num">0</span>）</button>
           <button type="button" class="btn-ghost" id="dp-start-review">復習（<span id="dp-review-num">0</span>）</button>
           <button type="button" class="btn-ghost" id="dp-start-unlearned">回数順<span id="dp-unlearned-num2" hidden>0</span></button>
         </div>
@@ -135,8 +141,10 @@
             <button class="chip" data-count="100">100</button>
           </div>
         </div>
+        <button type="button" class="btn-primary btn-block" id="mix-start-mix">おまかせミックスで始める</button>
         <div class="dp-quick-actions" id="mix-quick-actions">
-          <button type="button" class="btn-ghost" id="mix-start-weak">苦手語（<span id="mix-weak-num">0</span>）</button>
+          <button type="button" class="btn-ghost" id="mix-start-kimon">鬼門（<span id="mix-kimon-num">0</span>）</button>
+          <button type="button" class="btn-ghost" id="mix-start-weak">苦手（<span id="mix-weak-num">0</span>）</button>
           <button type="button" class="btn-ghost" id="mix-start-review">復習（<span id="mix-review-num">0</span>）</button>
           <button type="button" class="btn-ghost" id="mix-start-unlearned">回数順<span id="mix-unlearned-num" hidden>0</span></button>
         </div>
@@ -168,8 +176,10 @@
             <button class="chip" data-count="100">100</button>
           </div>
         </div>
+        <button type="button" class="btn-primary btn-block" id="idiom-dp-start-mix">おまかせミックスで始める</button>
         <div class="dp-quick-actions" id="idiom-dp-quick-actions">
-          <button type="button" class="btn-ghost" id="idiom-dp-start-weak">苦手語（<span id="idiom-dp-weak-num">0</span>）</button>
+          <button type="button" class="btn-ghost" id="idiom-dp-start-kimon">鬼門（<span id="idiom-dp-kimon-num">0</span>）</button>
+          <button type="button" class="btn-ghost" id="idiom-dp-start-weak">苦手（<span id="idiom-dp-weak-num">0</span>）</button>
           <button type="button" class="btn-ghost" id="idiom-dp-start-review">復習（<span id="idiom-dp-review-num">0</span>）</button>
           <button type="button" class="btn-ghost" id="idiom-dp-start-unlearned">回数順<span id="idiom-dp-unlearned-num2" hidden>0</span></button>
         </div>
@@ -316,6 +326,7 @@
     <div class="idiom-quiz-done" id="idiom-quiz-done" hidden>
       <div class="card">
         <div class="done-score"><span id="idiom-done-score-num">0</span> / <span id="idiom-done-score-total">10</span> 問正解</div>
+        <div class="done-mix-summary" id="idiom-done-mix-summary" hidden></div>
         <div class="done-list" id="idiom-done-list"></div>
         <button class="btn-primary btn-block" id="idiom-restart-btn">設定に戻る</button>
       </div>
@@ -337,7 +348,7 @@
       <div class="section-label">学習範囲（すべて）</div>
       <div class="dict-progress-nums">
         <div class="dp-num"><div class="n" id="dp-ok-num">0</div><div class="l"><span class="dp-dot dp-dot-ok"></span>習得済</div></div>
-        <div class="dp-num"><div class="n" id="dp-ng-num">0</div><div class="l"><span class="dp-dot dp-dot-ng"></span>苦手語</div></div>
+        <div class="dp-num"><div class="n" id="dp-ng-num">0</div><div class="l"><span class="dp-dot dp-dot-ng"></span>苦手</div></div>
         <div class="dp-num"><div class="n" id="dp-unlearned-num">0</div><div class="l"><span class="dp-dot dp-dot-unlearned"></span>未学習</div></div>
       </div>
       <div class="dict-progress-bar">
@@ -373,7 +384,7 @@
     <div class="chip-group" id="status-filter-group">
       <button class="chip active" data-status="all">すべて</button>
       <button class="chip" data-status="ok">習得済</button>
-      <button class="chip" data-status="ng">苦手語</button>
+      <button class="chip" data-status="ng">苦手</button>
     </div>
     <button type="button" class="btn-primary btn-block" id="open-dict-form-btn">＋ 新規登録</button>
     <div class="word-list" id="word-list"></div>
@@ -394,7 +405,7 @@
         <div class="section-label">学習範囲（すべて）</div>
         <div class="dict-progress-nums">
           <div class="dp-num"><div class="n" id="idiom-dp-ok-num">0</div><div class="l"><span class="dp-dot dp-dot-ok"></span>習得済</div></div>
-          <div class="dp-num"><div class="n" id="idiom-dp-ng-num">0</div><div class="l"><span class="dp-dot dp-dot-ng"></span>苦手語</div></div>
+          <div class="dp-num"><div class="n" id="idiom-dp-ng-num">0</div><div class="l"><span class="dp-dot dp-dot-ng"></span>苦手</div></div>
           <div class="dp-num"><div class="n" id="idiom-dp-unlearned-num">0</div><div class="l"><span class="dp-dot dp-dot-unlearned"></span>未学習</div></div>
         </div>
         <div class="dict-progress-bar">
@@ -424,7 +435,7 @@
       <div class="chip-group" id="idiom-status-filter-group">
         <button class="chip active" data-status="all">すべて</button>
         <button class="chip" data-status="ok">習得済</button>
-        <button class="chip" data-status="ng">苦手語</button>
+        <button class="chip" data-status="ng">苦手</button>
       </div>
       <div class="word-list" id="idiom-list"></div>
     </div>
@@ -766,7 +777,7 @@
 <script src="idiom-chunks.js?v=7"></script>
 <script src="pv-chunks.js?v=14"></script>
 <script src="my-chunks.js?v=5"></script>
-<script src="app.js?v=254"></script>
+<script src="app.js?v=255"></script>
 <div class="freq-pop" id="freq-pop" hidden>
   <div class="freq-pop-backdrop"></div>
   <div class="freq-pop-card" role="dialog" aria-modal="true">

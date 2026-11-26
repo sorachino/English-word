@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '242'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '243'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1911,9 +1911,7 @@ document.addEventListener('click', e => {
   const n = e.target.closest && e.target.closest('.note-sense');
   if (n) { e.stopPropagation(); openSenseDetail(n.dataset.senseNo); }
 }, true);
-// 低頻度の語は、より一般的な言い方があっても「この表現を使う場面」を解説に出す（頻度の理由の「。ただし〜」以降）
-const sceneOf = w => { const s = (w && w.freq === 'low' && w.freqWhy) || ''; const i = s.indexOf('。ただし'); return i < 0 ? '' : s.slice(i + 4); };
-const altHtml = w => (w.alt ? `<div class="nuance-alt">🔁 ${altLabel(w)}：${escHtml(w.alt)}</div>` : '') + (sceneOf(w) ? `<div class="nuance-alt nuance-scene">🎯 それでも使う場面：${escHtml(sceneOf(w))}</div>` : '');
+const altHtml = w => (w.alt ? `<div class="nuance-alt">🔁 ${altLabel(w)}：${escHtml(w.alt)}</div>` : '');
 const altLabel = w => (w.freq === 'low' ? 'もっとよく使う言い方' : 'ほかによく使う言い方');
 const FREQ_LABEL = { high: '頻度:高', mid: '頻度:中', low: '頻度:低' };
 // kind: 'pv' | 'id'、no: データの番号。押すと、その語の頻度の根拠（freqWhy）を出す

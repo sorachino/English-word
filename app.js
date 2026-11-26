@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '232'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '233'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -4474,8 +4474,16 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     const segs = Array.isArray(pc.hl) ? pc.hl : [pc.hl];
     const low = pc.chunk.toLowerCase();
     let pos = 0, html = '';
+    // 単語の区切りで探す（on が decision / attention の中の "on" に付かないように）。見つからなければ従来どおり部分一致
+    const isWordCh = ch => /[a-z0-9']/.test(ch || '');
+    const findWord = (q, from) => {
+      for (let j = low.indexOf(q, from); j >= 0; j = low.indexOf(q, j + 1)) {
+        if (!isWordCh(low[j - 1]) && !isWordCh(low[j + q.length])) return j;
+      }
+      return low.indexOf(q, from);
+    };
     for (const s of segs) {
-      const i = low.indexOf(String(s).toLowerCase(), pos);
+      const i = findWord(String(s).toLowerCase(), pos);
       if (i < 0) continue;
       html += escHtml(pc.chunk.slice(pos, i)) + '<b class="hl">' + escHtml(pc.chunk.slice(i, i + s.length)) + '</b>';
       pos = i + s.length;

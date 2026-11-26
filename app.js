@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '231'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '232'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -4730,8 +4730,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     // 熟語の解答後の解説と同じ並び：見出し(＋これまでの回数) → 分類 → 意味 → ニュアンス → 例文 → 語源
     let html = `<div class="reveal-box dd-reveal">`;
     html += `<div class="reveal-title-row"><div class="reveal-verb">${escHtml(item.phrase)}</div>　　<div class="reveal-answer-stats">${idiomAnswerStatsHtml(idiomKey(item))}</div></div>`;
-    if (item.categoryLabel) html += `<div class="idiom-category-tag">${escHtml(item.categoryLabel)}</div>`;
-    html += freqBadgeHtml(item.freq);
+    if (item.categoryLabel || freqBadgeHtml(item.freq)) html += `<div class="idiom-tag-row">${item.categoryLabel ? `<div class="idiom-category-tag">${escHtml(item.categoryLabel)}</div>` : ''}${freqBadgeHtml(item.freq)}</div>`;
     html += `<div class="reveal-meaning">${escHtml(item.meaning || '')}</div>`;
     if (item.nuance) html += `<div class="reveal-nuance">💡 ${escHtml(item.nuance)}</div>`;
     if (pc) html += sentRow(pc.chunk, pc.ja);

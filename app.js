@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '255'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '256'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1014,7 +1014,7 @@ function wordNuanceCardHtml(pair) {
   if (!pair || !pair.nuance) return '';
   return `<div class="nuance-card">
       <div class="nuance-label">${escHtml(pair.verb)}</div>
-      <div class="nuance-note">${escHtml(pair.nuance)}</div>
+      <div class="nuance-note">${noteBreakHtml(pair.nuance)}</div>
     </div>`;
 }
 
@@ -1029,7 +1029,7 @@ function nuanceCardHtml(group) {
   if (extraNotes[group]) note = note ? note + '\n（追記）' + extraNotes[group] : extraNotes[group];
   return `<div class="nuance-card">
       <div class="nuance-label">${escHtml(label)}</div>
-      <div class="nuance-note">${escHtml(note)}</div>
+      <div class="nuance-note">${noteBreakHtml(note)}</div>
     </div>`;
 }
 
@@ -2203,6 +2203,17 @@ function wordItemEl(w) {
   return div;
 }
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+// 解説文を読みやすく整形する：既存の改行は尊重し、長い文は2文ごとに段落（空行）を入れる
+function noteBreakHtml(text) {
+  const blocks = String(text || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const paras = [];
+  for (const block of blocks) {
+    const sentences = (block.match(/[^。！？]+[。！？]*[」』）)]*/g) || [block]).map(s => s.trim()).filter(Boolean);
+    if (!sentences.length) continue;
+    for (let i = 0; i < sentences.length; i += 2) paras.push(sentences.slice(i, i + 2).join(''));
+  }
+  return paras.map(p => escHtml(p)).join('<br><br>');
+}
 
 document.getElementById('list-search').addEventListener('input', renderWordList);
 document.getElementById('list-stage-filter').addEventListener('change', renderWordList);
@@ -2797,7 +2808,7 @@ function renderNuanceList() {
       <div class="nuance-label nuance-head">${escHtml(labelOf(gid))}<span class="nuance-toggle">▽</span></div>
       <div class="nuance-verbs">${verbsHtml}</div>
       <div class="nuance-body" hidden>
-        <div class="nuance-note nuance-note-display">${escHtml(noteOf(gid))}</div>
+        <div class="nuance-note nuance-note-display">${noteBreakHtml(noteOf(gid))}</div>
         <button type="button" class="btn-primary btn-block nuance-quiz-btn">このグループでクイズ（${members.length}語）</button>
         <button type="button" class="btn-ghost btn-block nuance-edit-btn">解説を編集する</button>
         ${editAreaHtml}
@@ -5735,4 +5746,51 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     cancelShadowSequence();
     if (shadowIdx < shadowPoolCache.length - 1) { shadowIdx++; renderShadowDetail(); }
   });
+})();
+
+// ===================== ディープリンク（誤答分析スペースからの導線） =====================
+// ?start=weak|kimon|mix … 辞書タブのクイック開始ボタンと同じ開始をする
+// ?start=drill&particle=off … そのパーティクルだけのドリルを開始する
+// ?word=pull%20off … その語（同じ表記の全語義）＋同じ頭動詞の語で集中セッションを開始する
+function startWordFocusQuiz(wordText) {
+  const target = String(wordText || '').trim().toLowerCase();
+  if (!target) return;
+  const words = allWords();
+  const targets = words.filter(w => baseForm(w.verb).toLowerCase() === target);
+  if (!targets.length) { toast('「' + wordText + '」が見つかりませんでした'); return; }
+  const head = target.split(' ')[0];
+  const neighbors = words.filter(w => !targets.includes(w) && baseForm(w.verb).toLowerCase().split(' ')[0] === head);
+  shuffle(neighbors);
+  const picks = targets.concat(neighbors.slice(0, Math.max(0, 10 - targets.length)));
+  const qs = makeQuestions(picks, words);
+  if (!qs.length) { toast('出題できる語がありませんでした'); return; }
+  toast('「' + baseForm(targets[0].verb) + '」の集中クイズを開始します');
+  launchPvQuiz(qs);
+}
+(function handleDeepLink() {
+  let params;
+  try { params = new URLSearchParams(location.search); } catch (e) { return; }
+  const start = params.get('start');
+  const wordParam = params.get('word');
+  if (!start && !wordParam) return;
+  // リロードで再発火しないよう、URLからパラメータを取り除く
+  try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
+  if (quizMode === 'matching') { toast('マッチングモードでは絞り込み出題は使えません。別のモードを選んでください'); return; }
+  if (wordParam) { startWordFocusQuiz(wordParam); return; }
+  if (start === 'weak' || start === 'kimon' || start === 'mix') { quickStartQuiz(start); return; }
+  if (start === 'drill') {
+    const p = (params.get('particle') || '').toLowerCase();
+    const sel = document.getElementById('quiz-particle');
+    const valid = sel && [...sel.options].some(o => o.value === p);
+    if (!valid) { toast('パーティクル「' + p + '」が見つかりませんでした'); return; }
+    sel.value = p;
+    localStorage.setItem('pv_quiz_particle', p);
+    if (typeof renderDictProgress === 'function') renderDictProgress();
+    const stage = parseInt(document.getElementById('quiz-stage').value, 10) || 0;
+    const freq = document.getElementById('quiz-freq').value;
+    const qs = buildQuiz(stage, quizCount, false, false, false, freq, p);
+    if (!qs.length) { toast('該当する語がありませんでした'); return; }
+    toast('「' + p + '」のドリルを開始します');
+    launchPvQuiz(qs);
+  }
 })();

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '234'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '235'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1557,7 +1557,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
     extraRow.hidden = true;
   }
   const nuanceEl = document.getElementById('reveal-nuance');
-  if (q.word.nuance) { nuanceEl.hidden = false; nuanceEl.innerHTML = '💡 ' + escHtml(q.word.nuance) + (q.word.alt ? `<div class="nuance-alt">🔁 もっとよく使う言い方：${escHtml(q.word.alt)}</div>` : ''); } else { nuanceEl.hidden = true; }
+  if (q.word.nuance) { nuanceEl.hidden = false; nuanceEl.innerHTML = '💡 ' + escHtml(q.word.nuance) + (q.word.alt ? `<div class="nuance-alt">🔁 ${altLabel(q.word)}：${escHtml(q.word.alt)}</div>` : ''); } else { nuanceEl.hidden = true; }
   document.getElementById('reveal-structure').innerHTML = structureHtml(q.answer, q.word.ex1, q.word.ex2);
   const noteEl = document.getElementById('reveal-note');
   if (q.note) { noteEl.hidden = false; noteEl.textContent = '※ ' + q.note; } else { noteEl.hidden = true; }
@@ -1696,7 +1696,7 @@ function renderDoneDetail() {
       ${freqBadgeHtml(w.freq, 'pv', w.no) ? `<div class="reveal-freq">${freqBadgeHtml(w.freq, 'pv', w.no)}</div>` : ''}
       <div class="reveal-meaning">${escHtml(w.meaning || '')}</div>
       ${w.def ? `<div class="reveal-def">${escHtml(w.def)}</div>` : ''}
-      ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}${w.alt ? `<div class="nuance-alt">🔁 もっとよく使う言い方：${escHtml(w.alt)}</div>` : ''}</div>` : ''}
+      ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}${w.alt ? `<div class="nuance-alt">🔁 ${altLabel(w)}：${escHtml(w.alt)}</div>` : ''}</div>` : ''}
       ${sentRow(w.ex1, w.ja1)}
       ${w.ex2 ? `<div class="reveal-extra-ex-row">${sentRow(w.ex2, w.ja2)}</div>` : ''}
       ${structureHtml(it.verb, w.ex1, w.ex2) ? `<div class="reveal-structure">${structureHtml(it.verb, w.ex1, w.ex2)}</div>` : ''}
@@ -1882,6 +1882,7 @@ function renderWordList() {
   if (!words.length) { el.innerHTML = '<div class="empty-note">該当する語がありません</div>'; return; }
   words.forEach(w => el.appendChild(wordItemEl(w)));
 }
+const altLabel = w => (w.freq === 'low' ? 'もっとよく使う言い方' : 'ほかによく使う言い方');
 const FREQ_LABEL = { high: '頻度:高', mid: '頻度:中', low: '頻度:低' };
 // kind: 'pv' | 'id'、no: データの番号。押すと、その語の頻度の根拠（freqWhy）を出す
 const freqBadgeHtml = (f, kind, no) => FREQ_LABEL[f] ? `<span class="wi-freq wi-freq-${f} wi-freq-tap" role="button" tabindex="0" data-fq-kind="${kind || ''}" data-fq-no="${no == null ? '' : no}">${FREQ_LABEL[f]}</span>` : '';
@@ -1926,7 +1927,7 @@ function wordItemEl(w) {
     <div class="wi-meaning">${escHtml(w.meaning || '')}</div>
     <div class="wi-detail">
       <div class="wi-answer-stats">${answerStatsHtml(trackKey)}</div>
-      ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}${w.alt ? `<div class="nuance-alt">🔁 もっとよく使う言い方：${escHtml(w.alt)}</div>` : ''}</div>` : ''}
+      ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}${w.alt ? `<div class="nuance-alt">🔁 ${altLabel(w)}：${escHtml(w.alt)}</div>` : ''}</div>` : ''}
       ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
       ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
       ${w.def ? `<div class="def">${escHtml(w.def)}</div>` : ''}

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '245'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '248'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1917,6 +1917,12 @@ const altLabel = w => (w.freq === 'low' ? 'もっとよく使う言い方' : '�
 const FREQ_LABEL = { high: '頻度:高', mid: '頻度:中', low: '頻度:低' };
 // kind: 'pv' | 'id'、no: データの番号。押すと、その語の頻度の根拠（freqWhy）を出す
 const freqBadgeHtml = (f, kind, no) => FREQ_LABEL[f] ? `<span class="wi-freq wi-freq-${f} wi-freq-tap" role="button" tabindex="0" data-fq-kind="${kind || ''}" data-fq-no="${no == null ? '' : no}">${FREQ_LABEL[f]}</span>` : '';
+// 比較の行の末尾に「を使う」を足す（末尾の（くだけた言い方）などの補足は、その後ろに置く）
+function useTail(t) {
+  const m = t.match(/^(.*?)(（[^（）]*）)?$/);
+  const main = m[1], sup = m[2] || '';
+  return main + (/[\x21-\x7e]$/.test(main) ? ' ' : '') + 'を使う' + sup;
+}
 function showFreqWhy(kind, no) {
   const src = kind === 'id' ? (typeof IDIOM_DATA !== 'undefined' ? IDIOM_DATA : []) : allWords();
   const it = src.find(x => String(x.no) === String(no));
@@ -1927,7 +1933,7 @@ function showFreqWhy(kind, no) {
   let why = fw;
   if (ti >= 0) {
     const scene = fw.slice(ti + 4), k = scene.lastIndexOf('は、');
-    why = fw.slice(0, ti + 1) + '\n\nただし' + (k >= 0 ? scene.slice(0, k) + '\n→ ' + scene.slice(k + 2) : scene);
+    why = fw.slice(0, ti + 1) + '\n\nただし' + (k >= 0 ? scene.slice(0, k) + '\n→ ' + useTail(scene.slice(k + 2)) : scene);
   }
   document.getElementById('freq-pop-body').textContent = why;
   document.getElementById('freq-pop').hidden = false;

@@ -725,3 +725,4 @@ select{
 /* 別語義の注：押すと同じ表記の別の語義を開く */
 .note-sense{cursor:pointer;}
 .note-sense-arrow{display:inline-block;margin-left:.3em;font-weight:700;text-decoration:underline;text-underline-offset:2px;white-space:nowrap;}
+.nuance-scene{margin-top:6px; padding-top:0; border-top:none;}

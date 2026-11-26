@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '241'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '242'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1563,7 +1563,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
     extraRow.hidden = true;
   }
   const nuanceEl = document.getElementById('reveal-nuance');
-  if (q.word.nuance) { nuanceEl.hidden = false; nuanceEl.innerHTML = '💡 ' + escHtml(q.word.nuance) + (q.word.alt ? `<div class="nuance-alt">🔁 ${altLabel(q.word)}：${escHtml(q.word.alt)}</div>` : ''); } else { nuanceEl.hidden = true; }
+  if (q.word.nuance) { nuanceEl.hidden = false; nuanceEl.innerHTML = '💡 ' + escHtml(q.word.nuance) + altHtml(q.word); } else { nuanceEl.hidden = true; }
   document.getElementById('reveal-structure').innerHTML = structureHtml(q.answer, q.word.ex1, q.word.ex2);
   const noteEl = document.getElementById('reveal-note');
   if (q.note) { noteEl.hidden = false; noteEl.innerHTML = noteInner(q.word); noteEl.classList.toggle('note-sense', senseNote(q.word)); noteEl.dataset.senseNo = q.word.no; } else { noteEl.hidden = true; noteEl.classList.remove('note-sense'); }
@@ -1704,7 +1704,7 @@ function renderDoneDetail() {
       ${freqBadgeHtml(w.freq, 'pv', w.no) ? `<div class="reveal-freq">${freqBadgeHtml(w.freq, 'pv', w.no)}</div>` : ''}
       <div class="reveal-meaning">${escHtml(w.meaning || '')}</div>
       ${w.def ? `<div class="reveal-def">${escHtml(w.def)}</div>` : ''}
-      ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}${w.alt ? `<div class="nuance-alt">🔁 ${altLabel(w)}：${escHtml(w.alt)}</div>` : ''}</div>` : ''}
+      ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}${altHtml(w)}</div>` : ''}
       ${sentRow(w.ex1, w.ja1)}
       ${w.ex2 ? `<div class="reveal-extra-ex-row">${sentRow(w.ex2, w.ja2)}</div>` : ''}
       ${structureHtml(it.verb, w.ex1, w.ex2) ? `<div class="reveal-structure">${structureHtml(it.verb, w.ex1, w.ex2)}</div>` : ''}
@@ -1891,7 +1891,9 @@ function renderWordList() {
   words.forEach(w => el.appendChild(wordItemEl(w)));
 }
 // 「Stage 4 / 5 に別語義あり」の注は、押すと同じ表記の別の語義（別の番号の語）をカードで見られるようにする
-const senseNote = w => !!(w && w.note && w.note.includes('別語義'));
+const senseBaseCount = (() => { let m = null; return w => { if (!m) { m = {}; PV_DATA.forEach(x => { const k = baseForm(x.verb).toLowerCase(); m[k] = (m[k] || 0) + 1; }); } return m[baseForm(w.verb || '').toLowerCase()] || 0; }; })();
+// 同じ表記の語が他にもあり、注が「別語義あり」または自分と同じ表記の語に触れているときだけ、押せるようにする
+const senseNote = w => !!(w && w.note && !w.mine && senseBaseCount(w) >= 2 && (w.note.includes('別語義') || w.note.toLowerCase().includes(baseForm(w.verb).toLowerCase())));
 const noteInner = w => '※ ' + escHtml(w.note) + (senseNote(w) ? ' <span class="note-sense-arrow">▸ 別語義を見る</span>' : '');
 const noteHtml = (w, cls) => w && w.note ? `<div class="${cls}${senseNote(w) ? ' note-sense' : ''}" data-sense-no="${escAttr(String(w.no))}">${noteInner(w)}</div>` : '';
 function openSenseDetail(no) {
@@ -1909,6 +1911,9 @@ document.addEventListener('click', e => {
   const n = e.target.closest && e.target.closest('.note-sense');
   if (n) { e.stopPropagation(); openSenseDetail(n.dataset.senseNo); }
 }, true);
+// 低頻度の語は、より一般的な言い方があっても「この表現を使う場面」を解説に出す（頻度の理由の「。ただし〜」以降）
+const sceneOf = w => { const s = (w && w.freq === 'low' && w.freqWhy) || ''; const i = s.indexOf('。ただし'); return i < 0 ? '' : s.slice(i + 4); };
+const altHtml = w => (w.alt ? `<div class="nuance-alt">🔁 ${altLabel(w)}：${escHtml(w.alt)}</div>` : '') + (sceneOf(w) ? `<div class="nuance-alt nuance-scene">🎯 それでも使う場面：${escHtml(sceneOf(w))}</div>` : '');
 const altLabel = w => (w.freq === 'low' ? 'もっとよく使う言い方' : 'ほかによく使う言い方');
 const FREQ_LABEL = { high: '頻度:高', mid: '頻度:中', low: '頻度:低' };
 // kind: 'pv' | 'id'、no: データの番号。押すと、その語の頻度の根拠（freqWhy）を出す
@@ -1954,7 +1959,7 @@ function wordItemEl(w) {
     <div class="wi-meaning">${escHtml(w.meaning || '')}</div>
     <div class="wi-detail">
       <div class="wi-answer-stats">${answerStatsHtml(trackKey)}</div>
-      ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}${w.alt ? `<div class="nuance-alt">🔁 ${altLabel(w)}：${escHtml(w.alt)}</div>` : ''}</div>` : ''}
+      ${w.nuance ? `<div class="reveal-nuance">💡 ${escHtml(w.nuance)}${altHtml(w)}</div>` : ''}
       ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
       ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
       ${w.def ? `<div class="def">${escHtml(w.def)}</div>` : ''}
@@ -4710,7 +4715,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-reveal-freq').innerHTML = freqBadgeHtml(q.item.freq, 'id', q.item.no);
     document.getElementById('idiom-reveal-meaning').textContent = q.item.meaning;
     const nuanceEl = document.getElementById('idiom-reveal-nuance');
-    if (q.item.nuance) { nuanceEl.innerHTML = '💡 ' + escHtml(q.item.nuance) + (q.item.alt ? `<div class="nuance-alt">🔁 ${altLabel(q.item)}：${escHtml(q.item.alt)}</div>` : ''); nuanceEl.hidden = false; }
+    if (q.item.nuance) { nuanceEl.innerHTML = '💡 ' + escHtml(q.item.nuance) + altHtml(q.item); nuanceEl.hidden = false; }
     else { nuanceEl.textContent = ''; nuanceEl.hidden = true; }
     document.getElementById('idiom-reveal-ex').textContent = q.item.ex;
     document.getElementById('idiom-reveal-speak-btn').dataset.text = q.item.ex || '';
@@ -4798,7 +4803,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     html += `<div class="reveal-title-row"><div class="reveal-verb">${escHtml(item.phrase)}</div>　　<div class="reveal-answer-stats">${idiomAnswerStatsHtml(idiomKey(item))}</div></div>`;
     if (item.categoryLabel || freqBadgeHtml(item.freq, 'id', item.no)) html += `<div class="idiom-tag-row">${item.categoryLabel ? `<div class="idiom-category-tag">${escHtml(item.categoryLabel)}</div>` : ''}${freqBadgeHtml(item.freq, 'id', item.no)}</div>`;
     html += `<div class="reveal-meaning">${escHtml(item.meaning || '')}</div>`;
-    if (item.nuance) html += `<div class="reveal-nuance">💡 ${escHtml(item.nuance)}${item.alt ? `<div class="nuance-alt">🔁 ${altLabel(item)}：${escHtml(item.alt)}</div>` : ''}</div>`;
+    if (item.nuance) html += `<div class="reveal-nuance">💡 ${escHtml(item.nuance)}${altHtml(item)}</div>`;
     if (pc) html += sentRow(pc.chunk, pc.ja);
     if (item.ex) html += (pc ? '<div class="reveal-extra-ex-row">' : '') + sentRow(item.ex, item.ja) + (pc ? '</div>' : '');
     if (item.etymology) html += `<div class="etym-box">${etymHtml(item.etymology, '')}</div>`;

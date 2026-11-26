@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '256'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '257'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1027,9 +1027,11 @@ function nuanceCardHtml(group) {
   if (!label) return '';
   let note = (GROUP_INFO[group] && GROUP_INFO[group].note) || (customGroups[group] && customGroups[group].note) || '';
   if (extraNotes[group]) note = note ? note + '\n（追記）' + extraNotes[group] : extraNotes[group];
+  const memberOrder = (typeof GROUP_INFO !== 'undefined' && typeof wordGroups === 'function')
+    ? [...new Set(allWords().filter(w => wordGroups(w).includes(group)).map(w => baseForm(w.verb).toLowerCase()))] : [];
   return `<div class="nuance-card">
       <div class="nuance-label">${escHtml(label)}</div>
-      <div class="nuance-note">${noteBreakHtml(note)}</div>
+      <div class="nuance-note">${noteBreakHtml(note, memberOrder)}</div>
     </div>`;
 }
 
@@ -2203,16 +2205,90 @@ function wordItemEl(w) {
   return div;
 }
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+// 解説文を文単位に分割する
+function splitNoteSentences(block) {
+  return (String(block).match(/[^。！？]+[。！？]*[」』）)]*/g) || [block]).map(s => s.trim()).filter(Boolean);
+}
+// 文が最初に言及する語の、order（チップの並び順）での位置。どの語にも触れていなければ -1
+function noteSentenceKey(s, order) {
+  const ls = s.toLowerCase();
+  let best = -1, bestPos = Infinity, bestLen = -1;
+  order.forEach((v, i) => {
+    const pos = ls.indexOf(v);
+    if (pos >= 0 && (pos < bestPos || (pos === bestPos && v.length > bestLen))) { best = i; bestPos = pos; bestLen = v.length; }
+  });
+  return best;
+}
 // 解説文を読みやすく整形する：既存の改行は尊重し、長い文は2文ごとに段落（空行）を入れる
-function noteBreakHtml(text) {
+// order（チップの並び順の語リスト）を渡すと、本文の文を「最初に言及される語」の順に並び替える。
+// どの語にも触れていない文（導入・まとめ）は元の位置のまま動かさない。並び替えは最初のブロック（基本解説）だけが対象で、追記は末尾に残す
+function noteBreakHtml(text, order) {
   const blocks = String(text || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+  let sentences = [];
+  blocks.forEach((block, bi) => {
+    let ss = splitNoteSentences(block);
+    if (bi === 0 && order && order.length) {
+      const anchored = ss.map((s, i) => ({ s, i, k: noteSentenceKey(s, order) })).filter(x => x.k >= 0);
+      const sorted = anchored.slice().sort((a, b) => (a.k - b.k) || (a.i - b.i));
+      let j = 0;
+      ss = ss.map(s => noteSentenceKey(s, order) >= 0 ? sorted[j++].s : s);
+    }
+    sentences = sentences.concat(ss);
+  });
   const paras = [];
-  for (const block of blocks) {
-    const sentences = (block.match(/[^。！？]+[。！？]*[」』）)]*/g) || [block]).map(s => s.trim()).filter(Boolean);
-    if (!sentences.length) continue;
-    for (let i = 0; i < sentences.length; i += 2) paras.push(sentences.slice(i, i + 2).join(''));
-  }
+  for (let i = 0; i < sentences.length; i += 2) paras.push(sentences.slice(i, i + 2).join(''));
   return paras.map(p => escHtml(p)).join('<br><br>');
+}
+// 使い分けグループの解説を「語ごとの行」に組み立てる（使い分けタブのグループ表示用）。
+// 各行＝語＋意味＋その語に触れた解説文＋例文。どの語にも触れない文（導入・まとめ・追記）は元の位置に段落として残す。
+// 同じ表記の語義が複数ある場合は、集めた文を語義の順に1文ずつ配る（余りは最後の語義へ）
+function nuanceRowsHtml(note, members, weakMap, kimonMap) {
+  const order = [...new Set(members.map(w => baseForm(w.verb).toLowerCase()))];
+  const blocks = String(note || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+  let sentences = [];
+  const sentKey = [];
+  blocks.forEach((block, bi) => {
+    splitNoteSentences(block).forEach(s => {
+      sentences.push(s);
+      sentKey.push(bi === 0 ? noteSentenceKey(s, order) : -1); // 追記ブロックの文は並び替え・振り分けの対象にしない
+    });
+  });
+  const byVerb = new Map();
+  sentences.forEach((s, i) => {
+    const k = sentKey[i];
+    if (k < 0) return;
+    const v = order[k];
+    if (!byVerb.has(v)) byVerb.set(v, []);
+    byVerb.get(v).push(s);
+  });
+  const rowsByWord = new Map(members.map(w => [w, []]));
+  order.forEach(v => {
+    const ss = byVerb.get(v) || [];
+    const entries = members.filter(w => baseForm(w.verb).toLowerCase() === v);
+    ss.forEach((s, i) => rowsByWord.get(entries[Math.min(i, entries.length - 1)]).push(s));
+  });
+  const rowHtml = w => {
+    const k = wordKey(w);
+    const cls = (kimonMap && (k in kimonMap)) ? ' st-kimon' : (weakMap && weakMap[k]) ? ' st-weak' : '';
+    const ss = rowsByWord.get(w) || [];
+    const ex = w.ex1 ? { en: w.ex1, ja: w.ja1 } : (w.ex2 ? { en: w.ex2, ja: w.ja2 } : null);
+    return '<div class="nuance-row">'
+      + '<div class="nuance-row-head"><span class="nuance-row-verb' + cls + '">' + escHtml(baseForm(w.verb)) + '</span>'
+      + (w.meaning ? '<span class="nuance-row-meaning">' + escHtml(w.meaning) + '</span>' : '') + '</div>'
+      + (ss.length ? '<div class="nuance-row-note">' + escHtml(ss.join('')) + '</div>' : '')
+      + (ex ? '<div class="nuance-row-ex">' + escHtml(ex.en) + (ex.ja ? '<span class="nuance-row-ex-ja">' + escHtml(ex.ja) + '</span>' : '') + '</div>' : '')
+      + '</div>';
+  };
+  // 出力順：導入文（最初の振り分け文より前にある未分類の文）→ 語の行（チップの並び順）→ 残りの未分類の文（まとめ・追記）
+  const firstAnchored = sentKey.findIndex(k => k >= 0);
+  const leadParts = [], tailParts = [];
+  sentences.forEach((s, i) => {
+    if (sentKey[i] >= 0) return;
+    const html = '<div class="nuance-note-part">' + escHtml(s) + '</div>';
+    if (firstAnchored === -1 || i < firstAnchored) leadParts.push(html); else tailParts.push(html);
+  });
+  const rowParts = members.map(w => rowHtml(w));
+  return leadParts.concat(rowParts).concat(tailParts).join('');
 }
 
 document.getElementById('list-search').addEventListener('input', renderWordList);
@@ -2808,7 +2884,7 @@ function renderNuanceList() {
       <div class="nuance-label nuance-head">${escHtml(labelOf(gid))}<span class="nuance-toggle">▽</span></div>
       <div class="nuance-verbs">${verbsHtml}</div>
       <div class="nuance-body" hidden>
-        <div class="nuance-note nuance-note-display">${noteBreakHtml(noteOf(gid))}</div>
+        <div class="nuance-detail">${nuanceRowsHtml(noteOf(gid), members, weakMap, kimonMap)}</div>
         <button type="button" class="btn-primary btn-block nuance-quiz-btn">このグループでクイズ（${members.length}語）</button>
         <button type="button" class="btn-ghost btn-block nuance-edit-btn">解説を編集する</button>
         ${editAreaHtml}

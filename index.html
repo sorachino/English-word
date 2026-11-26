@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16233B">
-<meta name="build-version" content="256">
+<meta name="build-version" content="257">
 <title>句動詞ノート — Phrasal Verbs</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -24,6 +24,16 @@
   .nuance-toggle { float: right; opacity: .55; font-size: 12px; }
   .nuance-body { margin-top: 8px; }
   .nuance-quiz-btn { margin: 8px 0 6px; }
+  .nuance-note-part { font-size: 13.5px; line-height: 1.7; margin: 6px 0; }
+  .nuance-row { border-top: 1px solid rgba(0,0,0,.08); padding: 7px 0 8px; }
+  .nuance-row-head { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+  .nuance-row-verb { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14.5px; }
+  .nuance-row-verb.st-weak { color: #c0392b; }
+  .nuance-row-verb.st-kimon { background: #c0392b; border-color: #c0392b; color: #fff; border-radius: 6px; padding: 0 6px; }
+  .nuance-row-meaning { font-size: 12.5px; opacity: .75; }
+  .nuance-row-note { font-size: 13.5px; line-height: 1.7; margin-top: 2px; }
+  .nuance-row-ex { font-size: 12.5px; line-height: 1.6; margin-top: 3px; opacity: .8; }
+  .nuance-row-ex-ja { display: block; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -777,7 +787,7 @@
 <script src="idiom-chunks.js?v=7"></script>
 <script src="pv-chunks.js?v=14"></script>
 <script src="my-chunks.js?v=5"></script>
-<script src="app.js?v=256"></script>
+<script src="app.js?v=257"></script>
 <div class="freq-pop" id="freq-pop" hidden>
   <div class="freq-pop-backdrop"></div>
   <div class="freq-pop-card" role="dialog" aria-modal="true">

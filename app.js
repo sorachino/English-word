@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '244'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '245'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1922,7 +1922,14 @@ function showFreqWhy(kind, no) {
   const it = src.find(x => String(x.no) === String(no));
   if (!it || !it.freqWhy) return;
   document.getElementById('freq-pop-title').innerHTML = `<span class="freq-pop-name">${escHtml(kind === 'id' ? it.phrase : baseForm(it.verb))}</span>${freqBadgeHtml(it.freq)}`;
-  document.getElementById('freq-pop-body').textContent = it.freqWhy;
+  // 「。ただし〜」の前で改行し、「ふだんの言い方」と「この表現を使う場面」を分けて読みやすくする
+  const fw = it.freqWhy, ti = fw.indexOf('。ただし');
+  let why = fw;
+  if (ti >= 0) {
+    const scene = fw.slice(ti + 4), k = scene.lastIndexOf('は、');
+    why = fw.slice(0, ti + 1) + '\n\nただし' + (k >= 0 ? scene.slice(0, k) + '\n→ ' + scene.slice(k + 2) : scene);
+  }
+  document.getElementById('freq-pop-body').textContent = why;
   document.getElementById('freq-pop').hidden = false;
 }
 // 頻度バッジは、一覧・解説カード・詳細のどこでも同じ動きにする（一覧の行を開く動きより先に受ける）

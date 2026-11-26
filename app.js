@@ -1027,9 +1027,11 @@ function nuanceCardHtml(group) {
   if (!label) return '';
   let note = (GROUP_INFO[group] && GROUP_INFO[group].note) || (customGroups[group] && customGroups[group].note) || '';
   if (extraNotes[group]) note = note ? note + '\n（追記）' + extraNotes[group] : extraNotes[group];
+  const memberOrder = (typeof GROUP_INFO !== 'undefined' && typeof wordGroups === 'function')
+    ? [...new Set(allWords().filter(w => wordGroups(w).includes(group)).map(w => baseForm(w.verb).toLowerCase()))] : [];
   return `<div class="nuance-card">
       <div class="nuance-label">${escHtml(label)}</div>
-      <div class="nuance-note">${noteBreakHtml(note)}</div>
+      <div class="nuance-note">${noteBreakHtml(note, memberOrder)}</div>
     </div>`;
 }
 
@@ -2204,14 +2206,33 @@ function wordItemEl(w) {
 }
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 // 解説文を読みやすく整形する：既存の改行は尊重し、長い文は2文ごとに段落（空行）を入れる
-function noteBreakHtml(text) {
+// order（チップの並び順の語リスト）を渡すと、本文の文を「最初に言及される語」の順に並び替える。
+// どの語にも触れていない文（導入・まとめ）は元の位置のまま動かさない。並び替えは最初のブロック（基本解説）だけが対象で、追記は末尾に残す
+function noteBreakHtml(text, order) {
   const blocks = String(text || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const splitSentences = block => (block.match(/[^。！？]+[。！？]*[」』）)]*/g) || [block]).map(s => s.trim()).filter(Boolean);
+  let sentences = [];
+  blocks.forEach((block, bi) => {
+    let ss = splitSentences(block);
+    if (bi === 0 && order && order.length) {
+      const keyOf = s => {
+        const ls = s.toLowerCase();
+        let best = -1, bestPos = Infinity, bestLen = -1;
+        order.forEach((v, i) => {
+          const pos = ls.indexOf(v);
+          if (pos >= 0 && (pos < bestPos || (pos === bestPos && v.length > bestLen))) { best = i; bestPos = pos; bestLen = v.length; }
+        });
+        return best;
+      };
+      const anchored = ss.map((s, i) => ({ s, i, k: keyOf(s) })).filter(x => x.k >= 0);
+      const sorted = anchored.slice().sort((a, b) => (a.k - b.k) || (a.i - b.i));
+      let j = 0;
+      ss = ss.map(s => keyOf(s) >= 0 ? sorted[j++].s : s);
+    }
+    sentences = sentences.concat(ss);
+  });
   const paras = [];
-  for (const block of blocks) {
-    const sentences = (block.match(/[^。！？]+[。！？]*[」』）)]*/g) || [block]).map(s => s.trim()).filter(Boolean);
-    if (!sentences.length) continue;
-    for (let i = 0; i < sentences.length; i += 2) paras.push(sentences.slice(i, i + 2).join(''));
-  }
+  for (let i = 0; i < sentences.length; i += 2) paras.push(sentences.slice(i, i + 2).join(''));
   return paras.map(p => escHtml(p)).join('<br><br>');
 }
 
@@ -2808,7 +2829,7 @@ function renderNuanceList() {
       <div class="nuance-label nuance-head">${escHtml(labelOf(gid))}<span class="nuance-toggle">▽</span></div>
       <div class="nuance-verbs">${verbsHtml}</div>
       <div class="nuance-body" hidden>
-        <div class="nuance-note nuance-note-display">${noteBreakHtml(noteOf(gid))}</div>
+        <div class="nuance-note nuance-note-display">${noteBreakHtml(noteOf(gid), [...new Set(members.map(w => baseForm(w.verb).toLowerCase()))])}</div>
         <button type="button" class="btn-primary btn-block nuance-quiz-btn">このグループでクイズ（${members.length}語）</button>
         <button type="button" class="btn-ghost btn-block nuance-edit-btn">解説を編集する</button>
         ${editAreaHtml}

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '243'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '244'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1566,7 +1566,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
   if (q.word.nuance) { nuanceEl.hidden = false; nuanceEl.innerHTML = '💡 ' + escHtml(q.word.nuance) + altHtml(q.word); } else { nuanceEl.hidden = true; }
   document.getElementById('reveal-structure').innerHTML = structureHtml(q.answer, q.word.ex1, q.word.ex2);
   const noteEl = document.getElementById('reveal-note');
-  if (q.note) { noteEl.hidden = false; noteEl.innerHTML = noteInner(q.word); noteEl.classList.toggle('note-sense', senseNote(q.word)); noteEl.dataset.senseNo = q.word.no; } else { noteEl.hidden = true; noteEl.classList.remove('note-sense'); }
+  if (hasNote(q.word)) { noteEl.hidden = false; noteEl.innerHTML = noteInner(q.word); } else { noteEl.hidden = true; }
   const etymEl = document.getElementById('reveal-etym');
   if (q.word.etymology) { etymEl.hidden = false; etymEl.innerHTML = etymHtml(q.word.etymology, q.word.illustration); } else { etymEl.hidden = true; }
 
@@ -1892,10 +1892,11 @@ function renderWordList() {
 }
 // 「Stage 4 / 5 に別語義あり」の注は、押すと同じ表記の別の語義（別の番号の語）をカードで見られるようにする
 const senseBaseCount = (() => { let m = null; return w => { if (!m) { m = {}; PV_DATA.forEach(x => { const k = baseForm(x.verb).toLowerCase(); m[k] = (m[k] || 0) + 1; }); } return m[baseForm(w.verb || '').toLowerCase()] || 0; }; })();
-// 同じ表記の語が他にもあり、注が「別語義あり」または自分と同じ表記の語に触れているときだけ、押せるようにする
-const senseNote = w => !!(w && w.note && !w.mine && senseBaseCount(w) >= 2 && (w.note.includes('別語義') || w.note.toLowerCase().includes(baseForm(w.verb).toLowerCase())));
-const noteInner = w => '※ ' + escHtml(w.note) + (senseNote(w) ? ' <span class="note-sense-arrow">▸ 別語義を見る</span>' : '');
-const noteHtml = (w, cls) => w && w.note ? `<div class="${cls}${senseNote(w) ? ' note-sense' : ''}" data-sense-no="${escAttr(String(w.no))}">${noteInner(w)}</div>` : '';
+// 別語義がある語は、注の末尾に「※ 別語義あり ▸」を同じ文言で出し、押すと同じ表記の別の語義を開く（注意書きがあれば別の行で先に出す）
+const hasSense = w => !!(w && w.sense && !w.mine && senseBaseCount(w) >= 2);
+const hasNote = w => !!(w && (w.note || hasSense(w)));
+const noteInner = w => (w.note ? `<div>※ ${escHtml(w.note)}</div>` : '') + (hasSense(w) ? `<div class="note-sense" data-sense-no="${escAttr(String(w.no))}">※ 別語義あり <span class="note-sense-arrow">▸</span></div>` : '');
+const noteHtml = (w, cls) => hasNote(w) ? `<div class="${cls}">${noteInner(w)}</div>` : '';
 function openSenseDetail(no) {
   const all = allWords();
   const w = all.find(x => String(x.no) === String(no));

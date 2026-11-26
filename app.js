@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '238'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '240'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -48,7 +48,13 @@ function saveJSON(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 // ===================== データ統合 =====================
 function myWords() { return loadJSON(LS.MY_WORDS, []); }
 function allWords() {
-  const mine = myWords().map((w, i) => ({ ...w, stage: 0, no: 'M' + (i + 1), mine: true }));
+  const mine = myWords().map((w, i) => {
+    const o = { ...w, stage: 0, no: 'M' + (i + 1), mine: true };
+    // 頻度・ほかによく使う言い方・頻度の理由は、本人が入力した値を優先し、無ければ my-chunks.js の句動詞名対応データで補う
+    const x = typeof MY_CHUNK_DATA !== 'undefined' ? MY_CHUNK_DATA[baseForm(o.verb || '').toLowerCase().trim()] : null;
+    if (x) { for (const k of ['freq', 'alt', 'freqWhy']) if (!o[k] && x[k]) o[k] = x[k]; }
+    return o;
+  });
   return PV_DATA.concat(mine);
 }
 // 単語が属する使い分けグループのidを配列で返す。
@@ -1520,6 +1526,10 @@ function finishQuestion(ok, method, delay, userAnswer) {
   const q = quizState.questions[quizState.idx];
   if (q.resolved) return;
   q.resolved = true; q.method = method;
+  // スタンプは記録・同期・効果音などの処理より先に出す（処理が重い語でも、押した瞬間に出るように）
+  const stamp = document.getElementById('stamp-result');
+  stamp.hidden = false;
+  stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
   const key = wordKey(q.word);
   recordResult(key, ok ? method : 'wrong');
   updateSrs(key, ok, method === 'hint'); // 4択（choice）の正解も間隔を伸ばす。ヒント使用時だけ据え置き
@@ -1530,10 +1540,6 @@ function finishQuestion(ok, method, delay, userAnswer) {
   syncLeaderboard(q.word, ok);
   if (ok) quizState.correctCount++;
   quizState.results.push({ verb: q.answer, ok, q });
-
-  const stamp = document.getElementById('stamp-result');
-  stamp.hidden = false;
-  stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
 
   const reveal = document.getElementById('reveal-box');
   document.getElementById('reveal-verb').textContent = q.answer;
@@ -1888,7 +1894,7 @@ const FREQ_LABEL = { high: '頻度:高', mid: '頻度:中', low: '頻度:低' };
 // kind: 'pv' | 'id'、no: データの番号。押すと、その語の頻度の根拠（freqWhy）を出す
 const freqBadgeHtml = (f, kind, no) => FREQ_LABEL[f] ? `<span class="wi-freq wi-freq-${f} wi-freq-tap" role="button" tabindex="0" data-fq-kind="${kind || ''}" data-fq-no="${no == null ? '' : no}">${FREQ_LABEL[f]}</span>` : '';
 function showFreqWhy(kind, no) {
-  const src = kind === 'id' ? (typeof IDIOM_DATA !== 'undefined' ? IDIOM_DATA : []) : PV_DATA;
+  const src = kind === 'id' ? (typeof IDIOM_DATA !== 'undefined' ? IDIOM_DATA : []) : allWords();
   const it = src.find(x => String(x.no) === String(no));
   if (!it || !it.freqWhy) return;
   document.getElementById('freq-pop-title').innerHTML = `<span class="freq-pop-name">${escHtml(kind === 'id' ? it.phrase : baseForm(it.verb))}</span>${freqBadgeHtml(it.freq)}`;
@@ -2021,6 +2027,9 @@ document.getElementById('ai-fill-btn').addEventListener('click', async () => {
       document.getElementById('d-ex2').value = data.ex2 || '';
       document.getElementById('d-ja2').value = data.ja2 || '';
       document.getElementById('d-nuance').value = data.nuance || '';
+      if (['high', 'mid', 'low'].includes(data.freq)) document.getElementById('d-freq').value = data.freq;
+      if (data.alt) document.getElementById('d-alt').value = data.alt;
+      if (data.freqWhy) document.getElementById('d-freqwhy').value = data.freqWhy;
 
       let groupLine = '';
       const existingId = data.suggestedGroupId || '';
@@ -2129,6 +2138,9 @@ function startEditWord(idx) {
   document.getElementById('d-ex2').value = w.ex2 || '';
   document.getElementById('d-ja2').value = w.ja2 || '';
   document.getElementById('d-nuance').value = w.nuance || '';
+  document.getElementById('d-freq').value = w.freq || '';
+  document.getElementById('d-alt').value = w.alt || '';
+  document.getElementById('d-freqwhy').value = w.freqWhy || '';
   document.getElementById('d-note').value = w.note || '';
   document.getElementById('d-group-new-label').value = '';
 
@@ -2160,6 +2172,9 @@ document.getElementById('dict-form').addEventListener('submit', e => {
     ex1: val('d-ex1'), ja1: val('d-ja1'), ex2: val('d-ex2'), ja2: val('d-ja2'),
     nuance: val('d-nuance'), note: val('d-note'),
   };
+  if (val('d-freq')) w.freq = val('d-freq');
+  if (val('d-alt')) w.alt = val('d-alt');
+  if (val('d-freqwhy')) w.freqWhy = val('d-freqwhy');
   if (!w.verb || !w.meaning) return;
 
   const isEdit = editingWordIndex !== null;
@@ -4641,6 +4656,10 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   // ---------- 共通：正誤記録して次の問題へ ----------
   function finishIdiomAnswer(q, ok) {
     q.correct = ok;
+    // スタンプは記録・同期・効果音などの処理より先に出す
+    const stamp = document.getElementById('idiom-stamp-result');
+    stamp.hidden = false;
+    stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
     if (ok) idiomQuizState.correctCount++;
     if (idiomQuizState.results) idiomQuizState.results.push({ item: q.item, ok });
     const key = idiomKey(q.item);
@@ -4652,10 +4671,6 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     recordIdiomAnswerLog(idiomQuizState.mode === 'order' ? 'idiom-order' : 'idiom-choice', q.item, ok, idiomQuizState.sessionId);
     syncLeaderboard(null, ok);
     playResultSound(ok);
-
-    const stamp = document.getElementById('idiom-stamp-result');
-    stamp.hidden = false;
-    stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
 
     // 解答後は選択肢が消えるので、出題文の反対側（英文→日本語／日本語→英文）をカードに表示する
     const pcR = prepChunkOf(q.item);

@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '240'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '241'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1566,7 +1566,7 @@ function finishQuestion(ok, method, delay, userAnswer) {
   if (q.word.nuance) { nuanceEl.hidden = false; nuanceEl.innerHTML = '💡 ' + escHtml(q.word.nuance) + (q.word.alt ? `<div class="nuance-alt">🔁 ${altLabel(q.word)}：${escHtml(q.word.alt)}</div>` : ''); } else { nuanceEl.hidden = true; }
   document.getElementById('reveal-structure').innerHTML = structureHtml(q.answer, q.word.ex1, q.word.ex2);
   const noteEl = document.getElementById('reveal-note');
-  if (q.note) { noteEl.hidden = false; noteEl.textContent = '※ ' + q.note; } else { noteEl.hidden = true; }
+  if (q.note) { noteEl.hidden = false; noteEl.innerHTML = noteInner(q.word); noteEl.classList.toggle('note-sense', senseNote(q.word)); noteEl.dataset.senseNo = q.word.no; } else { noteEl.hidden = true; noteEl.classList.remove('note-sense'); }
   const etymEl = document.getElementById('reveal-etym');
   if (q.word.etymology) { etymEl.hidden = false; etymEl.innerHTML = etymHtml(q.word.etymology, q.word.illustration); } else { etymEl.hidden = true; }
 
@@ -1689,7 +1689,8 @@ function renderDoneDetail() {
   document.getElementById('dd-prev').disabled = ddIndex === 0;
   document.getElementById('dd-next').disabled = ddIndex === ddItems.length - 1;
   let markHtml;
-  if (it.ok === true) markHtml = '<div class="dd-mark ok">○ 正解</div>';
+  if (it.plain) markHtml = '';
+  else if (it.ok === true) markHtml = '<div class="dd-mark ok">○ 正解</div>';
   else if (it.ok === false) markHtml = '<div class="dd-mark ng">× 不正解</div>';
   else markHtml = `<div class="dd-mark ng">★ 苦手な語${it.sub ? '（' + escHtml(it.sub) + '）' : ''}</div>`;
   if (it.html) { document.getElementById('dd-body').innerHTML = markHtml + it.html; return; }
@@ -1707,7 +1708,7 @@ function renderDoneDetail() {
       ${sentRow(w.ex1, w.ja1)}
       ${w.ex2 ? `<div class="reveal-extra-ex-row">${sentRow(w.ex2, w.ja2)}</div>` : ''}
       ${structureHtml(it.verb, w.ex1, w.ex2) ? `<div class="reveal-structure">${structureHtml(it.verb, w.ex1, w.ex2)}</div>` : ''}
-      ${w.note ? `<div class="reveal-note">※ ${escHtml(w.note)}</div>` : ''}
+      ${noteHtml(w, 'reveal-note')}
       ${w.etymology ? `<div class="etym-box">${etymHtml(w.etymology, w.illustration)}</div>` : ''}
     </div>
   `;
@@ -1889,6 +1890,25 @@ function renderWordList() {
   if (!words.length) { el.innerHTML = '<div class="empty-note">該当する語がありません</div>'; return; }
   words.forEach(w => el.appendChild(wordItemEl(w)));
 }
+// 「Stage 4 / 5 に別語義あり」の注は、押すと同じ表記の別の語義（別の番号の語）をカードで見られるようにする
+const senseNote = w => !!(w && w.note && w.note.includes('別語義'));
+const noteInner = w => '※ ' + escHtml(w.note) + (senseNote(w) ? ' <span class="note-sense-arrow">▸ 別語義を見る</span>' : '');
+const noteHtml = (w, cls) => w && w.note ? `<div class="${cls}${senseNote(w) ? ' note-sense' : ''}" data-sense-no="${escAttr(String(w.no))}">${noteInner(w)}</div>` : '';
+function openSenseDetail(no) {
+  const all = allWords();
+  const w = all.find(x => String(x.no) === String(no));
+  if (!w) return;
+  const base = baseForm(w.verb).toLowerCase();
+  const same = all.filter(x => !!x.mine === !!w.mine && baseForm(x.verb).toLowerCase() === base);
+  if (same.length < 2) { toast('別の語義が見つかりませんでした'); return; }
+  const items = same.map(x => ({ word: x, verb: baseForm(x.verb), key: wordKey(x), plain: true }));
+  const cur = same.indexOf(w);
+  openDetailModal(items, cur === 0 ? 1 : 0);
+}
+document.addEventListener('click', e => {
+  const n = e.target.closest && e.target.closest('.note-sense');
+  if (n) { e.stopPropagation(); openSenseDetail(n.dataset.senseNo); }
+}, true);
 const altLabel = w => (w.freq === 'low' ? 'もっとよく使う言い方' : 'ほかによく使う言い方');
 const FREQ_LABEL = { high: '頻度:高', mid: '頻度:中', low: '頻度:低' };
 // kind: 'pv' | 'id'、no: データの番号。押すと、その語の頻度の根拠（freqWhy）を出す
@@ -1938,7 +1958,7 @@ function wordItemEl(w) {
       ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
       ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
       ${w.def ? `<div class="def">${escHtml(w.def)}</div>` : ''}
-      ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
+      ${noteHtml(w, 'def')}
       ${w.etymology ? `<div class="etym-box">${etymHtml(w.etymology, w.illustration)}</div>` : ''}
       ${(w.mine && typeof w.no === 'string' && w.no.startsWith('M')) ? '<button type="button" class="btn-ghost btn-block wi-edit-btn">編集する</button>' : ''}
     </div>`;
@@ -2614,7 +2634,7 @@ function myDictItemEl(w) {
     <div class="wi-meaning">${escHtml(w.english || '')} <button class="speak-btn" data-text="${escAttr(w.english || '')}">🔊</button></div>
     <div class="wi-detail">
       ${w.example ? `<div class="ex">${escHtml(w.example)} <button class="speak-btn" data-text="${escAttr(w.example)}">🔊</button></div><div class="ja">${escHtml(w.exampleJa || '')}</div>` : ''}
-      ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
+      ${noteHtml(w, 'def')}
       <button type="button" class="btn-ghost btn-block mydict-edit-btn">編集する</button>
       <button type="button" class="btn-ghost btn-block mydict-delete-btn">削除</button>
     </div>`;
@@ -3764,7 +3784,7 @@ function openRoundResultDetail(round) {
         ${w.ex1 ? `<div class="ex">${escHtml(w.ex1)} <button class="speak-btn" data-text="${escAttr(w.ex1)}">🔊</button></div><div class="ja">${escHtml(w.ja1 || '')}</div>` : ''}
         ${w.ex2 ? `<div class="ex">${escHtml(w.ex2)} <button class="speak-btn" data-text="${escAttr(w.ex2)}">🔊</button></div><div class="ja">${escHtml(w.ja2 || '')}</div>` : ''}
         <div class="def">${escHtml(w.meaning || '')}${w.def ? '／' + escHtml(w.def) : ''}</div>
-        ${w.note ? `<div class="def">※ ${escHtml(w.note)}</div>` : ''}
+        ${noteHtml(w, 'def')}
         ${w.etymology ? `<div class="etym-box">${etymHtml(w.etymology, w.illustration)}</div>` : ''}
       </div>
     </div>`;

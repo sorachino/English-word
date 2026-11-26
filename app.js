@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '235'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '237'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -4670,7 +4670,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     document.getElementById('idiom-reveal-freq').innerHTML = freqBadgeHtml(q.item.freq, 'id', q.item.no);
     document.getElementById('idiom-reveal-meaning').textContent = q.item.meaning;
     const nuanceEl = document.getElementById('idiom-reveal-nuance');
-    if (q.item.nuance) { nuanceEl.textContent = '💡 ' + q.item.nuance; nuanceEl.hidden = false; }
+    if (q.item.nuance) { nuanceEl.innerHTML = '💡 ' + escHtml(q.item.nuance) + (q.item.alt ? `<div class="nuance-alt">🔁 ${altLabel(q.item)}：${escHtml(q.item.alt)}</div>` : ''); nuanceEl.hidden = false; }
     else { nuanceEl.textContent = ''; nuanceEl.hidden = true; }
     document.getElementById('idiom-reveal-ex').textContent = q.item.ex;
     document.getElementById('idiom-reveal-speak-btn').dataset.text = q.item.ex || '';
@@ -4758,7 +4758,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     html += `<div class="reveal-title-row"><div class="reveal-verb">${escHtml(item.phrase)}</div>　　<div class="reveal-answer-stats">${idiomAnswerStatsHtml(idiomKey(item))}</div></div>`;
     if (item.categoryLabel || freqBadgeHtml(item.freq, 'id', item.no)) html += `<div class="idiom-tag-row">${item.categoryLabel ? `<div class="idiom-category-tag">${escHtml(item.categoryLabel)}</div>` : ''}${freqBadgeHtml(item.freq, 'id', item.no)}</div>`;
     html += `<div class="reveal-meaning">${escHtml(item.meaning || '')}</div>`;
-    if (item.nuance) html += `<div class="reveal-nuance">💡 ${escHtml(item.nuance)}</div>`;
+    if (item.nuance) html += `<div class="reveal-nuance">💡 ${escHtml(item.nuance)}${item.alt ? `<div class="nuance-alt">🔁 ${altLabel(item)}：${escHtml(item.alt)}</div>` : ''}</div>`;
     if (pc) html += sentRow(pc.chunk, pc.ja);
     if (item.ex) html += (pc ? '<div class="reveal-extra-ex-row">' : '') + sentRow(item.ex, item.ja) + (pc ? '</div>' : '');
     if (item.etymology) html += `<div class="etym-box">${etymHtml(item.etymology, '')}</div>`;

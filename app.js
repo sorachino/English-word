@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '248'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '251'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -1526,10 +1526,6 @@ function finishQuestion(ok, method, delay, userAnswer) {
   const q = quizState.questions[quizState.idx];
   if (q.resolved) return;
   q.resolved = true; q.method = method;
-  // スタンプは記録・同期・効果音などの処理より先に出す（処理が重い語でも、押した瞬間に出るように）
-  const stamp = document.getElementById('stamp-result');
-  stamp.hidden = false;
-  stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
   const key = wordKey(q.word);
   recordResult(key, ok ? method : 'wrong');
   updateSrs(key, ok, method === 'hint'); // 4択（choice）の正解も間隔を伸ばす。ヒント使用時だけ据え置き
@@ -1604,13 +1600,15 @@ function finishQuestion(ok, method, delay, userAnswer) {
     markWrongBtn.hidden = true;
   }
 
-  // 日本語訳・英文の再生ボタンは、正解／不正解のスタンプと同じタイミングで出す（4択の遅延 run には含めない）
-  document.getElementById('pv-q-hint').textContent = '';
-  if (q.chunk) { const sp = document.getElementById('pv-q-speak'); sp.hidden = false; sp.dataset.text = q.chunk.en; }
-  if (quizState.mode === 'reverse' && q.chunk) document.getElementById('ja-preview').textContent = q.chunk.ja;
-
   const run = () => {
+    // 正解／不正解のスタンプ・日本語訳・英文の再生ボタンは、解説カードが出るのと同じタイミングでそろえて出す
+    const stamp = document.getElementById('stamp-result');
+    stamp.hidden = false;
+    stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
     reveal.hidden = false;
+    document.getElementById('pv-q-hint').textContent = '';
+    if (q.chunk) { const sp = document.getElementById('pv-q-speak'); sp.hidden = false; sp.dataset.text = q.chunk.en; }
+    if (quizState.mode === 'reverse' && q.chunk) document.getElementById('ja-preview').textContent = q.chunk.ja;
     document.getElementById('answer-form').hidden = true;
     document.getElementById('submit-btn').hidden = true;
     document.getElementById('choice-grid').hidden = true;
@@ -4518,19 +4516,13 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     const chosen = q.choices[idx];
     const correctText = q.correctText || q.item.meaning;
     const ok = chosen === correctText;
-    finishIdiomAnswer(q, ok);
+    finishIdiomAnswer(q, ok, true);
     const group = document.getElementById('idiom-choice-group');
     group.querySelectorAll('.choice-btn').forEach(btn => {
       const btnText = btn.textContent;
       if (btnText === correctText) btn.classList.add('correct');
       else if (parseInt(btn.dataset.idx, 10) === idx) btn.classList.add('wrong');
     });
-    // 句動詞クイズと同じく、解答後は選択肢を隠す（正誤の色を一瞬見せてから）
-    setTimeout(() => {
-      if (idiomQuizState.questions[idiomQuizState.idx] !== q) return;
-      group.hidden = true;
-      group.innerHTML = '';
-    }, 350);
   }
 
   // ---------- 並び替えモード ----------
@@ -4691,12 +4683,8 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
   });
 
   // ---------- 共通：正誤記録して次の問題へ ----------
-  function finishIdiomAnswer(q, ok) {
+  function finishIdiomAnswer(q, ok, delay) {
     q.correct = ok;
-    // スタンプは記録・同期・効果音などの処理より先に出す
-    const stamp = document.getElementById('idiom-stamp-result');
-    stamp.hidden = false;
-    stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
     if (ok) idiomQuizState.correctCount++;
     if (idiomQuizState.results) idiomQuizState.results.push({ item: q.item, ok });
     const key = idiomKey(q.item);
@@ -4709,42 +4697,55 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     syncLeaderboard(null, ok);
     playResultSound(ok);
 
-    // 解答後は選択肢が消えるので、出題文の反対側（英文→日本語／日本語→英文）をカードに表示する
-    const pcR = prepChunkOf(q.item);
-    const hintEl = document.querySelector('#idiom-q-example .idiom-chunk-hint');
-    if (pcR && hintEl && idiomQuizState.mode !== 'order') {
-      const other = q.dir === 'ja2en' ? pcR.chunk : pcR.ja;
-      if (other) { hintEl.textContent = other; hintEl.classList.add('idiom-chunk-answer'); }
-    } else if (!pcR && idiomQuizState.mode !== 'order' && q.item.ja) {
-      // 例文が出題文になっている熟語も、スタンプと同時に日本語訳を英文の下へ出す（チャンクのある熟語と同じ位置）
-      const exEl = document.getElementById('idiom-q-example');
-      if (exEl && !exEl.querySelector('.idiom-chunk-hint')) exEl.insertAdjacentHTML('beforeend', `<div class="idiom-chunk-hint idiom-chunk-answer">${escHtml(q.item.ja)}</div>`);
-    }
+    // 正解／不正解のスタンプ・日本語訳・解説カードは同じタイミングでそろえて出す（4択は、正誤の色を一瞬見せてから）
+    const show = () => {
+      if (idiomQuizState.questions[idiomQuizState.idx] !== q) return;
+      const stamp = document.getElementById('idiom-stamp-result');
+      stamp.hidden = false;
+      stamp.innerHTML = `<div class="stamp ${ok ? 'ok' : 'ng'}">${ok ? '正解' : '不正解'}</div>`;
+      if (delay) {
+        const group = document.getElementById('idiom-choice-group');
+        group.hidden = true;
+        group.innerHTML = '';
+      }
+      // 解答後は選択肢が消えるので、出題文の反対側（英文→日本語／日本語→英文）をカードに表示する
+      const pcR = prepChunkOf(q.item);
+      const hintEl = document.querySelector('#idiom-q-example .idiom-chunk-hint');
+      if (pcR && hintEl && idiomQuizState.mode !== 'order') {
+        const other = q.dir === 'ja2en' ? pcR.chunk : pcR.ja;
+        if (other) { hintEl.textContent = other; hintEl.classList.add('idiom-chunk-answer'); }
+      } else if (!pcR && idiomQuizState.mode !== 'order' && q.item.ja) {
+        // 例文が出題文になっている熟語も、スタンプと同時に日本語訳を英文の下へ出す（チャンクのある熟語と同じ位置）
+        const exEl = document.getElementById('idiom-q-example');
+        if (exEl && !exEl.querySelector('.idiom-chunk-hint')) exEl.insertAdjacentHTML('beforeend', `<div class="idiom-chunk-hint idiom-chunk-answer">${escHtml(q.item.ja)}</div>`);
+      }
 
-    document.getElementById('idiom-reveal-phrase').textContent = q.item.phrase;
-    document.getElementById('idiom-reveal-answer-stats').innerHTML = idiomAnswerStatsHtml(key);
-    document.getElementById('idiom-reveal-category').textContent = q.item.categoryLabel;
-    document.getElementById('idiom-reveal-freq').innerHTML = freqBadgeHtml(q.item.freq, 'id', q.item.no);
-    document.getElementById('idiom-reveal-meaning').textContent = q.item.meaning;
-    const nuanceEl = document.getElementById('idiom-reveal-nuance');
-    if (q.item.nuance) { nuanceEl.innerHTML = '💡 ' + escHtml(q.item.nuance) + altHtml(q.item); nuanceEl.hidden = false; }
-    else { nuanceEl.textContent = ''; nuanceEl.hidden = true; }
-    document.getElementById('idiom-reveal-ex').textContent = q.item.ex;
-    document.getElementById('idiom-reveal-speak-btn').dataset.text = q.item.ex || '';
-    document.getElementById('idiom-reveal-ja').textContent = q.item.ja;
-    const etymEl = document.getElementById('idiom-reveal-etym');
-    if (q.item.etymology) { etymEl.innerHTML = etymHtml(q.item.etymology, ''); etymEl.hidden = false; }
-    else { etymEl.innerHTML = ''; etymEl.hidden = true; }
-    document.getElementById('idiom-reveal-box').hidden = false;
+      document.getElementById('idiom-reveal-phrase').textContent = q.item.phrase;
+      document.getElementById('idiom-reveal-answer-stats').innerHTML = idiomAnswerStatsHtml(key);
+      document.getElementById('idiom-reveal-category').textContent = q.item.categoryLabel;
+      document.getElementById('idiom-reveal-freq').innerHTML = freqBadgeHtml(q.item.freq, 'id', q.item.no);
+      document.getElementById('idiom-reveal-meaning').textContent = q.item.meaning;
+      const nuanceEl = document.getElementById('idiom-reveal-nuance');
+      if (q.item.nuance) { nuanceEl.innerHTML = '💡 ' + escHtml(q.item.nuance) + altHtml(q.item); nuanceEl.hidden = false; }
+      else { nuanceEl.textContent = ''; nuanceEl.hidden = true; }
+      document.getElementById('idiom-reveal-ex').textContent = q.item.ex;
+      document.getElementById('idiom-reveal-speak-btn').dataset.text = q.item.ex || '';
+      document.getElementById('idiom-reveal-ja').textContent = q.item.ja;
+      const etymEl = document.getElementById('idiom-reveal-etym');
+      if (q.item.etymology) { etymEl.innerHTML = etymHtml(q.item.etymology, ''); etymEl.hidden = false; }
+      else { etymEl.innerHTML = ''; etymEl.hidden = true; }
+      document.getElementById('idiom-reveal-box').hidden = false;
 
-    const markWrongBtn = document.getElementById('idiom-mark-wrong-btn');
-    if (ok) {
-      markWrongBtn.hidden = false;
-      markWrongBtn.disabled = false;
-      markWrongBtn.onclick = () => markIdiomAsWrong(q);
-    } else {
-      markWrongBtn.hidden = true;
-    }
+      const markWrongBtn = document.getElementById('idiom-mark-wrong-btn');
+      if (ok) {
+        markWrongBtn.hidden = false;
+        markWrongBtn.disabled = false;
+        markWrongBtn.onclick = () => markIdiomAsWrong(q);
+      } else {
+        markWrongBtn.hidden = true;
+      }
+    };
+    delay ? setTimeout(show, 350) : show();
   }
 
   function markIdiomAsWrong(q) {

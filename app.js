@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '253'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '254'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -81,6 +81,11 @@ function baseForm(verb) {
 function wordKey(w) {
   if (!w) return '';
   return (typeof w.no === 'number') ? 'n' + w.no : 'v' + baseForm(w.verb);
+}
+// 句動詞のパーティクル（2語目）。例: pull off → "off"
+function particleOf(w) {
+  const parts = baseForm(w.verb).toLowerCase().split(' ');
+  return parts.length > 1 ? parts[1] : '';
 }
 function findWordByKey(key) {
   if (!key) return null;
@@ -247,7 +252,7 @@ function highlightVerbInChunk(chunk, verb) {
 // ===================== クイズエンジン =====================
 let quizState = null;
 
-function buildQuiz(stageFilter, count, weakOn, srsOn, newOn, freq) {
+function buildQuiz(stageFilter, count, weakOn, srsOn, newOn, freq, particle) {
   const words = allWords();
   const weak = loadJSON(LS.WEAK, {});
   const weakKeys = Object.keys(weak);
@@ -257,6 +262,7 @@ function buildQuiz(stageFilter, count, weakOn, srsOn, newOn, freq) {
 
   let pool = stageFilter ? words.filter(w => w.stage === stageFilter) : words.slice();
   if (freq && freq !== 'all') pool = pool.filter(w => w.freq === freq);
+  if (particle && particle !== 'all') pool = pool.filter(w => particleOf(w) === particle);
 
   // 苦手語・復習・未学習のいずれかがONなら、チェックした条件の語だけから100%出題する（優先度の概念なし）
   // 「未学習」ボタン単独のときは絞り込まず、解答回数が少ない語から順に出す（0回の語が先、足りなければ1回、2回…）
@@ -377,7 +383,7 @@ function lastMissKeys() {
 // セッションを優先度つきに合体する: 鬼門 → 前回の誤答 → 復習期限 → 苦手 → 通常。
 // 復習系（鬼門〜苦手）は全体の最大4割まで。ただし鬼門だけは枠を超えても全量優先する。
 const MIX_TIER_NAMES = { 1: '鬼門', 2: '前回の誤答', 3: '復習期限', 4: '苦手', 5: '通常' };
-function classifyMixPool(stageFilter, freq) {
+function classifyMixPool(stageFilter, freq, particle) {
   const words = allWords();
   const kimon = syncKimonRegistry();
   const weak = loadJSON(LS.WEAK, {});
@@ -386,6 +392,7 @@ function classifyMixPool(stageFilter, freq) {
   const isDue = w => { const s = srsScore(wordKey(w)); return s !== null && s <= 0; };
   let pool = stageFilter ? words.filter(w => w.stage === stageFilter) : words.slice();
   if (freq && freq !== 'all') pool = pool.filter(w => w.freq === freq);
+  if (particle && particle !== 'all') pool = pool.filter(w => particleOf(w) === particle);
   const tiers = { 1: [], 2: [], 3: [], 4: [], 5: [] };
   pool.forEach(w => {
     const key = wordKey(w);
@@ -424,19 +431,20 @@ function selectMixPicks(tiers, count) {
   const tail = declusterByGroup(shuffle(tailPicks.map(p => p.w))).map(w => ({ w, tier: tierByWord.get(w) }));
   return head.concat(tail);
 }
-function buildMixedQuiz(stageFilter, count, freq) {
-  const picked = selectMixPicks(classifyMixPool(stageFilter, freq), count);
+function buildMixedQuiz(stageFilter, count, freq, particle) {
+  const picked = selectMixPicks(classifyMixPool(stageFilter, freq, particle), count);
   const qs = makeQuestions(picked.map(p => p.w), allWords());
   const tierByWord = new Map(picked.map(p => [p.w, p.tier]));
   qs.forEach(q => { q.tier = tierByWord.get(q.word); });
   return qs;
 }
-function buildKimonQuiz(stageFilter, count, freq) {
+function buildKimonQuiz(stageFilter, count, freq, particle) {
   const kimon = syncKimonRegistry();
   const answered = loadJSON(LS_ANSWERED, {});
   let pool = allWords().filter(w => wordKey(w) in kimon);
   if (stageFilter) pool = pool.filter(w => w.stage === stageFilter);
   if (freq && freq !== 'all') pool = pool.filter(w => w.freq === freq);
+  if (particle && particle !== 'all') pool = pool.filter(w => particleOf(w) === particle);
   pool.sort((a, b) => (answered[wordKey(a)]?.lastAt || 0) - (answered[wordKey(b)]?.lastAt || 0)); // 放置が長い順に選ぶ
   const picks = shuffle(pool.slice(0, count)); // 出す順番はランダム
   const qs = makeQuestions(picks, allWords());
@@ -859,6 +867,18 @@ document.getElementById('quiz-stage').addEventListener('change', () => { saveQui
   const saved = localStorage.getItem('pv_quiz_freq');
   if (saved && [...sel.options].some(o => o.value === saved)) sel.value = saved;
   sel.addEventListener('change', () => { localStorage.setItem('pv_quiz_freq', sel.value); if (typeof renderDictProgress === 'function') renderDictProgress(); });
+})();
+// パーティクル選択肢は、収録語に実際に出てくるものを語数が多い順に並べる
+(() => {
+  const sel = document.getElementById('quiz-particle');
+  const counts = {};
+  PV_DATA.forEach(w => { const p = particleOf(w); if (p) counts[p] = (counts[p] || 0) + 1; });
+  Object.keys(counts).sort((a, b) => counts[b] - counts[a]).forEach(p => {
+    const o = document.createElement('option'); o.value = p; o.textContent = p; sel.appendChild(o);
+  });
+  const saved = localStorage.getItem('pv_quiz_particle');
+  if (saved && [...sel.options].some(o => o.value === saved)) sel.value = saved;
+  sel.addEventListener('change', () => { localStorage.setItem('pv_quiz_particle', sel.value); if (typeof renderDictProgress === 'function') renderDictProgress(); });
 })();
 
 let quizCount = parseInt(localStorage.getItem('pv_quiz_count'), 10);
@@ -1670,6 +1690,21 @@ function finishQuestion(ok, method, delay, userAnswer) {
   syncLeaderboard(q.word, ok);
   if (ok) quizState.correctCount++;
   quizState.results.push({ verb: q.answer, ok, q });
+  // セッション内リトライ: 間違えた語を、そのセッションの少し後（約8問後）にもう一度出す。
+  // 1語につき1回まで・1セッション20回まで。ミックス出題（1問ずつの状態）では行わない
+  if (!ok && !q.isRetry && quizState.questions.length > 1) {
+    quizState.retriedKeys = quizState.retriedKeys || new Set();
+    if (!quizState.retriedKeys.has(key) && quizState.retriedKeys.size < 20) {
+      quizState.retriedKeys.add(key);
+      const retryQs = makeQuestions([q.word], allWords());
+      if (retryQs.length) {
+        const rq = retryQs[0];
+        rq.isRetry = true;
+        if (q.tier) rq.tier = q.tier;
+        quizState.questions.splice(Math.min(quizState.idx + 8, quizState.questions.length), 0, rq);
+      }
+    }
+  }
 
   const reveal = document.getElementById('reveal-box');
   document.getElementById('reveal-verb').textContent = q.answer;
@@ -1957,7 +1992,8 @@ function renderDictProgress() {
   // 苦手・復習・未学習ボタンの語数は、クイズの範囲・使用頻度の設定に合わせて数える
   const qStage = parseInt(document.getElementById('quiz-stage').value, 10) || 0;
   const qFreq = document.getElementById('quiz-freq').value;
-  const qWords = words.filter(w => (!qStage || w.stage === qStage) && (qFreq === 'all' || w.freq === qFreq));
+  const qParticle = document.getElementById('quiz-particle').value;
+  const qWords = words.filter(w => (!qStage || w.stage === qStage) && (qFreq === 'all' || w.freq === qFreq) && (qParticle === 'all' || particleOf(w) === qParticle));
   let qWeak = 0, qNew = 0;
   qWords.forEach(w => {
     const key = wordKey(w);
@@ -1970,7 +2006,7 @@ function renderDictProgress() {
   const kimonMap = syncKimonRegistry();
   document.getElementById('dp-kimon-num').textContent = qWords.filter(w => wordKey(w) in kimonMap).length;
   // おまかせミックスの内訳プレビュー（実際に出題される構成をそのまま数える）
-  const previewPicks = selectMixPicks(classifyMixPool(qStage, qFreq), quizCount);
+  const previewPicks = selectMixPicks(classifyMixPool(qStage, qFreq, qParticle), quizCount);
   const cnt = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   previewPicks.forEach(p => { cnt[p.tier]++; });
   document.getElementById('mix-preview').textContent =
@@ -1985,9 +2021,10 @@ function quickStartQuiz(kind) {
   const newOn = kind === 'unlearned';
   const stage = parseInt(document.getElementById('quiz-stage').value, 10) || 0;
   const freq = document.getElementById('quiz-freq').value;
-  const qs = kind === 'mix' ? buildMixedQuiz(stage, quizCount, freq)
-    : kind === 'kimon' ? buildKimonQuiz(stage, quizCount, freq)
-    : buildQuiz(stage, quizCount, weakOn, srsOn, newOn, freq);
+  const particle = document.getElementById('quiz-particle').value;
+  const qs = kind === 'mix' ? buildMixedQuiz(stage, quizCount, freq, particle)
+    : kind === 'kimon' ? buildKimonQuiz(stage, quizCount, freq, particle)
+    : buildQuiz(stage, quizCount, weakOn, srsOn, newOn, freq, particle);
   if (!qs.length) { toast('該当する語がありませんでした'); return; }
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelector('.tab[data-tab="quiz"]').classList.add('active');

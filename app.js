@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '257'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '258'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -771,17 +771,66 @@ function flushPendingCloud() {
 window.addEventListener('online', flushPendingCloud);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') flushPendingCloud(); });
 
+// 回答ログ（1日分）を、クラウド側と端末側で合体させる。
+// セッションID（s）は1つの端末でしか生まれないので、セッション単位で分ければ
+// 別端末同士の記録が混ざらない。同じセッション同士は「多い方」を採用し、
+// 同数なら端末側（今まさに回答・訂正した側）を優先する。
+function mergeAnswerLogEntries(cloudEntries, localEntries) {
+  const norm = (v) => {
+    if (Array.isArray(v)) return v;
+    if (v && typeof v === 'object') return Object.keys(v).sort((a, b) => a - b).map(k => v[k]);
+    return [];
+  };
+  const group = (arr) => {
+    const m = new Map();
+    arr.forEach(e => {
+      const s = (e && e.s) || '';
+      if (!m.has(s)) m.set(s, []);
+      m.get(s).push(e);
+    });
+    return m;
+  };
+  const cArr = norm(cloudEntries), lArr = norm(localEntries);
+  const cg = group(cArr), lg = group(lArr);
+  const out = [];
+  const seen = new Set();
+  cArr.forEach(e => {
+    const s = (e && e.s) || '';
+    if (seen.has(s)) return;
+    seen.add(s);
+    const c = cg.get(s) || [], l = lg.get(s) || [];
+    out.push(...(c.length > l.length ? c : l));
+  });
+  lArr.forEach(e => {
+    const s = (e && e.s) || '';
+    if (seen.has(s)) return;
+    seen.add(s);
+    out.push(...(lg.get(s) || []));
+  });
+  return out;
+}
+
 function pushAnswerLogToCloud(dateKey, entries) {
   const db = initFirebase();
   if (!db) return;
   const nickname = getNickname();
   if (!nickname) return;
-  const pAl = [db.ref(`users/${nickname}/answerLog/${dateKey}`).set(entries)];
-  // 日別の回答数（数字のみ）を公開カウンタにも記録する。
-  // Muse がログインなしでその日の進捗（解いた問題数）を確認するために使う。
-  // 回答内容は含まない。読み取り側は dailyCounts のみ公開ルールで許可される。
-  pAl.push(db.ref(`dailyCounts/${nickname}/${dateKey}`).set(entries.length));
-  trackCloudWrite('a', dateKey, Promise.all(pAl));
+  // 端末の内容でいきなり上書きせず、まずクラウド側と合体させてから書く。
+  // 記録の少ない別のブラウザで解き始めても、その日の記録が消えないようにするため。
+  const job = db.ref(`users/${nickname}/answerLog/${dateKey}`).get().then(snap => {
+    const merged = mergeAnswerLogEntries(snap.val(), entries);
+    // 端末側も合体結果にそろえる（次回からどちらで開いても同じ内容になる）
+    const all = loadJSON(LS.ANSWER_LOG, {});
+    if ((all[dateKey] || []).length !== merged.length) { all[dateKey] = merged; saveJSON(LS.ANSWER_LOG, all); }
+    return Promise.all([
+      db.ref(`users/${nickname}/answerLog/${dateKey}`).set(merged),
+      // 日別の回答数（数字のみ）を公開カウンタにも記録する。
+      // Muse がログインなしでその日の進捗（解いた問題数）を確認するために使う。
+      // 回答内容は含まない。読み取り側は dailyCounts のみ公開ルールで許可される。
+      db.ref(`dailyCounts/${nickname}/${dateKey}`).set(merged.length)
+    ]);
+  });
+  trackCloudWrite('a', dateKey, job);
 }
 // ---------- 公開カウンタ(dailyCounts)の過去分バックフィル ----------
 // dailyCounts は 2026-11-16 から記録し始めたため、それ以前に解いた日は公開カウンタに無い。
@@ -3580,6 +3629,19 @@ function pullAndMergeCloud(nickname, verbose) {
         }
       });
       if (sub) { saveJSON(LS.LOG, localLog); changed = true; }
+    }
+
+    // 回答ログ（日ごとの明細）も取り込む。これが無いと、まっさらなブラウザで
+    // 解き始めた時に、その日のクラウド側の明細を少ない件数で上書きしてしまう。
+    if (cloud.answerLog && typeof cloud.answerLog === 'object') {
+      const localAL = loadJSON(LS.ANSWER_LOG, {});
+      let sub = false;
+      Object.entries(cloud.answerLog).forEach(([date, ca]) => {
+        if (!Array.isArray(ca)) return;
+        const merged = mergeAnswerLogEntries(ca, localAL[date]);
+        if (merged.length !== (localAL[date] || []).length) { localAL[date] = merged; sub = true; }
+      });
+      if (sub) { saveJSON(LS.ANSWER_LOG, localAL); changed = true; }
     }
 
     if (cloud.answered && typeof cloud.answered === 'object') {

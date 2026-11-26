@@ -698,3 +698,5 @@ select{
 /* 再生ボタンが出ている間は、出題文の最小の高さをなくして、文とボタンの間をあけすぎない */
 .question-text:has(+ .pv-q-speak:not([hidden])){min-height:0;}
 #idiom-q-example .speak-btn{display:inline-block; margin:8px 0 0 6px; vertical-align:middle;}
+
+.weak-breakdown{margin-left:8px; font-size:11.5px; font-weight:500; color:var(--ink-soft); letter-spacing:0;}

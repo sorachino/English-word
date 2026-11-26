@@ -3,7 +3,7 @@
 // ズレていた場合、以降のコードで何が起きても分かるよう、まず警告バナーを出す。
 (function checkBuildVersion() {
   try {
-    const EXPECTED_BUILD = '228'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
+    const EXPECTED_BUILD = '229'; // ← app.jsのバージョンを上げるたびに、index.htmlのmeta build-versionと必ず揃えること
     const meta = document.querySelector('meta[name="build-version"]');
     const htmlBuild = meta ? meta.getAttribute('content') : null;
     window.__APP_BUILD = { js: EXPECTED_BUILD, html: htmlBuild }; // ヘッダーのバージョン表示用
@@ -2857,58 +2857,71 @@ function renderStats() {
     chart.appendChild(col);
   });
 
+  pruneOrphanWeak(); // データに無い語の苦手記録（端末・クラウドとも）を先に消す
   const weak = loadJSON(LS.WEAK, {});
-  const keys = Object.keys(weak);
-  document.getElementById('weak-total').textContent = keys.length;
+  const idWeakAll = loadJSON(LS_IDIOM_WEAK, {});
+  const idByKey = {};
+  (typeof IDIOM_DATA !== 'undefined' ? IDIOM_DATA : []).forEach(it => { idByKey[idiomKey(it)] = it; });
+  // 句動詞・熟語をまとめて、苦手の度合いが高い順に並べる（ミックスの「苦手語」と同じ数え方）
+  const entries = [];
+  Object.keys(weak).forEach(k => {
+    const word = findWordByKey(k); if (!word) return;
+    const w = weak[k], p = [];
+    if (w.wrong) p.push('誤答' + w.wrong);
+    if (w.choice) p.push('4択' + w.choice);
+    if (w.hint) p.push('ヒント' + w.hint);
+    entries.push({ type: 'pv', key: k, label: baseForm(word.verb), sub: p.join(' '), score: (w.wrong || 0) * 3 + (w.choice || 0) * 2 + (w.hint || 0), heavy: ((w.wrong || 0) + (w.choice || 0)) > 0, word });
+  });
+  Object.keys(idWeakAll).forEach(k => {
+    const item = idByKey[k]; if (!item) return;
+    const n = idWeakAll[k].wrong || 0;
+    entries.push({ type: 'id', key: k, label: item.phrase, sub: n ? '誤答' + n : '', score: n * 3, heavy: true, item });
+  });
+  entries.sort((x, y) => y.score - x.score);
+  const pvN = entries.filter(e => e.type === 'pv').length, idN = entries.length - pvN;
+  document.getElementById('weak-total').textContent = entries.length;
+  const bd = document.getElementById('weak-breakdown');
+  if (bd) bd.textContent = `句動詞${pvN}・熟語${idN}`;
   const wl = document.getElementById('weak-list');
   wl.innerHTML = '';
-  document.getElementById('weak-empty').hidden = keys.length > 0;
-  const sortedKeys = keys.slice().sort((a, b) => {
-    const sa = weak[a].wrong * 3 + weak[a].choice * 2 + weak[a].hint;
-    const sb = weak[b].wrong * 3 + weak[b].choice * 2 + weak[b].hint;
-    return sb - sa;
-  });
-  function buildWeakChip(k) {
-    const word = findWordByKey(k);
-    const verbText = word ? baseForm(word.verb) : k;
-    const w = weak[k];
-    const heavy = (w.wrong + w.choice) > 0;
+  document.getElementById('weak-empty').hidden = entries.length > 0;
+  function detailItems() {
+    return entries.map(e => e.type === 'pv'
+      ? { key: e.key, verb: e.label, ok: null, sub: e.sub, word: e.word }
+      : Object.assign(window.__idiomDetailItem(e.item, null), { key: e.key, sub: e.sub }));
+  }
+  function buildWeakChip(e) {
     const chip = document.createElement('span');
-    chip.className = 'weak-chip' + (heavy ? '' : ' hint');
-    const parts = [];
-    if (w.wrong) parts.push('誤答' + w.wrong);
-    if (w.choice) parts.push('4択' + w.choice);
-    if (w.hint) parts.push('ヒント' + w.hint);
-    const sub = parts.join(' ');
-    chip.textContent = verbText + ' ×' + sub;
+    chip.className = 'weak-chip' + (e.heavy ? '' : ' hint');
+    chip.textContent = (e.type === 'id' ? '［熟］' : '') + e.label + ' ×' + e.sub;
     chip.addEventListener('click', () => {
-      const items = sortedKeys.map(kk => {
-        const ww = weak[kk];
-        const p = [];
-        if (ww.wrong) p.push('誤答' + ww.wrong);
-        if (ww.choice) p.push('4択' + ww.choice);
-        if (ww.hint) p.push('ヒント' + ww.hint);
-        const word2 = findWordByKey(kk);
-        return { key: kk, verb: word2 ? baseForm(word2.verb) : kk, ok: null, sub: p.join(' '), word: word2 };
-      }).filter(it => it.word);
-      const idx = items.findIndex(it => it.key === k);
-      if (idx === -1) { toast('この語の例文データが見つかりませんでした'); return; }
-      openDetailModal(items, idx);
+      if (entries.some(x => x.type === 'id') && !window.__idiomDetailItem) { toast('読み込み中です。少し待ってからもう一度お試しください'); return; }
+      const items = detailItems();
+      openDetailModal(items, entries.indexOf(e));
     });
     return chip;
   }
   const WEAK_LIMIT = 20;
-  sortedKeys.slice(0, WEAK_LIMIT).forEach(k => wl.appendChild(buildWeakChip(k)));
-  if (sortedKeys.length > WEAK_LIMIT) {
+  entries.slice(0, WEAK_LIMIT).forEach(e => wl.appendChild(buildWeakChip(e)));
+  if (entries.length > WEAK_LIMIT) {
     const moreChip = document.createElement('span');
     moreChip.className = 'weak-chip weak-chip-more';
-    moreChip.textContent = `他${sortedKeys.length - WEAK_LIMIT}語を表示 ▾`;
+    moreChip.textContent = `他${entries.length - WEAK_LIMIT}語を表示 ▾`;
     moreChip.addEventListener('click', () => {
-      sortedKeys.slice(WEAK_LIMIT).forEach(k => wl.insertBefore(buildWeakChip(k), moreChip));
+      entries.slice(WEAK_LIMIT).forEach(e => wl.insertBefore(buildWeakChip(e), moreChip));
       moreChip.remove();
     });
     wl.appendChild(moreChip);
   }
+}
+// 内蔵データに存在しない番号（n数字）の苦手記録は、一覧にも出ず出題もされないので、端末とクラウドから消す
+function pruneOrphanWeak() {
+  const weak = loadJSON(LS.WEAK, {});
+  const orphans = Object.keys(weak).filter(k => /^n\d+$/.test(k) && !PV_DATA.some(w => 'n' + w.no === k));
+  if (!orphans.length) return;
+  orphans.forEach(k => delete weak[k]);
+  saveJSON(LS.WEAK, weak);
+  orphans.forEach(k => pushWordStateByKey(k)); // 端末側に無くなったので、クラウドの苦手記録も消える
 }
 function calcStreak(log) {
   let streak = 0;
@@ -4721,6 +4734,7 @@ function recordIdiomAnswerLog(mode, item, ok, sessionId) {
     html += `</div>`;
     return { verb: item.phrase, ok, html };
   }
+  window.__idiomDetailItem = idiomDetailItem;
   function renderIdiomDoneList(results) {
     const list = document.getElementById('idiom-done-list');
     list.innerHTML = '';
